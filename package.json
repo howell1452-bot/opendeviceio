@@ -1,0 +1,15 @@
+{
+  "name": "opendeviceio",
+  "version": "0.1.0",
+  "private": true,
+  "description": "OpenDeviceIO (ODIO) — an open, machine-readable format for describing hardware device I/O. Root dev tooling and conformance runner.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "validate:examples": "node tools/validate-examples.mjs"
+  },
+  "devDependencies": {
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1"
+  }
+}
