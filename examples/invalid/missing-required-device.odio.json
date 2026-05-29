@@ -8,8 +8,9 @@
       "id": "hdmi-in",
       "direction": "input",
       "connector": "hdmi-type-a",
-      "signals": [{ "domain": "video", "standard": "hdmi-2.0" }]
+      "link": { "type": "hdmi", "standard": "hdmi-2.0" },
+      "signals": [{ "domain": "video", "transport": "hdmi" }]
     }
   ],
-  "x-invalid-reason": "device.model is required but missing."
+  "x-invalid-reason": "device.model is required but missing. Everything else is valid."
 }

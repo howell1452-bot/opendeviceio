@@ -8,7 +8,7 @@
       "id": "weird-port",
       "direction": "output",
       "connector": "other",
-      "signals": [{ "domain": "control", "protocol": "rs-232" }]
+      "signals": [{ "domain": "control", "transport": "rs-232" }]
     }
   ],
   "x-invalid-reason": "connector is 'other' but connectorOther is not provided (conditionally required)."

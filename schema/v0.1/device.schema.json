@@ -6,10 +6,7 @@
   "type": "object",
   "required": ["odioVersion", "id", "device", "ports"],
   "properties": {
-    "$schema": {
-      "type": "string",
-      "description": "URI of the schema this document conforms to."
-    },
+    "$schema": { "type": "string", "description": "URI of the schema this document conforms to." },
     "odioVersion": {
       "type": "string",
       "description": "Semantic version of the OpenDeviceIO format this file conforms to.",
@@ -17,7 +14,7 @@
     },
     "id": {
       "type": "string",
-      "description": "Stable, URL-safe device identifier derived as slug(manufacturer)/slug(model)[@slug(revision)].",
+      "description": "Stable, URL-safe device identifier: slug(manufacturer)/slug(model)[@slug(revision)]. Slug rule: lowercase; '+' -> '-plus'; runs of other non [a-z0-9._-] characters -> '-'.",
       "pattern": "^[a-z0-9][a-z0-9-]*\\/[a-z0-9][a-z0-9._-]*(?:@[a-z0-9][a-z0-9._-]*)?$"
     },
     "device": { "$ref": "#/$defs/device" },
@@ -28,10 +25,7 @@
     },
     "power": { "$ref": "#/$defs/power" },
     "physical": { "$ref": "#/$defs/physical" },
-    "standards": {
-      "type": "array",
-      "items": { "$ref": "#/$defs/standard" }
-    },
+    "standards": { "type": "array", "items": { "$ref": "#/$defs/standard" } },
     "parameters": { "$ref": "#/$defs/parameters" },
     "provenance": { "$ref": "#/$defs/provenance" }
   },
@@ -65,49 +59,22 @@
 
     "port": {
       "type": "object",
-      "description": "One externally accessible connector (or a group of identical connectors) and the signals it carries.",
+      "description": "One externally accessible connector (or a group of identical connectors), the physical link it provides, and the logical signal flows it carries.",
       "required": ["id", "direction", "connector", "signals"],
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Identifier unique within this device.",
-          "pattern": "^[a-z0-9][a-z0-9._-]*$"
-        },
-        "label": {
-          "type": "string",
-          "description": "Human-facing label as silkscreened on the device, e.g. 'HDMI INPUT 1'."
-        },
+        "id": { "type": "string", "description": "Identifier unique within this device.", "pattern": "^[a-z0-9][a-z0-9._-]*$" },
+        "label": { "type": "string", "description": "Human-facing label as silkscreened on the device, e.g. 'HDMI INPUT 1'." },
         "direction": {
           "type": "string",
+          "description": "Overall port direction. Individual signal flows may override via signal.direction.",
           "enum": ["input", "output", "bidirectional"]
         },
-        "connector": {
-          "type": "string",
-          "description": "Controlled connector vocabulary. Use 'other' with connectorOther when not listed.",
-          "enum": [
-            "hdmi-type-a", "hdmi-type-c", "hdmi-type-d",
-            "displayport", "mini-displayport",
-            "usb-a", "usb-b", "usb-c", "usb-micro-b",
-            "rj45", "rj11", "sfp", "sfp+", "sfp28", "qsfp+",
-            "xlr-3-m", "xlr-3-f", "xlr-5-m", "xlr-5-f",
-            "euroblock-3.5mm", "euroblock-5.08mm", "phoenix", "terminal-block",
-            "rca", "bnc", "f-type", "3.5mm-trs", "3.5mm-trrs", "6.35mm-trs",
-            "speakon", "binding-post", "banana",
-            "db9", "db15", "db25", "hd15-vga",
-            "optical-st", "optical-sc", "optical-lc", "toslink",
-            "iec-c8", "iec-c14", "iec-c20", "barrel-dc", "phoenix-power",
-            "captive-screw", "other"
-          ]
-        },
-        "connectorOther": {
-          "type": "string",
-          "description": "Free-text connector name; required when connector is 'other'."
-        },
+        "connector": { "$ref": "#/$defs/connector" },
+        "connectorOther": { "type": "string", "description": "Free-text connector name; required when connector is 'other'." },
         "count": {
           "type": "integer",
           "description": "Number of identical, separately addressable connectors collapsed into this entry. Use individual entries when labels or positions differ.",
-          "minimum": 1,
-          "default": 1
+          "minimum": 1, "default": 1
         },
         "poleCount": {
           "type": "integer",
@@ -129,9 +96,10 @@
             "additionalProperties": false
           }
         },
+        "link": { "$ref": "#/$defs/link" },
         "signals": {
           "type": "array",
-          "description": "One or more signal domains carried by this connector.",
+          "description": "One or more concurrent logical signal flows carried by this connector. A single network or USB connector commonly carries several (e.g. Dante + AES67 + AV-over-IP + control + general LAN).",
           "minItems": 1,
           "items": { "$ref": "#/$defs/signal" }
         },
@@ -151,32 +119,92 @@
       "patternProperties": { "^x-": {} },
       "additionalProperties": false,
       "allOf": [
-        {
-          "if": { "properties": { "connector": { "const": "other" } } },
-          "then": { "required": ["connectorOther"] }
-        }
+        { "if": { "properties": { "connector": { "const": "other" } } }, "then": { "required": ["connectorOther"] } }
       ]
     },
 
-    "signal": {
+    "connector": {
+      "type": "string",
+      "description": "Controlled connector (physical jack) vocabulary. Use 'other' with connectorOther when not listed. The connector describes the jack only; the transmission standard belongs in port.link and the carried flows in port.signals.",
+      "enum": [
+        "hdmi-type-a", "hdmi-type-b", "hdmi-type-c", "hdmi-type-d",
+        "displayport", "mini-displayport",
+        "dvi-d", "dvi-i", "dvi-a", "hd15-vga",
+        "usb-a", "usb-b", "usb-b-mini", "usb-b-micro", "usb-c",
+        "rj45", "rj45-shielded", "ethercon",
+        "sfp", "sfp+", "sfp28", "qsfp", "qsfp+", "qsfp28",
+        "fiber-lc", "fiber-lc-duplex", "fiber-sc", "fiber-st", "fiber-mpo", "fiber-mtp", "opticalcon",
+        "bnc", "bnc-din-1.0-2.3", "rca", "f-type", "toslink", "mini-toslink",
+        "xlr-3-m", "xlr-3-f", "xlr-5-m", "xlr-5-f", "mini-xlr-3", "mini-xlr-4", "xlr-combo",
+        "euroblock-3.5mm", "euroblock-5.08mm", "phoenix", "terminal-block", "captive-screw",
+        "trs-3.5mm", "trrs-3.5mm", "ts-6.35mm", "trs-6.35mm",
+        "speakon-nl2", "speakon-nl4", "speakon-nl8", "binding-post", "banana",
+        "db9", "db15", "db25", "rj11", "rj12",
+        "sma", "rp-sma", "tnc", "n-type",
+        "iec-c8", "iec-c14", "iec-c16", "iec-c20", "powercon", "powercon-true1", "nema-5-15", "barrel-dc", "phoenix-power",
+        "other"
+      ]
+    },
+
+    "link": {
       "type": "object",
-      "description": "A signal domain carried by a port. The 'domain' discriminates the attribute set.",
-      "required": ["domain"],
-      "oneOf": [
-        { "$ref": "#/$defs/signalVideo" },
-        { "$ref": "#/$defs/signalAudio" },
-        { "$ref": "#/$defs/signalNetwork" },
-        { "$ref": "#/$defs/signalControl" },
-        { "$ref": "#/$defs/signalUsb" },
-        { "$ref": "#/$defs/signalPower" }
+      "description": "The physical transmission layer ('pipe') a port provides, independent of the logical flows it carries. PoE, link speed, USB power delivery, and fiber characteristics live here once per port rather than being duplicated across flows.",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["ethernet", "usb", "thunderbolt", "sdi", "hdmi", "displayport", "dvi", "vga", "analog-audio", "aes3", "fiber", "coax", "twisted-pair", "wireless", "mains", "dc", "other"]
+        },
+        "typeOther": { "type": "string" },
+        "standard": { "type": "string", "description": "Transmission standard/version, e.g. 'hdmi-2.1', 'dp-1.4', '12g-sdi', 'hdbaset-3', 'usb-3.2-gen2', '1000base-t'." },
+        "speed": { "type": "string", "description": "Link speed where applicable, e.g. '100m', '1g', '2.5g', '5g', '10g', '25g', '40g', '100g'." },
+        "bandwidthGbps": { "type": "number", "exclusiveMinimum": 0, "description": "Raw link bandwidth in Gbps, when useful." },
+        "poe": {
+          "type": "object",
+          "description": "Power over Ethernet capability of this link.",
+          "properties": {
+            "standard": { "type": "string", "enum": ["802.3af", "802.3at", "802.3bt-type3", "802.3bt-type4", "passive", "other"] },
+            "role": { "type": "string", "enum": ["pse", "pd"], "description": "pse = sources power; pd = consumes power." },
+            "classWatts": { "type": "number", "exclusiveMinimum": 0 }
+          },
+          "patternProperties": { "^x-": {} },
+          "additionalProperties": false
+        },
+        "powerDeliveryWatts": { "type": "number", "minimum": 0, "description": "USB Power Delivery budget on this link, in watts." },
+        "usbRole": { "type": "string", "enum": ["host", "device", "dual-role"], "description": "Physical USB role of the connector." },
+        "fiberMode": { "type": "string", "enum": ["single-mode", "multi-mode"] },
+        "fiberStrands": { "type": "integer", "minimum": 1 },
+        "notes": { "type": "string" }
+      },
+      "patternProperties": { "^x-": {} },
+      "additionalProperties": false,
+      "allOf": [
+        { "if": { "properties": { "type": { "const": "other" } }, "required": ["type"] }, "then": { "required": ["typeOther"] } }
       ]
     },
 
     "channels": {
       "type": "integer",
-      "description": "Number of independent, separately-routable circuits of this signal carried by the port (default 1). A 3-pole RS-232 connector has channels=1; an 8-pole GPIO block has channels=8.",
-      "minimum": 1,
-      "default": 1
+      "description": "Number of independent, separately-routable circuits of this flow carried by the port (default 1). A 3-pole RS-232 connector has channels=1; an 8-pole GPIO block has channels=8.",
+      "minimum": 1, "default": 1
+    },
+    "signalDirection": {
+      "type": "string",
+      "description": "Direction of this specific flow; overrides the port direction when present.",
+      "enum": ["input", "output", "bidirectional"]
+    },
+
+    "signal": {
+      "type": "object",
+      "description": "A logical signal flow carried by a port. The 'domain' discriminates the attribute set; 'transport' names the protocol/standard carrying it.",
+      "required": ["domain"],
+      "oneOf": [
+        { "$ref": "#/$defs/signalVideo" },
+        { "$ref": "#/$defs/signalAudio" },
+        { "$ref": "#/$defs/signalControl" },
+        { "$ref": "#/$defs/signalNetwork" },
+        { "$ref": "#/$defs/signalData" },
+        { "$ref": "#/$defs/signalPower" }
+      ]
     },
 
     "signalVideo": {
@@ -184,20 +212,26 @@
       "required": ["domain"],
       "properties": {
         "domain": { "const": "video" },
-        "channels": { "$ref": "#/$defs/channels" },
-        "standard": {
+        "transport": {
           "type": "string",
-          "description": "e.g. 'hdmi-1.4', 'hdmi-2.0', 'hdmi-2.1', 'dp-1.4', 'dp-2.0', 'hdbaset', 'sdi-3g', 'sdi-12g', 'vga', 'dvi'."
+          "enum": ["hdmi", "displayport", "dvi", "vga", "component", "composite", "s-video", "sdi-3g", "sdi-6g", "sdi-12g", "hdbaset", "sdvoe", "ndi", "ndi-hx", "ipmx", "dante-av", "av-over-ip", "usb-uvc", "h.264", "h.265", "mjpeg", "other"]
         },
+        "transportOther": { "type": "string" },
+        "direction": { "$ref": "#/$defs/signalDirection" },
+        "channels": { "$ref": "#/$defs/channels" },
         "maxResolution": { "type": "string", "description": "e.g. '4096x2160' or '3840x2160'." },
         "maxRefreshHz": { "type": "number", "exclusiveMinimum": 0 },
         "colorDepthBits": { "type": "integer", "minimum": 1 },
         "chromaSubsampling": { "type": "string", "enum": ["4:4:4", "4:2:2", "4:2:0"] },
         "hdcp": { "type": "string", "description": "HDCP version, e.g. '1.4', '2.2', '2.3', or 'none'." },
-        "hdr": { "type": "array", "items": { "type": "string" }, "description": "Supported HDR formats, e.g. 'hdr10', 'dolby-vision'." }
+        "hdr": { "type": "array", "items": { "type": "string" }, "description": "Supported HDR formats, e.g. 'hdr10', 'hdr10+', 'dolby-vision', 'hlg'." },
+        "scaling": { "type": "boolean", "description": "Port performs scaling/format conversion." },
+        "edidManagement": { "type": "boolean" },
+        "notes": { "type": "string" }
       },
       "patternProperties": { "^x-": {} },
-      "additionalProperties": false
+      "additionalProperties": false,
+      "allOf": [ { "if": { "properties": { "transport": { "const": "other" } }, "required": ["transport"] }, "then": { "required": ["transportOther"] } } ]
     },
 
     "signalAudio": {
@@ -205,52 +239,28 @@
       "required": ["domain"],
       "properties": {
         "domain": { "const": "audio" },
-        "channels": { "$ref": "#/$defs/channels" },
-        "format": {
+        "transport": {
           "type": "string",
-          "description": "e.g. 'analog-line', 'analog-mic', 'analog-speaker', 'lpcm', 'aes3', 'spdif', 'adat', 'dante', 'aes67', 'avb', 'cobranet'."
+          "enum": ["analog", "lpcm", "aes3", "spdif", "adat", "madi", "arc", "earc", "dante", "aes67", "avb", "milan", "cobranet", "livewire", "usb-uac", "bluetooth", "other"]
         },
+        "transportOther": { "type": "string" },
+        "direction": { "$ref": "#/$defs/signalDirection" },
+        "channels": { "$ref": "#/$defs/channels" },
         "maxChannelsPerCircuit": { "type": "integer", "minimum": 1, "description": "Audio channels within one circuit (e.g. 2 for a stereo pair)." },
-        "levelDbu": { "type": "number", "description": "Nominal level in dBu (e.g. +4 for line, -10 for consumer ~ -7.78 dBu)." },
+        "networkChannels": { "type": "integer", "minimum": 1, "description": "For audio-over-IP, the number of network audio channels (e.g. Dante 64x64 -> 64)." },
+        "levelDbu": { "type": "number", "description": "Nominal level in dBu (e.g. +4 line, -10 consumer ~ -7.78 dBu)." },
         "impedanceOhms": { "type": "number", "exclusiveMinimum": 0 },
         "sampleRateHz": { "type": "integer", "exclusiveMinimum": 0 },
         "bitDepth": { "type": "integer", "minimum": 1 },
         "phantomPower": { "type": "boolean", "description": "48V phantom power available (typically mic inputs)." },
-        "balanced": { "type": "boolean" }
+        "balanced": { "type": "boolean" },
+        "gainDbRange": { "type": "string", "description": "Adjustable gain range, e.g. '0-60'." },
+        "maxSplDb": { "type": "number", "description": "Max SPL for a transducer, in dB." },
+        "notes": { "type": "string" }
       },
       "patternProperties": { "^x-": {} },
-      "additionalProperties": false
-    },
-
-    "signalNetwork": {
-      "type": "object",
-      "required": ["domain"],
-      "properties": {
-        "domain": { "const": "network" },
-        "channels": { "$ref": "#/$defs/channels" },
-        "speed": {
-          "type": "string",
-          "description": "Link speed, e.g. '10m', '100m', '1g', '2.5g', '5g', '10g', '25g', '40g'."
-        },
-        "poe": {
-          "type": "object",
-          "description": "Power over Ethernet capability on this port.",
-          "properties": {
-            "standard": { "type": "string", "enum": ["802.3af", "802.3at", "802.3bt-type3", "802.3bt-type4", "passive"] },
-            "role": { "type": "string", "enum": ["pse", "pd"], "description": "pse = sources power, pd = consumes power." },
-            "classWatts": { "type": "number", "exclusiveMinimum": 0 }
-          },
-          "patternProperties": { "^x-": {} },
-          "additionalProperties": false
-        },
-        "protocols": {
-          "type": "array",
-          "description": "AV/IT protocols transported, e.g. 'dante', 'aes67', 'ndi', 'sdvoe', 'av-over-ip', 'sip'.",
-          "items": { "type": "string" }
-        }
-      },
-      "patternProperties": { "^x-": {} },
-      "additionalProperties": false
+      "additionalProperties": false,
+      "allOf": [ { "if": { "properties": { "transport": { "const": "other" } }, "required": ["transport"] }, "then": { "required": ["transportOther"] } } ]
     },
 
     "signalControl": {
@@ -258,53 +268,86 @@
       "required": ["domain"],
       "properties": {
         "domain": { "const": "control" },
-        "channels": { "$ref": "#/$defs/channels" },
-        "protocol": {
+        "transport": {
           "type": "string",
-          "enum": ["rs-232", "rs-422", "rs-485", "ir", "gpio", "contact-closure", "relay", "ethernet", "cresnet", "i2c", "other"]
+          "enum": ["rs-232", "rs-422", "rs-485", "ir", "cec", "gpio", "contact-closure", "relay", "usb-hid", "usb-cdc", "cresnet", "knx", "dali", "dmx512", "artnet", "sacn", "onvif", "sip", "bacnet", "modbus", "mqtt", "http", "rest", "telnet", "ssh", "ip-control", "other"]
         },
-        "protocolOther": { "type": "string" },
+        "transportOther": { "type": "string" },
+        "direction": { "$ref": "#/$defs/signalDirection" },
+        "channels": { "$ref": "#/$defs/channels" },
         "baudRange": { "type": "string", "description": "e.g. '9600-115200'." },
-        "roles": { "type": "array", "items": { "type": "string" }, "description": "e.g. 'controller', 'controlled'." }
+        "irCarrierKhz": { "type": "number", "exclusiveMinimum": 0, "description": "IR carrier frequency, e.g. 38." },
+        "roles": { "type": "array", "items": { "type": "string" }, "description": "e.g. 'controller', 'controlled'." },
+        "busAddressable": { "type": "boolean", "description": "Bus protocol where multiple devices share the line (RS-485, DMX, KNX, DALI)." },
+        "maxBusDevices": { "type": "integer", "minimum": 1 },
+        "notes": { "type": "string" }
       },
       "patternProperties": { "^x-": {} },
       "additionalProperties": false,
-      "allOf": [
-        {
-          "if": { "properties": { "protocol": { "const": "other" } } },
-          "then": { "required": ["protocolOther"] }
-        }
-      ]
+      "allOf": [ { "if": { "properties": { "transport": { "const": "other" } }, "required": ["transport"] }, "then": { "required": ["transportOther"] } } ]
     },
 
-    "signalUsb": {
+    "signalNetwork": {
       "type": "object",
+      "description": "General IP connectivity / infrastructure flow (LAN, control network, management). Service-specific media flows that happen to ride Ethernet (Dante, AES67, SDVoE, NDI...) are modeled under their own domain (audio/video) with the matching transport.",
       "required": ["domain"],
       "properties": {
-        "domain": { "const": "usb" },
+        "domain": { "const": "network" },
+        "transport": {
+          "type": "string",
+          "enum": ["ethernet", "ip", "control-network", "av-network", "management", "vlan-trunk", "other"]
+        },
+        "transportOther": { "type": "string" },
+        "direction": { "$ref": "#/$defs/signalDirection" },
         "channels": { "$ref": "#/$defs/channels" },
-        "version": { "type": "string", "description": "e.g. '2.0', '3.2-gen1', '3.2-gen2', 'usb4'." },
-        "role": { "type": "string", "enum": ["host", "device", "dual-role"] },
-        "powerDeliveryWatts": { "type": "number", "minimum": 0 },
-        "uses": { "type": "array", "items": { "type": "string" }, "description": "e.g. 'data', 'kvm', 'storage', 'audio', 'video'." }
+        "vlanCapable": { "type": "boolean" },
+        "managed": { "type": "boolean" },
+        "redundancy": { "type": "string", "enum": ["none", "lag", "smpte-2022-7", "parallel", "stp", "other"] },
+        "protocols": { "type": "array", "items": { "type": "string" }, "description": "Additional transported AV/IT protocols not broken out as separate flows, e.g. 'dante', 'ndi', 'sdvoe'." },
+        "notes": { "type": "string" }
       },
       "patternProperties": { "^x-": {} },
-      "additionalProperties": false
+      "additionalProperties": false,
+      "allOf": [ { "if": { "properties": { "transport": { "const": "other" } }, "required": ["transport"] }, "then": { "required": ["transportOther"] } } ]
+    },
+
+    "signalData": {
+      "type": "object",
+      "description": "Non-AV data payload (e.g. USB data, mass storage, generic file transfer).",
+      "required": ["domain"],
+      "properties": {
+        "domain": { "const": "data" },
+        "transport": { "type": "string", "enum": ["usb-data", "usb-mass-storage", "thunderbolt", "file-transfer", "other"] },
+        "transportOther": { "type": "string" },
+        "direction": { "$ref": "#/$defs/signalDirection" },
+        "channels": { "$ref": "#/$defs/channels" },
+        "rateGbps": { "type": "number", "exclusiveMinimum": 0 },
+        "notes": { "type": "string" }
+      },
+      "patternProperties": { "^x-": {} },
+      "additionalProperties": false,
+      "allOf": [ { "if": { "properties": { "transport": { "const": "other" } }, "required": ["transport"] }, "then": { "required": ["transportOther"] } } ]
     },
 
     "signalPower": {
       "type": "object",
+      "description": "Power delivery as a port's function (e.g. a DC output, 12V trigger, PDU outlet, speaker drive). Note: PoE belongs on link.poe and USB-PD on link.powerDeliveryWatts.",
       "required": ["domain"],
       "properties": {
         "domain": { "const": "power" },
+        "transport": { "type": "string", "enum": ["ac", "dc", "usb-pd", "phantom", "trigger", "wireless-power", "other"] },
+        "transportOther": { "type": "string" },
+        "direction": { "$ref": "#/$defs/signalDirection" },
         "channels": { "$ref": "#/$defs/channels" },
-        "kind": { "type": "string", "enum": ["ac", "dc", "poe", "usb-pd"] },
         "role": { "type": "string", "enum": ["source", "sink"], "description": "source = supplies power out of this port; sink = draws power in." },
         "nominalVoltage": { "type": "number", "description": "Volts." },
-        "maxWatts": { "type": "number", "minimum": 0 }
+        "maxWatts": { "type": "number", "minimum": 0 },
+        "maxAmps": { "type": "number", "minimum": 0 },
+        "notes": { "type": "string" }
       },
       "patternProperties": { "^x-": {} },
-      "additionalProperties": false
+      "additionalProperties": false,
+      "allOf": [ { "if": { "properties": { "transport": { "const": "other" } }, "required": ["transport"] }, "then": { "required": ["transportOther"] } } ]
     },
 
     "power": {
@@ -376,7 +419,7 @@
 
     "standard": {
       "type": "object",
-      "description": "A compliance or interoperability standard the device meets.",
+      "description": "A device-level compliance or interoperability standard (safety, EMC, environmental). Per-signal interop standards (Dante, AES67, etc.) are expressed as signal.transport.",
       "required": ["name"],
       "properties": {
         "category": { "type": "string", "enum": ["safety", "emc", "env", "av", "network", "wireless", "other"] },

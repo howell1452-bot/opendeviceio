@@ -16,18 +16,11 @@
       "label": "HDMI INPUT",
       "direction": "input",
       "connector": "hdmi-type-a",
+      "link": { "type": "hdmi", "standard": "hdmi-2.0" },
       "location": { "face": "rear", "group": "inputs", "order": 1 },
       "signals": [
-        {
-          "domain": "video",
-          "standard": "hdmi-2.0",
-          "maxResolution": "4096x2160",
-          "maxRefreshHz": 60,
-          "colorDepthBits": 8,
-          "chromaSubsampling": "4:2:0",
-          "hdcp": "2.2"
-        },
-        { "domain": "audio", "format": "lpcm", "maxChannelsPerCircuit": 8 }
+        { "domain": "video", "transport": "hdmi", "maxResolution": "4096x2160", "maxRefreshHz": 60, "colorDepthBits": 8, "chromaSubsampling": "4:2:0", "hdcp": "2.2" },
+        { "domain": "audio", "transport": "lpcm", "maxChannelsPerCircuit": 8 }
       ]
     },
     {
@@ -35,8 +28,9 @@
       "label": "VGA / RGB",
       "direction": "input",
       "connector": "hd15-vga",
+      "link": { "type": "vga" },
       "location": { "face": "rear", "group": "inputs", "order": 2 },
-      "signals": [{ "domain": "video", "standard": "vga", "maxResolution": "1920x1200", "maxRefreshHz": 60 }]
+      "signals": [{ "domain": "video", "transport": "vga", "maxResolution": "1920x1200", "maxRefreshHz": 60 }]
     },
     {
       "id": "analog-audio-in",
@@ -44,9 +38,10 @@
       "direction": "input",
       "connector": "euroblock-3.5mm",
       "poleCount": 5,
+      "link": { "type": "analog-audio" },
       "location": { "face": "rear", "group": "inputs", "order": 3 },
       "signals": [
-        { "domain": "audio", "format": "analog-line", "maxChannelsPerCircuit": 2, "balanced": true, "levelDbu": 4 }
+        { "domain": "audio", "transport": "analog", "maxChannelsPerCircuit": 2, "balanced": true, "levelDbu": 4 }
       ]
     },
     {
@@ -54,13 +49,14 @@
       "label": "DTP2 OUTPUT",
       "direction": "output",
       "connector": "rj45",
+      "link": { "type": "twisted-pair", "standard": "hdbaset" },
       "location": { "face": "rear", "group": "outputs", "order": 1 },
       "notes": "Transports video, audio, bidirectional RS-232 and IR over a single shielded twisted-pair run (HDBaseT-class).",
       "signals": [
-        { "domain": "video", "standard": "hdbaset", "maxResolution": "4096x2160", "maxRefreshHz": 60 },
-        { "domain": "audio", "format": "lpcm", "maxChannelsPerCircuit": 8 },
-        { "domain": "control", "protocol": "rs-232" },
-        { "domain": "control", "protocol": "ir" }
+        { "domain": "video", "transport": "hdbaset", "direction": "output", "maxResolution": "4096x2160", "maxRefreshHz": 60 },
+        { "domain": "audio", "transport": "lpcm", "direction": "output", "maxChannelsPerCircuit": 8 },
+        { "domain": "control", "transport": "rs-232", "direction": "bidirectional" },
+        { "domain": "control", "transport": "ir", "direction": "output" }
       ]
     },
     {
@@ -75,8 +71,8 @@
         { "pole": 3, "function": "gnd" }
       ],
       "location": { "face": "rear", "group": "control", "order": 1 },
-      "notes": "One RS-232 link across three poles — channels = 1, so a one-line drawing shows a single connection.",
-      "signals": [{ "domain": "control", "protocol": "rs-232", "channels": 1, "baudRange": "9600-115200" }]
+      "notes": "One RS-232 link across three poles - channels = 1, so a one-line drawing shows a single connection.",
+      "signals": [{ "domain": "control", "transport": "rs-232", "channels": 1, "baudRange": "9600-115200" }]
     }
   ],
   "power": {

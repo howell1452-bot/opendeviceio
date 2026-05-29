@@ -15,14 +15,15 @@
       "direction": "bidirectional",
       "connector": "rj45",
       "count": 8,
+      "link": {
+        "type": "ethernet",
+        "standard": "1000base-t",
+        "speed": "1g",
+        "poe": { "standard": "802.3at", "role": "pse", "classWatts": 30 }
+      },
       "location": { "face": "front", "group": "network", "order": 1 },
       "signals": [
-        {
-          "domain": "network",
-          "speed": "1g",
-          "poe": { "standard": "802.3at", "role": "pse", "classWatts": 30 },
-          "protocols": ["dante", "ndi", "av-over-ip"]
-        }
+        { "domain": "network", "transport": "av-network", "vlanCapable": true, "managed": true, "protocols": ["dante", "ndi", "av-over-ip"] }
       ]
     },
     {
@@ -31,16 +32,18 @@
       "direction": "bidirectional",
       "connector": "sfp+",
       "count": 2,
+      "link": { "type": "ethernet", "speed": "10g" },
       "location": { "face": "front", "group": "uplink", "order": 1 },
-      "signals": [{ "domain": "network", "speed": "10g" }]
+      "signals": [{ "domain": "network", "transport": "vlan-trunk", "vlanCapable": true }]
     },
     {
       "id": "console",
       "label": "CONSOLE",
       "direction": "bidirectional",
       "connector": "usb-c",
+      "link": { "type": "usb", "standard": "usb-2.0", "usbRole": "device" },
       "location": { "face": "front", "group": "management", "order": 1 },
-      "signals": [{ "domain": "usb", "version": "2.0", "role": "device", "uses": ["data"] }]
+      "signals": [{ "domain": "control", "transport": "usb-cdc" }]
     }
   ],
   "power": {

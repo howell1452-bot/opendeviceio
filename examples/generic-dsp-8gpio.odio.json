@@ -16,10 +16,11 @@
       "connector": "euroblock-3.5mm",
       "count": 12,
       "poleCount": 3,
+      "link": { "type": "analog-audio" },
       "location": { "face": "rear", "group": "audio-inputs", "order": 1 },
       "notes": "Twelve identical balanced mic/line inputs collapsed via count=12.",
       "signals": [
-        { "domain": "audio", "format": "analog-mic", "balanced": true, "phantomPower": true, "impedanceOhms": 2000 }
+        { "domain": "audio", "transport": "analog", "balanced": true, "phantomPower": true, "impedanceOhms": 2000, "gainDbRange": "0-60" }
       ]
     },
     {
@@ -29,8 +30,23 @@
       "connector": "euroblock-3.5mm",
       "count": 8,
       "poleCount": 3,
+      "link": { "type": "analog-audio" },
       "location": { "face": "rear", "group": "audio-outputs", "order": 1 },
-      "signals": [{ "domain": "audio", "format": "analog-line", "balanced": true, "levelDbu": 4 }]
+      "signals": [{ "domain": "audio", "transport": "analog", "balanced": true, "levelDbu": 4 }]
+    },
+    {
+      "id": "lan",
+      "label": "LAN (Dante)",
+      "direction": "bidirectional",
+      "connector": "rj45",
+      "link": { "type": "ethernet", "standard": "1000base-t", "speed": "1g" },
+      "location": { "face": "rear", "group": "network", "order": 1 },
+      "notes": "Audio-over-IP plus management on one link. Dante and AES67 are separate audio flows; general connectivity is the network flow.",
+      "signals": [
+        { "domain": "audio", "transport": "dante", "direction": "bidirectional", "networkChannels": 64, "sampleRateHz": 48000, "bitDepth": 24 },
+        { "domain": "audio", "transport": "aes67", "direction": "bidirectional", "networkChannels": 64 },
+        { "domain": "network", "transport": "control-network", "managed": true }
+      ]
     },
     {
       "id": "gpio",
@@ -39,20 +55,10 @@
       "connector": "euroblock-3.5mm",
       "poleCount": 10,
       "location": { "face": "rear", "group": "control", "order": 1 },
-      "notes": "One 10-pole terminal block: 8 independent GPIO circuits (channels=8) plus a reference and a +5V pin. Each GPIO can route to a different device, so a tool may draw up to 8 separate connections — the format reports the facts, the tool decides grouping.",
+      "notes": "One 10-pole terminal block: 8 independent GPIO circuits (channels=8) plus a reference and a +5V pin. Each GPIO can route to a different device, so a tool may draw up to 8 separate connections - the format reports the facts, the tool decides grouping.",
       "signals": [
-        { "domain": "control", "protocol": "gpio", "channels": 8 },
-        { "domain": "power", "kind": "dc", "role": "source", "nominalVoltage": 5, "maxWatts": 2.5 }
-      ]
-    },
-    {
-      "id": "control-net",
-      "label": "LAN",
-      "direction": "bidirectional",
-      "connector": "rj45",
-      "location": { "face": "rear", "group": "control", "order": 2 },
-      "signals": [
-        { "domain": "network", "speed": "1g", "protocols": ["dante", "aes67"] }
+        { "domain": "control", "transport": "gpio", "channels": 8 },
+        { "domain": "power", "transport": "dc", "role": "source", "nominalVoltage": 5, "maxWatts": 2.5 }
       ]
     },
     {
@@ -61,7 +67,7 @@
       "direction": "bidirectional",
       "connector": "euroblock-3.5mm",
       "poleCount": 3,
-      "signals": [{ "domain": "control", "protocol": "rs-485", "channels": 1 }]
+      "signals": [{ "domain": "control", "transport": "rs-485", "channels": 1, "busAddressable": true, "maxBusDevices": 32 }]
     }
   ],
   "power": {
@@ -92,5 +98,5 @@
     "method": "manual",
     "validation": { "status": "draft" }
   },
-  "x-note": "Illustrative fictional device exercising terminal-block poleCount + per-signal channels."
+  "x-note": "Illustrative fictional device exercising terminal-block poleCount + per-signal channels and audio-over-IP flows."
 }

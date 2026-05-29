@@ -8,8 +8,9 @@
       "id": "hdmi-in",
       "direction": "input",
       "connector": "hdmi-type-a",
-      "signals": [{ "domain": "video", "standard": "hdmi-2.0", "resolution": "4k" }]
+      "link": { "type": "hdmi", "standard": "hdmi-2.0" },
+      "signals": [{ "domain": "video", "transport": "hdmi", "resolution": "4k" }]
     }
   ],
-  "x-invalid-reason": "signal uses unknown non-x- field 'resolution' (should be 'maxResolution'); core objects forbid unknown fields."
+  "x-invalid-reason": "video signal uses unknown non-x- field 'resolution' (should be 'maxResolution'); core objects forbid unknown fields."
 }

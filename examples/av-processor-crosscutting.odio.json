@@ -1,0 +1,96 @@
+{
+  "$schema": "https://opendeviceio.org/schema/v0.1/device.schema.json",
+  "odioVersion": "0.1.0",
+  "id": "acme/av-core-c100@1",
+  "device": {
+    "manufacturer": "Acme",
+    "model": "AV Core C-100",
+    "revision": "1",
+    "category": "av/processor/dsp"
+  },
+  "ports": [
+    {
+      "id": "lan-a",
+      "label": "LAN A",
+      "direction": "bidirectional",
+      "connector": "rj45",
+      "link": {
+        "type": "ethernet",
+        "standard": "1000base-t",
+        "speed": "1g",
+        "poe": { "standard": "802.3at", "role": "pd", "classWatts": 25 }
+      },
+      "location": { "face": "rear", "group": "network", "order": 1 },
+      "notes": "One physical 1G PoE link carrying five concurrent logical flows: Dante and AES67 audio, AV-over-IP video, IP device control, and general/control-network connectivity. PoE lives on the link; each flow is a separate signal with its own transport.",
+      "signals": [
+        { "domain": "audio", "transport": "dante", "direction": "bidirectional", "networkChannels": 64, "sampleRateHz": 48000, "bitDepth": 24 },
+        { "domain": "audio", "transport": "aes67", "direction": "bidirectional", "networkChannels": 64 },
+        { "domain": "video", "transport": "av-over-ip", "direction": "bidirectional", "maxResolution": "3840x2160", "maxRefreshHz": 60 },
+        { "domain": "control", "transport": "ip-control", "direction": "bidirectional" },
+        { "domain": "network", "transport": "control-network", "vlanCapable": true, "managed": true }
+      ]
+    },
+    {
+      "id": "usb-c-front",
+      "label": "USB-C",
+      "direction": "bidirectional",
+      "connector": "usb-c",
+      "link": {
+        "type": "usb",
+        "standard": "usb-3.2-gen2",
+        "usbRole": "host",
+        "powerDeliveryWatts": 60
+      },
+      "location": { "face": "front", "group": "peripheral", "order": 1 },
+      "notes": "A single USB-C connector carrying control (HID), audio (UAC), and video (UVC) flows plus data, with 60W USB-PD on the link.",
+      "signals": [
+        { "domain": "control", "transport": "usb-hid", "direction": "bidirectional" },
+        { "domain": "audio", "transport": "usb-uac", "direction": "bidirectional", "maxChannelsPerCircuit": 2 },
+        { "domain": "video", "transport": "usb-uvc", "direction": "input", "maxResolution": "1920x1080", "maxRefreshHz": 30 },
+        { "domain": "data", "transport": "usb-data", "direction": "bidirectional", "rateGbps": 10 }
+      ]
+    },
+    {
+      "id": "hdmi-out",
+      "label": "HDMI OUT",
+      "direction": "output",
+      "connector": "hdmi-type-a",
+      "link": { "type": "hdmi", "standard": "hdmi-2.0" },
+      "location": { "face": "rear", "group": "av", "order": 1 },
+      "signals": [
+        { "domain": "video", "transport": "hdmi", "direction": "output", "maxResolution": "4096x2160", "maxRefreshHz": 60, "hdcp": "2.2" },
+        { "domain": "audio", "transport": "lpcm", "direction": "output", "maxChannelsPerCircuit": 8 },
+        { "domain": "audio", "transport": "earc", "direction": "bidirectional", "notes": "Audio return channel." },
+        { "domain": "control", "transport": "cec", "direction": "bidirectional" }
+      ]
+    }
+  ],
+  "power": {
+    "inputs": [
+      { "type": "ac", "voltageRange": "100-240V", "frequencyHz": "50/60", "connector": "iec-c14" },
+      { "type": "poe", "standard": "802.3at" }
+    ],
+    "consumptionWatts": { "typical": 22, "max": 45 },
+    "redundant": false
+  },
+  "physical": {
+    "dimensionsMm": { "width": 217, "height": 44, "depth": 200 },
+    "weightGrams": 1800,
+    "rackUnits": 1,
+    "rackMountable": true,
+    "rackWidth": "half",
+    "mounting": ["rack", "surface"]
+  },
+  "standards": [
+    { "category": "network", "name": "AES67" },
+    { "category": "network", "name": "Dante" },
+    { "category": "av", "name": "SMPTE ST 2110", "detail": "AV-over-IP" },
+    { "category": "safety", "name": "UL 62368-1" }
+  ],
+  "provenance": {
+    "generator": "manual",
+    "method": "manual",
+    "validation": { "status": "draft" }
+  },
+  "x-note": "Fictional device demonstrating cross-cutting flows: one network port carrying five concurrent transports, and one USB-C port carrying control + audio + video + data + power."
+}
