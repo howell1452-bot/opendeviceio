@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any, Sequence
 
 from . import __version__
+from .env import load_dotenv
 from .extractor import DEFAULT_MODEL, ClaudeExtractor, Extractor, MockExtractor
 from .pipeline import (
     GenieError,
@@ -142,6 +143,9 @@ def _cmd_validate(args: argparse.Namespace) -> int:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    # Load a nearby .env (non-overriding) so ANTHROPIC_API_KEY can live in a gitignored
+    # file rather than the shell environment. Already-exported vars always win.
+    load_dotenv()
     parser = _build_parser()
     args = parser.parse_args(argv)
     try:

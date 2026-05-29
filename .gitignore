@@ -19,8 +19,12 @@ Thumbs.db
 # Logs / env
 *.log
 .env
-.env.local
+.env.*
+!.env.example
 
 # Build output
 coverage/
 out/
+
+# Local scratch / experiments (not part of the repo)
+_scratch/
