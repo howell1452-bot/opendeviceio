@@ -1,0 +1,15 @@
+{
+  "$schema": "https://opendeviceio.org/schema/v0.1/device.schema.json",
+  "odioVersion": "0.1.0",
+  "id": "acme/widget",
+  "device": { "manufacturer": "Acme" },
+  "ports": [
+    {
+      "id": "hdmi-in",
+      "direction": "input",
+      "connector": "hdmi-type-a",
+      "signals": [{ "domain": "video", "standard": "hdmi-2.0" }]
+    }
+  ],
+  "x-invalid-reason": "device.model is required but missing."
+}

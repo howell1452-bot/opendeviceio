@@ -1,0 +1,70 @@
+{
+  "$schema": "https://opendeviceio.org/schema/v0.1/device.schema.json",
+  "odioVersion": "0.1.0",
+  "id": "netgear/m4250-10g2f-poe-plus",
+  "device": {
+    "manufacturer": "NETGEAR",
+    "model": "M4250-10G2F-PoE+",
+    "category": "it/network/switch",
+    "productLine": "M4250 AV Line"
+  },
+  "ports": [
+    {
+      "id": "ge-poe",
+      "label": "1-8 (1G PoE+)",
+      "direction": "bidirectional",
+      "connector": "rj45",
+      "count": 8,
+      "location": { "face": "front", "group": "network", "order": 1 },
+      "signals": [
+        {
+          "domain": "network",
+          "speed": "1g",
+          "poe": { "standard": "802.3at", "role": "pse", "classWatts": 30 },
+          "protocols": ["dante", "ndi", "av-over-ip"]
+        }
+      ]
+    },
+    {
+      "id": "sfp-uplink",
+      "label": "9-10 (SFP+)",
+      "direction": "bidirectional",
+      "connector": "sfp+",
+      "count": 2,
+      "location": { "face": "front", "group": "uplink", "order": 1 },
+      "signals": [{ "domain": "network", "speed": "10g" }]
+    },
+    {
+      "id": "console",
+      "label": "CONSOLE",
+      "direction": "bidirectional",
+      "connector": "usb-c",
+      "location": { "face": "front", "group": "management", "order": 1 },
+      "signals": [{ "domain": "usb", "version": "2.0", "role": "device", "uses": ["data"] }]
+    }
+  ],
+  "power": {
+    "inputs": [{ "type": "ac", "voltageRange": "100-240V", "frequencyHz": "50/60", "connector": "iec-c14" }],
+    "consumptionWatts": { "typical": 40, "max": 280 },
+    "redundant": false
+  },
+  "physical": {
+    "dimensionsMm": { "width": 328, "height": 43, "depth": 169 },
+    "weightGrams": 2200,
+    "rackUnits": 1,
+    "rackMountable": true,
+    "rackWidth": "half",
+    "mounting": ["rack", "surface"]
+  },
+  "standards": [
+    { "category": "network", "name": "IEEE 802.3at" },
+    { "category": "safety", "name": "UL 62368-1" },
+    { "category": "emc", "name": "FCC Part 15 Class A" }
+  ],
+  "provenance": {
+    "generator": "manual",
+    "method": "manual",
+    "validation": { "status": "draft" }
+  },
+  "x-note": "Illustrative example for OpenDeviceIO v0.1; values plausible but not manufacturer-verified."
+}

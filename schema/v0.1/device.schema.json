@@ -1,0 +1,456 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opendeviceio.org/schema/v0.1/device.schema.json",
+  "title": "OpenDeviceIO Device",
+  "description": "An open, machine-readable description of a hardware device's I/O, power, physical, and compliance characteristics. Canonical source of truth for the OpenDeviceIO (.odio.json) format, v0.1.",
+  "type": "object",
+  "required": ["odioVersion", "id", "device", "ports"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "URI of the schema this document conforms to."
+    },
+    "odioVersion": {
+      "type": "string",
+      "description": "Semantic version of the OpenDeviceIO format this file conforms to.",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?$"
+    },
+    "id": {
+      "type": "string",
+      "description": "Stable, URL-safe device identifier derived as slug(manufacturer)/slug(model)[@slug(revision)].",
+      "pattern": "^[a-z0-9][a-z0-9-]*\\/[a-z0-9][a-z0-9._-]*(?:@[a-z0-9][a-z0-9._-]*)?$"
+    },
+    "device": { "$ref": "#/$defs/device" },
+    "ports": {
+      "type": "array",
+      "description": "The device's externally accessible I/O ports.",
+      "items": { "$ref": "#/$defs/port" }
+    },
+    "power": { "$ref": "#/$defs/power" },
+    "physical": { "$ref": "#/$defs/physical" },
+    "standards": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/standard" }
+    },
+    "parameters": { "$ref": "#/$defs/parameters" },
+    "provenance": { "$ref": "#/$defs/provenance" }
+  },
+  "patternProperties": { "^x-": {} },
+  "additionalProperties": false,
+
+  "$defs": {
+    "device": {
+      "type": "object",
+      "description": "Device identity and classification.",
+      "required": ["manufacturer", "model"],
+      "properties": {
+        "manufacturer": { "type": "string", "minLength": 1 },
+        "model": { "type": "string", "minLength": 1 },
+        "revision": { "type": "string", "description": "Hardware revision, if applicable." },
+        "category": {
+          "type": "string",
+          "description": "Dotted taxonomy path, e.g. 'av/extender/transmitter' or 'it/network/switch'.",
+          "pattern": "^[a-z0-9]+(?:/[a-z0-9-]+)*$"
+        },
+        "productLine": { "type": "string" },
+        "gtin": { "type": "string", "description": "GTIN/UPC/EAN.", "pattern": "^\\d{8,14}$" },
+        "sku": { "type": "string", "description": "Manufacturer SKU / part number." },
+        "productUrl": { "type": "string", "format": "uri" },
+        "datasheetUrl": { "type": "string", "format": "uri" },
+        "releaseDate": { "type": "string", "format": "date" }
+      },
+      "patternProperties": { "^x-": {} },
+      "additionalProperties": false
+    },
+
+    "port": {
+      "type": "object",
+      "description": "One externally accessible connector (or a group of identical connectors) and the signals it carries.",
+      "required": ["id", "direction", "connector", "signals"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Identifier unique within this device.",
+          "pattern": "^[a-z0-9][a-z0-9._-]*$"
+        },
+        "label": {
+          "type": "string",
+          "description": "Human-facing label as silkscreened on the device, e.g. 'HDMI INPUT 1'."
+        },
+        "direction": {
+          "type": "string",
+          "enum": ["input", "output", "bidirectional"]
+        },
+        "connector": {
+          "type": "string",
+          "description": "Controlled connector vocabulary. Use 'other' with connectorOther when not listed.",
+          "enum": [
+            "hdmi-type-a", "hdmi-type-c", "hdmi-type-d",
+            "displayport", "mini-displayport",
+            "usb-a", "usb-b", "usb-c", "usb-micro-b",
+            "rj45", "rj11", "sfp", "sfp+", "sfp28", "qsfp+",
+            "xlr-3-m", "xlr-3-f", "xlr-5-m", "xlr-5-f",
+            "euroblock-3.5mm", "euroblock-5.08mm", "phoenix", "terminal-block",
+            "rca", "bnc", "f-type", "3.5mm-trs", "3.5mm-trrs", "6.35mm-trs",
+            "speakon", "binding-post", "banana",
+            "db9", "db15", "db25", "hd15-vga",
+            "optical-st", "optical-sc", "optical-lc", "toslink",
+            "iec-c8", "iec-c14", "iec-c20", "barrel-dc", "phoenix-power",
+            "captive-screw", "other"
+          ]
+        },
+        "connectorOther": {
+          "type": "string",
+          "description": "Free-text connector name; required when connector is 'other'."
+        },
+        "count": {
+          "type": "integer",
+          "description": "Number of identical, separately addressable connectors collapsed into this entry. Use individual entries when labels or positions differ.",
+          "minimum": 1,
+          "default": 1
+        },
+        "poleCount": {
+          "type": "integer",
+          "description": "Physical poles/pins on a terminal-block-style connector (e.g. a 3-pole Phoenix). Independent of how many signal channels are carried; see signal.channels.",
+          "minimum": 1
+        },
+        "poles": {
+          "type": "array",
+          "description": "Optional pole-to-function map for pin-level detail (e.g. Phoenix RS-232 pinout).",
+          "items": {
+            "type": "object",
+            "required": ["pole"],
+            "properties": {
+              "pole": { "type": "integer", "minimum": 1 },
+              "function": { "type": "string", "description": "e.g. 'tx', 'rx', 'gnd', 'audio-l+', 'gpio-1'." },
+              "label": { "type": "string" }
+            },
+            "patternProperties": { "^x-": {} },
+            "additionalProperties": false
+          }
+        },
+        "signals": {
+          "type": "array",
+          "description": "One or more signal domains carried by this connector.",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/signal" }
+        },
+        "location": {
+          "type": "object",
+          "description": "Optional physical layout hint for rendering the device face.",
+          "properties": {
+            "face": { "type": "string", "enum": ["front", "rear", "top", "bottom", "left", "right"] },
+            "group": { "type": "string", "description": "Logical grouping label, e.g. 'inputs', 'outputs', 'control'." },
+            "order": { "type": "integer", "minimum": 0 }
+          },
+          "patternProperties": { "^x-": {} },
+          "additionalProperties": false
+        },
+        "notes": { "type": "string" }
+      },
+      "patternProperties": { "^x-": {} },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": { "properties": { "connector": { "const": "other" } } },
+          "then": { "required": ["connectorOther"] }
+        }
+      ]
+    },
+
+    "signal": {
+      "type": "object",
+      "description": "A signal domain carried by a port. The 'domain' discriminates the attribute set.",
+      "required": ["domain"],
+      "oneOf": [
+        { "$ref": "#/$defs/signalVideo" },
+        { "$ref": "#/$defs/signalAudio" },
+        { "$ref": "#/$defs/signalNetwork" },
+        { "$ref": "#/$defs/signalControl" },
+        { "$ref": "#/$defs/signalUsb" },
+        { "$ref": "#/$defs/signalPower" }
+      ]
+    },
+
+    "channels": {
+      "type": "integer",
+      "description": "Number of independent, separately-routable circuits of this signal carried by the port (default 1). A 3-pole RS-232 connector has channels=1; an 8-pole GPIO block has channels=8.",
+      "minimum": 1,
+      "default": 1
+    },
+
+    "signalVideo": {
+      "type": "object",
+      "required": ["domain"],
+      "properties": {
+        "domain": { "const": "video" },
+        "channels": { "$ref": "#/$defs/channels" },
+        "standard": {
+          "type": "string",
+          "description": "e.g. 'hdmi-1.4', 'hdmi-2.0', 'hdmi-2.1', 'dp-1.4', 'dp-2.0', 'hdbaset', 'sdi-3g', 'sdi-12g', 'vga', 'dvi'."
+        },
+        "maxResolution": { "type": "string", "description": "e.g. '4096x2160' or '3840x2160'." },
+        "maxRefreshHz": { "type": "number", "exclusiveMinimum": 0 },
+        "colorDepthBits": { "type": "integer", "minimum": 1 },
+        "chromaSubsampling": { "type": "string", "enum": ["4:4:4", "4:2:2", "4:2:0"] },
+        "hdcp": { "type": "string", "description": "HDCP version, e.g. '1.4', '2.2', '2.3', or 'none'." },
+        "hdr": { "type": "array", "items": { "type": "string" }, "description": "Supported HDR formats, e.g. 'hdr10', 'dolby-vision'." }
+      },
+      "patternProperties": { "^x-": {} },
+      "additionalProperties": false
+    },
+
+    "signalAudio": {
+      "type": "object",
+      "required": ["domain"],
+      "properties": {
+        "domain": { "const": "audio" },
+        "channels": { "$ref": "#/$defs/channels" },
+        "format": {
+          "type": "string",
+          "description": "e.g. 'analog-line', 'analog-mic', 'analog-speaker', 'lpcm', 'aes3', 'spdif', 'adat', 'dante', 'aes67', 'avb', 'cobranet'."
+        },
+        "maxChannelsPerCircuit": { "type": "integer", "minimum": 1, "description": "Audio channels within one circuit (e.g. 2 for a stereo pair)." },
+        "levelDbu": { "type": "number", "description": "Nominal level in dBu (e.g. +4 for line, -10 for consumer ~ -7.78 dBu)." },
+        "impedanceOhms": { "type": "number", "exclusiveMinimum": 0 },
+        "sampleRateHz": { "type": "integer", "exclusiveMinimum": 0 },
+        "bitDepth": { "type": "integer", "minimum": 1 },
+        "phantomPower": { "type": "boolean", "description": "48V phantom power available (typically mic inputs)." },
+        "balanced": { "type": "boolean" }
+      },
+      "patternProperties": { "^x-": {} },
+      "additionalProperties": false
+    },
+
+    "signalNetwork": {
+      "type": "object",
+      "required": ["domain"],
+      "properties": {
+        "domain": { "const": "network" },
+        "channels": { "$ref": "#/$defs/channels" },
+        "speed": {
+          "type": "string",
+          "description": "Link speed, e.g. '10m', '100m', '1g', '2.5g', '5g', '10g', '25g', '40g'."
+        },
+        "poe": {
+          "type": "object",
+          "description": "Power over Ethernet capability on this port.",
+          "properties": {
+            "standard": { "type": "string", "enum": ["802.3af", "802.3at", "802.3bt-type3", "802.3bt-type4", "passive"] },
+            "role": { "type": "string", "enum": ["pse", "pd"], "description": "pse = sources power, pd = consumes power." },
+            "classWatts": { "type": "number", "exclusiveMinimum": 0 }
+          },
+          "patternProperties": { "^x-": {} },
+          "additionalProperties": false
+        },
+        "protocols": {
+          "type": "array",
+          "description": "AV/IT protocols transported, e.g. 'dante', 'aes67', 'ndi', 'sdvoe', 'av-over-ip', 'sip'.",
+          "items": { "type": "string" }
+        }
+      },
+      "patternProperties": { "^x-": {} },
+      "additionalProperties": false
+    },
+
+    "signalControl": {
+      "type": "object",
+      "required": ["domain"],
+      "properties": {
+        "domain": { "const": "control" },
+        "channels": { "$ref": "#/$defs/channels" },
+        "protocol": {
+          "type": "string",
+          "enum": ["rs-232", "rs-422", "rs-485", "ir", "gpio", "contact-closure", "relay", "ethernet", "cresnet", "i2c", "other"]
+        },
+        "protocolOther": { "type": "string" },
+        "baudRange": { "type": "string", "description": "e.g. '9600-115200'." },
+        "roles": { "type": "array", "items": { "type": "string" }, "description": "e.g. 'controller', 'controlled'." }
+      },
+      "patternProperties": { "^x-": {} },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": { "properties": { "protocol": { "const": "other" } } },
+          "then": { "required": ["protocolOther"] }
+        }
+      ]
+    },
+
+    "signalUsb": {
+      "type": "object",
+      "required": ["domain"],
+      "properties": {
+        "domain": { "const": "usb" },
+        "channels": { "$ref": "#/$defs/channels" },
+        "version": { "type": "string", "description": "e.g. '2.0', '3.2-gen1', '3.2-gen2', 'usb4'." },
+        "role": { "type": "string", "enum": ["host", "device", "dual-role"] },
+        "powerDeliveryWatts": { "type": "number", "minimum": 0 },
+        "uses": { "type": "array", "items": { "type": "string" }, "description": "e.g. 'data', 'kvm', 'storage', 'audio', 'video'." }
+      },
+      "patternProperties": { "^x-": {} },
+      "additionalProperties": false
+    },
+
+    "signalPower": {
+      "type": "object",
+      "required": ["domain"],
+      "properties": {
+        "domain": { "const": "power" },
+        "channels": { "$ref": "#/$defs/channels" },
+        "kind": { "type": "string", "enum": ["ac", "dc", "poe", "usb-pd"] },
+        "role": { "type": "string", "enum": ["source", "sink"], "description": "source = supplies power out of this port; sink = draws power in." },
+        "nominalVoltage": { "type": "number", "description": "Volts." },
+        "maxWatts": { "type": "number", "minimum": 0 }
+      },
+      "patternProperties": { "^x-": {} },
+      "additionalProperties": false
+    },
+
+    "power": {
+      "type": "object",
+      "description": "Device-level power characteristics.",
+      "properties": {
+        "inputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["type"],
+            "properties": {
+              "type": { "type": "string", "enum": ["ac", "dc", "poe", "usb-pd"] },
+              "voltageRange": { "type": "string", "description": "e.g. '100-240V'." },
+              "nominalVoltage": { "type": "number", "description": "Volts (typically for DC)." },
+              "frequencyHz": { "type": "string", "description": "e.g. '50/60'." },
+              "connector": { "type": "string", "description": "Connector vocabulary value, e.g. 'iec-c14', 'barrel-dc'." },
+              "standard": { "type": "string", "description": "For PoE inputs, e.g. '802.3at'." }
+            },
+            "patternProperties": { "^x-": {} },
+            "additionalProperties": false
+          }
+        },
+        "consumptionWatts": {
+          "type": "object",
+          "properties": {
+            "typical": { "type": "number", "minimum": 0 },
+            "max": { "type": "number", "minimum": 0 },
+            "standby": { "type": "number", "minimum": 0 }
+          },
+          "patternProperties": { "^x-": {} },
+          "additionalProperties": false
+        },
+        "heatBtuPerHour": { "type": "number", "minimum": 0, "description": "Optional; derivable from watts (W x 3.412) if absent." },
+        "redundant": { "type": "boolean", "description": "True if the device has redundant power supplies." }
+      },
+      "patternProperties": { "^x-": {} },
+      "additionalProperties": false
+    },
+
+    "physical": {
+      "type": "object",
+      "description": "Physical dimensions and mounting. SI units; dimensions in millimetres, mass in grams.",
+      "properties": {
+        "dimensionsMm": {
+          "type": "object",
+          "properties": {
+            "width": { "type": "number", "exclusiveMinimum": 0 },
+            "height": { "type": "number", "exclusiveMinimum": 0 },
+            "depth": { "type": "number", "exclusiveMinimum": 0 }
+          },
+          "patternProperties": { "^x-": {} },
+          "additionalProperties": false
+        },
+        "weightGrams": { "type": "number", "exclusiveMinimum": 0 },
+        "rackUnits": { "type": "number", "minimum": 0, "description": "Height in rack units (U). 0 if not rack-mounted; 0.5 for half-U, etc." },
+        "rackMountable": { "type": "boolean" },
+        "rackWidth": { "type": "string", "enum": ["full", "half", "third", "quarter"] },
+        "mounting": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["rack", "surface", "wall", "under-table", "pole", "ceiling", "din-rail", "vesa", "desktop"] }
+        },
+        "ipRating": { "type": "string", "description": "e.g. 'IP20', 'IP65'." },
+        "color": { "type": "string" }
+      },
+      "patternProperties": { "^x-": {} },
+      "additionalProperties": false
+    },
+
+    "standard": {
+      "type": "object",
+      "description": "A compliance or interoperability standard the device meets.",
+      "required": ["name"],
+      "properties": {
+        "category": { "type": "string", "enum": ["safety", "emc", "env", "av", "network", "wireless", "other"] },
+        "name": { "type": "string", "minLength": 1, "description": "e.g. 'UL 62368-1', 'FCC Part 15 Class A', 'HDBaseT', 'AES67', 'RoHS'." },
+        "detail": { "type": "string" }
+      },
+      "patternProperties": { "^x-": {} },
+      "additionalProperties": false
+    },
+
+    "parameters": {
+      "type": "object",
+      "description": "Free-form parametric data with no typed home (operating temperature, latency, MTBF, warranty, etc.). Values may be primitives or { value, unit } objects.",
+      "additionalProperties": {
+        "oneOf": [
+          { "type": "string" },
+          { "type": "number" },
+          { "type": "boolean" },
+          {
+            "type": "object",
+            "required": ["value"],
+            "properties": {
+              "value": { "type": ["string", "number", "boolean"] },
+              "unit": { "type": "string" }
+            },
+            "patternProperties": { "^x-": {} },
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+
+    "provenance": {
+      "type": "object",
+      "description": "Where this data came from and how trustworthy it is.",
+      "properties": {
+        "generator": { "type": "string", "description": "Tool that produced the file, e.g. 'genie/0.1.0', or 'manual'." },
+        "method": { "type": "string", "enum": ["llm-extraction", "manual", "manufacturer"] },
+        "sourceDocuments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": { "type": "string" },
+              "url": { "type": "string", "format": "uri" },
+              "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+              "retrieved": { "type": "string", "format": "date" }
+            },
+            "patternProperties": { "^x-": {} },
+            "additionalProperties": false
+          }
+        },
+        "validation": {
+          "type": "object",
+          "properties": {
+            "status": { "type": "string", "enum": ["draft", "reviewed", "manufacturer-verified"] },
+            "by": { "type": "string" },
+            "date": { "type": "string", "format": "date" }
+          },
+          "patternProperties": { "^x-": {} },
+          "additionalProperties": false
+        },
+        "confidence": {
+          "type": "object",
+          "properties": {
+            "overall": { "type": "number", "minimum": 0, "maximum": 1 },
+            "lowConfidenceFields": { "type": "array", "items": { "type": "string" }, "description": "JSON paths the generator was unsure about, for human review." }
+          },
+          "patternProperties": { "^x-": {} },
+          "additionalProperties": false
+        }
+      },
+      "patternProperties": { "^x-": {} },
+      "additionalProperties": false
+    }
+  }
+}

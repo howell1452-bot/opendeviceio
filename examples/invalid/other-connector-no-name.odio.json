@@ -1,0 +1,15 @@
+{
+  "$schema": "https://opendeviceio.org/schema/v0.1/device.schema.json",
+  "odioVersion": "0.1.0",
+  "id": "acme/widget",
+  "device": { "manufacturer": "Acme", "model": "Widget" },
+  "ports": [
+    {
+      "id": "weird-port",
+      "direction": "output",
+      "connector": "other",
+      "signals": [{ "domain": "control", "protocol": "rs-232" }]
+    }
+  ],
+  "x-invalid-reason": "connector is 'other' but connectorOther is not provided (conditionally required)."
+}

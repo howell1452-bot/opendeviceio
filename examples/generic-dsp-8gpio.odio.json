@@ -1,0 +1,96 @@
+{
+  "$schema": "https://opendeviceio.org/schema/v0.1/device.schema.json",
+  "odioVersion": "0.1.0",
+  "id": "acme/dsp-1212@1",
+  "device": {
+    "manufacturer": "Acme Audio",
+    "model": "DSP-1212",
+    "revision": "1",
+    "category": "av/audio/dsp"
+  },
+  "ports": [
+    {
+      "id": "mic-line-in",
+      "label": "ANALOG IN 1-12",
+      "direction": "input",
+      "connector": "euroblock-3.5mm",
+      "count": 12,
+      "poleCount": 3,
+      "location": { "face": "rear", "group": "audio-inputs", "order": 1 },
+      "notes": "Twelve identical balanced mic/line inputs collapsed via count=12.",
+      "signals": [
+        { "domain": "audio", "format": "analog-mic", "balanced": true, "phantomPower": true, "impedanceOhms": 2000 }
+      ]
+    },
+    {
+      "id": "line-out",
+      "label": "ANALOG OUT 1-8",
+      "direction": "output",
+      "connector": "euroblock-3.5mm",
+      "count": 8,
+      "poleCount": 3,
+      "location": { "face": "rear", "group": "audio-outputs", "order": 1 },
+      "signals": [{ "domain": "audio", "format": "analog-line", "balanced": true, "levelDbu": 4 }]
+    },
+    {
+      "id": "gpio",
+      "label": "GPIO",
+      "direction": "bidirectional",
+      "connector": "euroblock-3.5mm",
+      "poleCount": 10,
+      "location": { "face": "rear", "group": "control", "order": 1 },
+      "notes": "One 10-pole terminal block: 8 independent GPIO circuits (channels=8) plus a reference and a +5V pin. Each GPIO can route to a different device, so a tool may draw up to 8 separate connections — the format reports the facts, the tool decides grouping.",
+      "signals": [
+        { "domain": "control", "protocol": "gpio", "channels": 8 },
+        { "domain": "power", "kind": "dc", "role": "source", "nominalVoltage": 5, "maxWatts": 2.5 }
+      ]
+    },
+    {
+      "id": "control-net",
+      "label": "LAN",
+      "direction": "bidirectional",
+      "connector": "rj45",
+      "location": { "face": "rear", "group": "control", "order": 2 },
+      "signals": [
+        { "domain": "network", "speed": "1g", "protocols": ["dante", "aes67"] }
+      ]
+    },
+    {
+      "id": "rs485",
+      "label": "RS-485",
+      "direction": "bidirectional",
+      "connector": "euroblock-3.5mm",
+      "poleCount": 3,
+      "signals": [{ "domain": "control", "protocol": "rs-485", "channels": 1 }]
+    }
+  ],
+  "power": {
+    "inputs": [{ "type": "ac", "voltageRange": "100-240V", "frequencyHz": "50/60", "connector": "iec-c14" }],
+    "consumptionWatts": { "typical": 35, "max": 60 },
+    "redundant": false
+  },
+  "physical": {
+    "dimensionsMm": { "width": 483, "height": 44, "depth": 305 },
+    "weightGrams": 3600,
+    "rackUnits": 1,
+    "rackMountable": true,
+    "rackWidth": "full",
+    "mounting": ["rack"]
+  },
+  "standards": [
+    { "category": "network", "name": "AES67" },
+    { "category": "network", "name": "Dante" },
+    { "category": "safety", "name": "UL 62368-1" }
+  ],
+  "parameters": {
+    "operatingTemperature": { "value": "0 to 40", "unit": "C" },
+    "dspChannels": 64,
+    "latency": { "value": 1.5, "unit": "ms" }
+  },
+  "provenance": {
+    "generator": "manual",
+    "method": "manual",
+    "validation": { "status": "draft" }
+  },
+  "x-note": "Illustrative fictional device exercising terminal-block poleCount + per-signal channels."
+}
