@@ -11,6 +11,25 @@ export { EasySchematicAdapter } from "./easyschematic.js";
 export { DxfAdapter } from "./dxf.js";
 export { VisioAdapter } from "./visio.js";
 export { AvcadAdapter } from "./stubs.js";
+export { TableSvgAdapter, renderTableSvg } from "./table-svg.js";
+export {
+  buildIoTable,
+  IO_GROUP_ORDER,
+  type IoTable,
+  type IoTableRow,
+  type IoTableSection,
+  type IoTableComponent,
+  type IoGroup
+} from "./table.js";
+export {
+  buildBlockModel,
+  blockTitle,
+  prettifyConnector,
+  connectorTypeLabel,
+  powerSubtitle,
+  type BlockModel,
+  type BlockPort
+} from "./block.js";
 export {
   expandConnectors,
   expandPort,

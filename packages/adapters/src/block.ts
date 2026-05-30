@@ -131,12 +131,18 @@ function humanizeConnector(slug: string): string {
     .join(" ");
 }
 
+/** Pretty display name for a physical connector vocabulary value. */
+export function prettifyConnector(connector: string, connectorOther?: string): string {
+  if (connector === "other") return connectorOther ?? "other";
+  return CONNECTOR_PRETTY[connector] ?? humanizeConnector(connector);
+}
+
 /** The connector-type line for a terminal: physical jack first, then signal. */
 export function connectorTypeLabel(t: ExpandedConnector): string {
   if (t.connector === "other") {
     return t.connectorOther ?? t.primaryTransport ?? t.primaryDomain ?? "other";
   }
-  return CONNECTOR_PRETTY[t.connector] ?? humanizeConnector(t.connector);
+  return prettifyConnector(t.connector);
 }
 
 /** Format a single power input as a compact descriptor. */

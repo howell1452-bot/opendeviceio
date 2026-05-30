@@ -5,13 +5,15 @@ import { EasySchematicAdapter } from "./easyschematic.js";
 import { DxfAdapter } from "./dxf.js";
 import { VisioAdapter } from "./visio.js";
 import { AvcadAdapter } from "./stubs.js";
+import { TableSvgAdapter } from "./table-svg.js";
 
 /** All registered adapters keyed by their stable id. */
 export const adapters: Readonly<Record<string, Adapter>> = {
   easyschematic: EasySchematicAdapter,
   dxf: DxfAdapter,
   visio: VisioAdapter,
-  avcad: AvcadAdapter
+  avcad: AvcadAdapter,
+  "table-svg": TableSvgAdapter
 };
 
 /** The set of valid adapter ids. */
