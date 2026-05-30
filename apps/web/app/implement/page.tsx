@@ -155,6 +155,21 @@ export default function ImplementPage() {
             <code>.odio.json</code> files directly with the SDK.
           </p>
 
+          <div className="my-6 rounded-xl border border-emerald-200 bg-emerald-50 p-5">
+            <p className="m-0 font-semibold text-emerald-900">
+              Are you a manufacturer?
+            </p>
+            <p className="mb-0 mt-2 text-emerald-900">
+              Brands can publish authoritative, <strong>manufacturer-verified</strong>{" "}
+              files for their own products. Approved reps upload{" "}
+              <code>.odio.json</code> files through the web UI or an authenticated{" "}
+              <code>POST /api/v1/devices</code> token.{" "}
+              <Link href="/contribute" className="font-semibold underline">
+                Request access on the Contribute page →
+              </Link>
+            </p>
+          </div>
+
           {/* What ODIO is */}
           <h2 id="what">What ODIO is</h2>
           <p>

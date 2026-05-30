@@ -23,6 +23,7 @@ export function SiteFooter() {
                 <li><Link className="hover:text-brand-700" href="/implement">Implement ODIO</Link></li>
                 <li><Link className="hover:text-brand-700" href="/api-docs">API reference</Link></li>
                 <li><Link className="hover:text-brand-700" href="/registry">Registry</Link></li>
+                <li><Link className="hover:text-brand-700" href="/contribute">Contribute (manufacturers)</Link></li>
               </ul>
             </div>
             <div>

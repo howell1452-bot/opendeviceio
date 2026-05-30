@@ -1,10 +1,12 @@
 import Link from "next/link";
+import { AuthNav } from "./AuthNav";
 
 const NAV = [
   { href: "/whitepaper", label: "Whitepaper" },
   { href: "/guide", label: "Authoring guide" },
   { href: "/implement", label: "Implement" },
   { href: "/registry", label: "Registry" },
+  { href: "/contribute", label: "Contribute" },
   { href: "/schema/v0.1/device.schema.json", label: "Schema" }
 ];
 
@@ -30,6 +32,8 @@ export function SiteHeader() {
               {item.label}
             </Link>
           ))}
+          <span className="mx-1 hidden h-5 w-px bg-slate-200 sm:inline-block" />
+          <AuthNav />
         </nav>
       </div>
     </header>

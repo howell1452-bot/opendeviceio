@@ -14,7 +14,7 @@ import { getRegistryRow } from "@/lib/registry";
 //   odio         (default) — the raw .odio.json document
 //   easyschematic          — EasySchematic bulk-import JSON
 //   dxf                    — AutoCAD DXF (text)
-//   visio                  — Microsoft Visio drawing (.vsdx, binary)
+//   visio                  — Microsoft Visio stencil (.vssx, binary; masters w/ connection points)
 //
 // Bundles are expanded internally by each adapter, so this works for devices,
 // bundles, and cables alike.
@@ -39,8 +39,8 @@ const FORMATS: Record<
   },
   visio: {
     adapterId: "visio",
-    contentType: "application/vnd.ms-visio.drawing",
-    ext: "vsdx"
+    contentType: "application/vnd.ms-visio.stencil",
+    ext: "vssx"
   }
 };
 
