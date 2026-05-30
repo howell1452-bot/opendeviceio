@@ -88,13 +88,26 @@ async function collectLinks() {
 }
 
 // --- 2. download a PDF (resumable: skip existing non-empty files) ---------------
-async function download(item) {
+async function download(item, tries = 4) {
   const file = join(outDir, `${safeName(item.model)}.pdf`);
   if (existsSync(file) && statSync(file).size > 0) return { ...item, file, skipped: true };
-  const res = await fetch(item.url, { headers: { "User-Agent": UA } });
-  if (!res.ok || !res.body) throw new Error(`HTTP ${res.status} for ${item.url}`);
-  await pipeline(Readable.fromWeb(res.body), createWriteStream(file));
-  return { ...item, file, bytes: statSync(file).size };
+  for (let t = 1; t <= tries; t++) {
+    try {
+      const res = await fetch(item.url, { headers: { "User-Agent": UA } });
+      // 403/429 = throttling: back off and retry rather than fail permanently.
+      if ((res.status === 403 || res.status === 429) && t < tries) {
+        await sleep(4000 * t);
+        continue;
+      }
+      if (!res.ok || !res.body) throw new Error(`HTTP ${res.status} for ${item.url}`);
+      await pipeline(Readable.fromWeb(res.body), createWriteStream(file));
+      return { ...item, file, bytes: statSync(file).size };
+    } catch (e) {
+      if (t === tries) throw e;
+      await sleep(2000 * t);
+    }
+  }
+  throw new Error(`exhausted retries for ${item.url}`);
 }
 
 async function run() {
