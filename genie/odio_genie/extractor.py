@@ -22,8 +22,11 @@ from typing import Any
 
 from .models import ConfidenceSignals
 
-# A current Claude model id. Override per-call via the CLI ``--model`` flag.
-DEFAULT_MODEL = "claude-opus-4-8"
+# Default extraction model. Spec-sheet extraction is structured parsing, not deep
+# reasoning, so a mid/cheap tier is the right default — Opus is ~15x the cost per token
+# for little accuracy gain here. Sonnet balances quality and cost; for high-volume bulk
+# ingest, override to Haiku ("claude-haiku-4-5-20251001") via the CLI ``--model`` flag.
+DEFAULT_MODEL = "claude-sonnet-4-6"
 
 
 class Extractor(ABC):
