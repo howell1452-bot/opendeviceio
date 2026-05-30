@@ -1,0 +1,52 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    OpenDeviceIO AutoCAD import add-in.
+
+    Builds a NETLOAD-able / auto-loading plug-in that adds the ODIOIMPORT command:
+    fetch a device's DrawProgram from the OpenDeviceIO API (?format=draw) and draw
+    its schematic block into the active drawing.
+
+    Target: .NET Framework 4.8 (AutoCAD 2018-2024, ObjectARX-managed).
+
+    The AutoCAD managed assemblies are provided by the `AutoCAD.NET` reference-
+    assembly NuGet package so this builds WITHOUT AutoCAD installed. Set the
+    version to match your AutoCAD release (see the table in README.md); the value
+    below targets the 2019 API, which loads in 2018-2024. If you prefer to
+    reference the DLLs from your AutoCAD install instead, comment out the
+    PackageReference and use the HintPath ItemGroup below.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <AssemblyName>OdioImport</AssemblyName>
+    <RootNamespace>OpenDeviceIO.AutoCAD</RootNamespace>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <!-- AutoCAD loads the DLL; never copy the managed AutoCAD assemblies next to it. -->
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="AutoCAD.NET" Version="23.0.0">
+      <ExcludeAssets>runtime</ExcludeAssets>
+    </PackageReference>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+  <!--
+    ALTERNATIVE: reference the DLLs from your AutoCAD install instead of the NuGet.
+    Uncomment and set $(AutoCADPath), then remove the AutoCAD.NET PackageReference.
+
+  <PropertyGroup>
+    <AutoCADPath>C:\Program Files\Autodesk\AutoCAD 2024</AutoCADPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="accoremgd"><HintPath>$(AutoCADPath)\accoremgd.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="acdbmgd"><HintPath>$(AutoCADPath)\acdbmgd.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="acmgd"><HintPath>$(AutoCADPath)\acmgd.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+  -->
+
+</Project>

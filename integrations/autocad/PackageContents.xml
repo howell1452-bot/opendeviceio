@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  AutoCAD auto-loader manifest. To install as an auto-loading bundle, copy the
+  built add-in into a folder named "OdioImport.bundle" with this layout under
+  %APPDATA%\Autodesk\ApplicationPlugins\ :
+
+    OdioImport.bundle\
+      PackageContents.xml         (this file)
+      Contents\
+        OdioImport.dll            (build output)
+        Newtonsoft.Json.dll       (dependency)
+
+  AutoCAD then registers the ODIOIMPORT command on demand. SeriesMin/Max cover
+  AutoCAD 2018 (R22.0) through 2024 (R24.3); widen for newer releases.
+-->
+<ApplicationPackage SchemaVersion="1.0"
+                    AppVersion="0.1.0"
+                    Name="OpenDeviceIO Import"
+                    Description="Import OpenDeviceIO (.odio) device blocks into AutoCAD"
+                    Author="OpenDeviceIO">
+  <CompanyDetails Name="OpenDeviceIO" Url="https://opendeviceio.org" />
+  <Components Description="net48">
+    <RuntimeRequirements OS="Win64" Platform="AutoCAD*" SeriesMin="R22.0" SeriesMax="R24.3" />
+    <ComponentEntry AppName="OdioImport"
+                    ModuleName="./Contents/OdioImport.dll"
+                    LoadOnAutoCADStartup="false"
+                    LoadOnCommandInvocation="true">
+      <Commands GroupName="ODIO">
+        <Command Global="ODIOIMPORT" Local="ODIOIMPORT" />
+      </Commands>
+    </ComponentEntry>
+  </Components>
+</ApplicationPackage>
