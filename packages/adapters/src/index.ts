@@ -9,7 +9,6 @@ export {
 } from "./mappings.js";
 export { EasySchematicAdapter } from "./easyschematic.js";
 export { DxfAdapter } from "./dxf.js";
-export { VisioAdapter } from "./visio.js";
 export { AvcadAdapter } from "./stubs.js";
 export { TableSvgAdapter, renderTableSvg } from "./table-svg.js";
 export {

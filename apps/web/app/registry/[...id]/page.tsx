@@ -91,7 +91,7 @@ export default async function RegistryDetailPage({
             <DownloadLink id={row.id} format="odio" label="ODIO JSON" primary />
             <DownloadLink id={row.id} format="easyschematic" label="EasySchematic" />
             <DownloadLink id={row.id} format="dxf" label="DXF (CAD)" />
-            <DownloadLink id={row.id} format="visio" label="Visio (VSDX)" />
+            <DownloadLink id={row.id} format="svg" label="I/O table (SVG)" />
           </div>
         </div>
       </header>
@@ -168,7 +168,7 @@ function DownloadLink({
   primary
 }: {
   id: string;
-  format: "odio" | "easyschematic" | "dxf" | "visio";
+  format: "odio" | "easyschematic" | "dxf" | "svg";
   label: string;
   primary?: boolean;
 }) {

@@ -14,13 +14,13 @@ import { getRegistryRow } from "@/lib/registry";
 //   odio         (default) — the raw .odio.json document
 //   easyschematic          — EasySchematic bulk-import JSON
 //   dxf                    — AutoCAD DXF (text)
-//   visio                  — Microsoft Visio stencil (.vssx, binary; masters w/ connection points)
+//   svg                    — standardized ODIO I/O table (SVG; opens in any browser)
 //
 // Bundles are expanded internally by each adapter, so this works for devices,
 // bundles, and cables alike.
 export const dynamic = "force-dynamic";
 
-type Format = "odio" | "easyschematic" | "dxf" | "visio";
+type Format = "odio" | "easyschematic" | "dxf" | "svg";
 
 // adapter id (in @opendeviceio/adapters) + the download metadata per format.
 const FORMATS: Record<
@@ -37,15 +37,15 @@ const FORMATS: Record<
     contentType: "application/dxf",
     ext: "dxf"
   },
-  visio: {
-    adapterId: "visio",
-    contentType: "application/vnd.ms-visio.stencil",
-    ext: "vssx"
+  svg: {
+    adapterId: "table-svg",
+    contentType: "image/svg+xml; charset=utf-8",
+    ext: "io-table.svg"
   }
 };
 
 function isFormat(v: string | null): v is Format {
-  return v === "odio" || v === "easyschematic" || v === "dxf" || v === "visio";
+  return v === "odio" || v === "easyschematic" || v === "dxf" || v === "svg";
 }
 
 export async function GET(
