@@ -118,6 +118,17 @@ export default async function ContributePage() {
                   </li>
                 ))}
               </ul>
+              <p className="mt-3 text-sm text-slate-600">
+                Two ways to publish for your brand:{" "}
+                <Link className="text-brand-700 underline" href="/publish">
+                  upload an .odio file
+                </Link>
+                , or{" "}
+                <Link className="text-brand-700 underline" href="/author">
+                  author one from a form
+                </Link>{" "}
+                with a live preview and publish it directly.
+              </p>
             </section>
           ) : null}
 

@@ -136,7 +136,13 @@ const inputCls =
   "w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500";
 const labelCls = "block text-xs font-medium text-slate-500";
 
-export function OdioAuthor() {
+export function OdioAuthor({
+  signedIn = false,
+  brands = []
+}: {
+  signedIn?: boolean;
+  brands?: string[];
+}) {
   const [device, setDevice] = useState({
     manufacturer: "",
     model: "",
@@ -146,6 +152,7 @@ export function OdioAuthor() {
   });
   const [ports, setPorts] = useState<PortForm[]>([newPort()]);
   const [power, setPower] = useState<PowerForm[]>([]);
+  const [publishState, setPublishState] = useState<{ status: "idle" | "busy" | "ok" | "error"; message?: string }>({ status: "idle" });
 
   const { doc, errors, svg, json } = useMemo(() => {
     const d = buildDoc(device, ports, power);
@@ -178,6 +185,33 @@ export function OdioAuthor() {
     );
 
   const fileBase = slugId(`${device.manufacturer || "device"}-${device.model || ""}`);
+
+  // Publishing is gated to signed-in manufacturers and scoped to their approved
+  // brands. The button is convenience over POST /api/v1/devices, which re-checks
+  // auth + brand server-side (RLS), so this can't be bypassed from the client.
+  const trimmedMfr = device.manufacturer.trim();
+  const brandOk = trimmedMfr.length > 0 && brands.includes(trimmedMfr);
+  const canPublish = signedIn && errors.length === 0 && brandOk && publishState.status !== "busy";
+
+  const publish = async () => {
+    setPublishState({ status: "busy" });
+    try {
+      const res = await fetch("/api/v1/devices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: json
+      });
+      if (res.ok) {
+        setPublishState({ status: "ok", message: String((doc as { id?: string }).id ?? "") });
+      } else {
+        const e = (await res.json().catch(() => ({}))) as { error?: string };
+        setPublishState({ status: "error", message: e.error ?? `HTTP ${res.status}` });
+      }
+    } catch (e) {
+      setPublishState({ status: "error", message: e instanceof Error ? e.message : String(e) });
+    }
+  };
 
   return (
     <div className="grid gap-8 lg:grid-cols-2">
@@ -462,6 +496,51 @@ export function OdioAuthor() {
             ✓ Valid ODIO document.
           </div>
         )}
+
+        {/* Publish (gated to signed-in manufacturers, scoped to approved brands). */}
+        <div className="mt-3">
+          {signedIn ? (
+            <>
+              <button
+                onClick={publish}
+                disabled={!canPublish}
+                className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white enabled:hover:bg-emerald-700 disabled:opacity-40"
+              >
+                {publishState.status === "busy" ? "Publishing…" : "Publish to registry"}
+              </button>
+              {errors.length === 0 && !brandOk ? (
+                <p className="mt-2 text-xs text-amber-700">
+                  Your account isn&apos;t approved to publish for{" "}
+                  <strong>{trimmedMfr || "(no manufacturer)"}</strong>. Approved:{" "}
+                  {brands.length ? brands.join(", ") : "none"}.{" "}
+                  <a className="underline" href="/contribute">
+                    Request access
+                  </a>
+                  .
+                </p>
+              ) : null}
+              {publishState.status === "ok" ? (
+                <p className="mt-2 text-xs text-emerald-700">
+                  Published as <code className="font-mono">{publishState.message}</code> —{" "}
+                  <a className="underline" href={`/registry/${publishState.message}`}>
+                    view in registry
+                  </a>{" "}
+                  (manufacturer-verified).
+                </p>
+              ) : null}
+              {publishState.status === "error" ? (
+                <p className="mt-2 text-xs text-red-700">Publish failed: {publishState.message}</p>
+              ) : null}
+            </>
+          ) : (
+            <p className="text-xs text-slate-500">
+              <a className="underline" href="/contribute">
+                Sign in as a manufacturer
+              </a>{" "}
+              to publish this to the registry, or just download it above.
+            </p>
+          )}
+        </div>
 
         {svg ? (
           <div
