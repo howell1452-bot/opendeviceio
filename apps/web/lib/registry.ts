@@ -1,4 +1,5 @@
 import type { OdioDocument } from "@opendeviceio/sdk";
+import { normalizeManufacturer } from "@opendeviceio/sdk";
 import { getSupabase } from "./supabase";
 
 // A row of the `public.registry` table. The `document` column is the full
@@ -177,7 +178,9 @@ export async function getFacets(): Promise<RegistryFacets> {
         connectors: string[] | null;
       }>) {
         if (r.kind) kinds.add(r.kind);
-        if (r.manufacturer) manufacturers.add(r.manufacturer);
+        // Canonicalize for the facet so any un-migrated variant still folds into
+        // its brand (storage is normalized on write, so this is belt-and-braces).
+        if (r.manufacturer) manufacturers.add(normalizeManufacturer(r.manufacturer));
         if (r.category) categories.add(r.category);
         for (const c of r.connectors ?? []) connectors.add(c);
       }

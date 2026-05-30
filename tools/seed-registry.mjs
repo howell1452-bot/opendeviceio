@@ -22,6 +22,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { normalizeManufacturer } from "@opendeviceio/sdk";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, "..");
@@ -63,10 +64,17 @@ function rowFor(doc) {
   const portCount = kind === "device" && Array.isArray(doc.ports) ? doc.ports.length : null;
   const connectors = [...collectByKey(doc, ["connector"])].sort();
   const transports = [...collectByKey(doc, ["transport"])].sort();
+  // Canonicalize the manufacturer so brand variants ("Crestron Electronics, Inc."
+  // → "Crestron") collapse into one registry facet. Normalize the stored document
+  // too so the .odio served from the registry matches the facet.
+  const manufacturer = normalizeManufacturer(identity?.manufacturer ?? null);
+  if (identity && manufacturer && identity.manufacturer !== manufacturer) {
+    identity.manufacturer = manufacturer;
+  }
   return {
     id,
     kind,
-    manufacturer: identity?.manufacturer ?? null,
+    manufacturer,
     model: identity?.model ?? null,
     category: identity?.category ?? null,
     product_line: identity?.productLine ?? null,

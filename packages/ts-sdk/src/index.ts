@@ -66,6 +66,13 @@ export type {
 } from "./bundle-types.js";
 export type { OpenDeviceIOCable as Cable } from "./cable-types.js";
 
+// --- Manufacturer-name normalization -------------------------------------
+export {
+  normalizeManufacturer,
+  manufacturerKey,
+  MANUFACTURER_ALIASES
+} from "./manufacturer.js";
+
 // --- Bundle & cable validation / parsing ---------------------------------
 export {
   validateBundle,

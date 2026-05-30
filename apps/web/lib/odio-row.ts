@@ -1,4 +1,5 @@
 import type { OdioDocument } from "@opendeviceio/sdk";
+import { normalizeManufacturer } from "@opendeviceio/sdk";
 import type { RegistryRow } from "./registry";
 
 // Mirrors the registry-row metadata derivation in tools/seed-registry.mjs so
@@ -80,10 +81,16 @@ export function deriveRegistryRow(
   const transports = [...collectByKey(doc, ["transport"])].sort();
   const str = (v: unknown): string | null =>
     typeof v === "string" ? v : null;
+  // Canonicalize the manufacturer (same rule as seed) so a publisher's brand
+  // variant folds into the existing facet, and the stored document matches.
+  const manufacturer = normalizeManufacturer(str(identity?.manufacturer));
+  if (identity && manufacturer && identity.manufacturer !== manufacturer) {
+    identity.manufacturer = manufacturer;
+  }
   return {
     id,
     kind,
-    manufacturer: str(identity?.manufacturer),
+    manufacturer,
     model: str(identity?.model),
     category: str(identity?.category),
     product_line: str(identity?.productLine),
