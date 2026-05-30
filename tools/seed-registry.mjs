@@ -98,6 +98,19 @@ const files = walkOdioFiles(inputDir).sort();
 let rows = files.map((f) => rowFor(JSON.parse(readFileSync(f, "utf8"))));
 if (statusFilter) rows = rows.filter((r) => statusFilter.has(r.validation_status));
 
+// Drop rows with no identifiable manufacturer (an unreadable datasheet can still
+// validate but yields an "unknown/unknown" id — never seed that as a real device).
+{
+  const before = rows.length;
+  rows = rows.filter((r) => {
+    const m = (r.manufacturer ?? "").trim().toLowerCase();
+    return m && m !== "unknown" && !String(r.id ?? "").toLowerCase().startsWith("unknown/");
+  });
+  if (rows.length < before) {
+    console.error(`Dropped ${before - rows.length} row(s) with no identifiable manufacturer.`);
+  }
+}
+
 // Collapse duplicate ids before upsert: two source documents can extract to the
 // same device id (e.g. amp-x300.pdf + amp-x300_1.pdf), but `id` is the registry's
 // primary key and a single upsert command cannot touch the same id twice. Last
