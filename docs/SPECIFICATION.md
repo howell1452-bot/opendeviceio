@@ -1043,3 +1043,26 @@ exercise the model end to end, including:
 The `examples/invalid/` directory documents, by counter-example, the conformance rules in
 §1–§7 (missing required field, unsatisfied `other`→`*Other` requirement, and an unknown
 non-`x-` core field).
+
+## 21. `network` — device networking class
+
+An optional, device-level block (a sibling of `power` and `physical`) for **network
+devices** (switches, routers, gateways). It is a coarse, queryable capability
+classification — **not** a model of internal forwarding/routing behavior.
+
+```jsonc
+"network": {
+  "osiLayers": [2, 3],   // OSI layers the device operates at
+  "managed": "managed",  // managed | smart | unmanaged
+  "routing": true        // performs L3 routing
+}
+```
+
+- **`osiLayers`** — a non-empty array of OSI layers (integers 1–7). Use `[2]` for an
+  L2-only switch, `[3]` for a router, and `[2, 3]` for an L2+/multilayer switch. This is
+  the field that captures the practically important L2-vs-L3 distinction.
+- **`managed`** — `managed`, `smart`, or `unmanaged` (for switches).
+- **`routing`** — `true` when the device performs Layer-3 routing.
+
+All members are OPTIONAL; omit `network` entirely for non-network devices. The block is
+`additionalProperties: false` with the usual `^x-` extension escape hatch.
