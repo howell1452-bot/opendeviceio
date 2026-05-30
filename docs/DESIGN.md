@@ -611,3 +611,44 @@ Build order: schema + types + a conformance example ✅ (done) → slot-aware va
 budget) → I/O-table + adapter **slot labels** ("Slot in-1 / HDMI IN 1") → Genie prompts for
 slot/card extraction → SPECIFICATION section. Some already-seeded Crestron drafts are
 modular (DM-MD frames) and were captured as fixed devices — revisit once this lands.
+
+## 16. AI-assisted system design (roadmap)
+
+A high-leverage payoff of a validated, machine-readable device corpus: it is the
+ground truth an AI design assistant needs so it stops hallucinating device I/O. Two
+modes, both building on what already ships (the public API, the SDK validators, the
+DrawProgram/I/O-table projections).
+
+### 16.1 ODIO as ground truth (inference-time, no training)
+The registry + `GET /api/v1/devices` are **tools** an LLM agent calls: find devices by
+capability, fetch a device's exact I/O, check whether two ports can connect, assemble a
+bill of materials. Answers are grounded in the schema rather than guessed. **First
+concrete step: an MCP server over the registry** — query + validate as first-class tools,
+a thin wrapper over the shipped API/SDK.
+
+### 16.2 ODIO as a training substrate
+The growing manufacturer-verified `.odio` corpus plus the relationships encoded in
+bundles/chassis is a clean labeled dataset for design reasoning (compatibility, signal
+routing, BOM generation, device substitution), for datasheet extraction (the §12 Genie
+fine-tune), and for synthetic valid/invalid designs that train a design validator.
+Training on normalized ODIO beats training on noisy PDFs — ODIO is a domain ontology plus
+verified instances. CC-BY data makes it usable for open training with attribution.
+
+### 16.3 The reliability mechanism — generate → validate → repair
+The differentiator over generic LLM design help: connector→link→signals, PoE/USB-PD
+budgets, and slot fit are explicit and machine-checkable (`validateDocument`,
+`validateChassis`, the primary-signal/compatibility logic). An AI **proposes** a
+connection or a system; the SDK **verifies** it and surfaces concrete errors to **repair**.
+That loop is how device-design automation becomes trustworthy instead of confidently wrong.
+The DrawProgram (§14) and I/O table let the assistant render and explain its output.
+
+### 16.4 Directions
+MCP/tool API over the registry; a design copilot (natural language → pick devices, route
+signals, validate, emit a bundle `.odio` + BOM + I/O tables + schematic blocks); a
+compatibility service ("can these ports connect?" / "which devices satisfy this room?");
+and a data flywheel where verified devices and user-built bundles become ever-better
+grounding/training data — which is also the adoption story.
+
+**Scope honesty:** ODIO models *I/O*, not full device behavior (routing fabric, control-
+protocol semantics, acoustics). A design AI uses ODIO as the device-I/O truth layer and
+pairs it with room/best-practice knowledge.
