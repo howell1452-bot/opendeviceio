@@ -21,7 +21,12 @@ from .batch import (
     ingest_directory,
     slugify,
 )
-from .extractor import Extractor, MockExtractor
+from .extractor import (
+    Extractor,
+    MockExtractor,
+    default_examples,
+    estimate_cost,
+)
 from .models import ConfidenceSignals, ExtractedText
 from .pipeline import (
     GenieError,
@@ -45,6 +50,8 @@ __all__ = [
     "GENERATOR",
     "Extractor",
     "MockExtractor",
+    "default_examples",
+    "estimate_cost",
     "ExtractedText",
     "ConfidenceSignals",
     "GenieError",

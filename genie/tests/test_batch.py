@@ -17,7 +17,7 @@ import json
 
 import pytest
 
-from odio_genie import MockExtractor
+from odio_genie import MockExtractor, default_examples, validate
 from odio_genie.batch import (
     Candidate,
     discover_documents,
@@ -26,6 +26,16 @@ from odio_genie.batch import (
 )
 from odio_genie.models import ConfidenceSignals
 from odio_genie.pipeline import _leaf_paths
+
+
+# Canned per-request usage so the manifest's cost math has something to chew on. The
+# fake attaches this to every Candidate it returns; tests assert it propagates through.
+_FAKE_USAGE = {
+    "input_tokens": 1000,
+    "output_tokens": 500,
+    "cache_creation_input_tokens": 2000,
+    "cache_read_input_tokens": 4000,
+}
 
 
 # A known schema-valid device document (the deterministic mock candidate).
@@ -74,7 +84,9 @@ class _FakeBatchExtractor:
         is_escalation = "sonnet" in self.model
         out: dict[str, Candidate] = {}
         for custom_id in items:
-            out[custom_id] = self._candidate_for(custom_id, is_escalation)
+            cand = self._candidate_for(custom_id, is_escalation)
+            cand.usage = dict(_FAKE_USAGE)
+            out[custom_id] = cand
         return out
 
     def _candidate_for(self, custom_id: str, is_escalation: bool) -> Candidate:
@@ -267,3 +279,178 @@ def test_manifest_records_model_valid_confidence(tmp_path):
     assert doc["overallConfidence"] == pytest.approx(1.0)
     assert doc["lowConfidenceFieldCount"] == 0
     assert doc["errorCount"] == 0
+
+
+# --- few-shot examples ------------------------------------------------------------
+
+
+def test_default_examples_device_returns_two_valid_docs():
+    examples = default_examples("device")
+    assert len(examples) == 2
+    for ex in examples:
+        # Each is a real, schema-valid ODIO device document.
+        assert isinstance(ex, dict)
+        assert validate(ex) == []
+    # Distinct, diverse docs (extender + switch), not the same file twice.
+    ids = {ex.get("id") for ex in examples}
+    assert len(ids) == 2
+
+
+def test_default_examples_bundle_returns_one_valid_doc():
+    examples = default_examples("bundle")
+    assert len(examples) == 1
+    ex = examples[0]
+    assert ex.get("kind") == "bundle"
+    assert validate(ex) == []
+
+
+def test_default_examples_returns_fresh_copies():
+    a = default_examples("device")
+    a[0]["id"] = "mutated"
+    b = default_examples("device")
+    assert b[0]["id"] != "mutated"
+
+
+# --- usage + cost capture ---------------------------------------------------------
+
+
+def test_manifest_captures_per_doc_usage_and_cost(tmp_path):
+    src = tmp_path / "in"
+    src.mkdir()
+    _write_inputs(src)
+    out = tmp_path / "out"
+    factory, _ = _make_factory()
+
+    manifest = ingest_directory(
+        src, out, confidence_threshold=0.6, extractor_factory=factory
+    )
+
+    by_slug = {d["slug"]: d for d in manifest["documents"]}
+
+    # HIGH was only extracted once (Haiku) -> usage == one canned payload.
+    high = by_slug[HIGH]
+    assert high["usage"]["input_tokens"] == _FAKE_USAGE["input_tokens"]
+    assert high["usage"]["output_tokens"] == _FAKE_USAGE["output_tokens"]
+    assert high["estimatedCostUsd"] is not None
+    assert high["estimatedCostUsd"] > 0
+
+    # LOW + BAD were escalated -> two attempts each -> doubled tokens.
+    low = by_slug[LOW]
+    assert low["usage"]["input_tokens"] == 2 * _FAKE_USAGE["input_tokens"]
+    # And its cost is more than a single-attempt doc's.
+    assert low["estimatedCostUsd"] > high["estimatedCostUsd"]
+
+    # Batch discount applies: cost is half the non-batch estimate for the same usage.
+    from odio_genie import estimate_cost
+
+    sync = estimate_cost("claude-haiku-4-5-20251001", _FAKE_USAGE, batch=False)
+    assert high["estimatedCostUsd"] == pytest.approx(sync * 0.5)
+
+
+def test_manifest_aggregates_usage_and_cost(tmp_path):
+    src = tmp_path / "in"
+    src.mkdir()
+    _write_inputs(src)
+    out = tmp_path / "out"
+    factory, _ = _make_factory()
+
+    manifest = ingest_directory(
+        src, out, confidence_threshold=0.6, extractor_factory=factory
+    )
+
+    # 3 docs, 2 escalated -> 5 total attempts, each with the canned usage.
+    total_attempts = 5
+    assert manifest["usage"]["input_tokens"] == (
+        total_attempts * _FAKE_USAGE["input_tokens"]
+    )
+    assert manifest["usage"]["cache_read_input_tokens"] == (
+        total_attempts * _FAKE_USAGE["cache_read_input_tokens"]
+    )
+
+    cost = manifest["cost"]
+    assert cost["estimatedCostUsd"] is not None
+    assert cost["estimatedCostUsd"] > 0
+    # Aggregate equals the sum of per-doc estimates.
+    per_doc = sum(d["estimatedCostUsd"] for d in manifest["documents"])
+    assert cost["estimatedCostUsd"] == pytest.approx(per_doc)
+    # Per-model breakdown present for both models, with the right attempt counts.
+    by_model = cost["byModel"]
+    assert manifest["model"] in by_model
+    assert by_model[manifest["model"]]["usage"]["input_tokens"] == (
+        3 * _FAKE_USAGE["input_tokens"]  # Haiku ran on all 3 docs
+    )
+    assert "note" in cost
+
+
+def test_unknown_model_yields_null_cost(tmp_path):
+    src = tmp_path / "in"
+    src.mkdir()
+    (src / "high.txt").write_text("only doc", encoding="utf-8")
+    out = tmp_path / "out"
+    factory, _ = _make_factory()
+
+    manifest = ingest_directory(
+        src,
+        out,
+        model="some-unpriced-model",
+        escalate=False,
+        extractor_factory=factory,
+    )
+    doc = manifest["documents"][0]
+    # Tokens still captured, but cost is null (not a crash) for an unknown model.
+    assert doc["usage"]["input_tokens"] == _FAKE_USAGE["input_tokens"]
+    assert doc["estimatedCostUsd"] is None
+    assert manifest["cost"]["estimatedCostUsd"] is None
+
+
+def test_no_fewshot_path_still_works(tmp_path):
+    src = tmp_path / "in"
+    src.mkdir()
+    _write_inputs(src)
+    out = tmp_path / "out"
+    factory, _ = _make_factory()
+
+    manifest = ingest_directory(
+        src,
+        out,
+        confidence_threshold=0.6,
+        fewshot=False,
+        extractor_factory=factory,
+    )
+    assert manifest["fewshot"] is False
+    assert manifest["counts"]["total"] == 3
+    # Usage/cost still captured regardless of the few-shot toggle.
+    assert manifest["usage"]["input_tokens"] > 0
+
+
+def test_estimate_cost_unit():
+    from odio_genie import estimate_cost
+
+    usage = {
+        "input_tokens": 1_000_000,
+        "output_tokens": 0,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+    }
+    # 1M Haiku input tokens at $1.0/Mtok = $1.00 sync, $0.50 batched.
+    assert estimate_cost("claude-haiku-4-5-20251001", usage) == pytest.approx(1.0)
+    assert estimate_cost(
+        "claude-haiku-4-5-20251001", usage, batch=True
+    ) == pytest.approx(0.5)
+    # Unknown model / empty usage -> None (never crashes).
+    assert estimate_cost("nope", usage) is None
+    assert estimate_cost("claude-haiku-4-5-20251001", None) is None
+    assert estimate_cost("claude-haiku-4-5-20251001", {}) is None
+
+
+def test_fewshot_examples_in_claude_system_blocks():
+    """The few-shot docs must ride along as a cached system block (cache hits)."""
+    from odio_genie.extractor import ClaudeExtractor
+    from odio_genie.pipeline import load_schema
+
+    ext = ClaudeExtractor(schema=load_schema(), examples=default_examples("device"))
+    blocks = ext._system_blocks()
+    # Last block is the cached few-shot reference text.
+    last = blocks[-1]
+    assert "Few-shot reference" in last["text"]
+    assert last["cache_control"] == {"type": "ephemeral"}

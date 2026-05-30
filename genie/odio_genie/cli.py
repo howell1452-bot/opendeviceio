@@ -28,7 +28,14 @@ from .batch import (
     DEFAULT_ESCALATE_MODEL,
 )
 from .env import load_dotenv
-from .extractor import DEFAULT_MODEL, ClaudeExtractor, Extractor, MockExtractor
+from .extractor import (
+    DEFAULT_MODEL,
+    ClaudeExtractor,
+    Extractor,
+    MockExtractor,
+    default_examples,
+    estimate_cost,
+)
 from .pipeline import (
     GenieError,
     MissingExtraError,
@@ -79,6 +86,12 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Use the deterministic MockExtractor instead of the Claude API "
         "(offline; no API key needed).",
+    )
+    p_parse.add_argument(
+        "--no-fewshot",
+        action="store_true",
+        help="Disable the built-in few-shot reference examples (for A/B testing; "
+        "examples normally cut the schema-error / escalation rate).",
     )
     p_parse.add_argument(
         "--by",
@@ -135,6 +148,12 @@ def _build_parser() -> argparse.ArgumentParser:
         "(handy for small runs / debug; full price, no batch discount).",
     )
     p_ingest.add_argument(
+        "--no-fewshot",
+        action="store_true",
+        help="Disable the built-in few-shot reference examples sent with every batch "
+        "request (for A/B testing; examples normally cut the escalation rate).",
+    )
+    p_ingest.add_argument(
         "--confidence-threshold",
         type=float,
         default=DEFAULT_CONFIDENCE_THRESHOLD,
@@ -155,11 +174,19 @@ def _make_extractor(args: argparse.Namespace) -> Extractor:
     kind = getattr(args, "kind", "device")
     if args.mock:
         return MockExtractor(kind=kind)
+    # Default to the curated few-shot examples (cuts schema errors); ``--no-fewshot``
+    # turns them off for A/B testing.
+    examples = None if getattr(args, "no_fewshot", False) else default_examples(kind)
     if kind == "bundle":
         return ClaudeExtractor(
-            schema=bundle_tool_schema(), kind="bundle", model=args.model
+            schema=bundle_tool_schema(),
+            kind="bundle",
+            model=args.model,
+            examples=examples,
         )
-    return ClaudeExtractor(schema=load_schema(), kind="device", model=args.model)
+    return ClaudeExtractor(
+        schema=load_schema(), kind="device", model=args.model, examples=examples
+    )
 
 
 def _cmd_parse(args: argparse.Namespace) -> int:
@@ -184,6 +211,15 @@ def _cmd_parse(args: argparse.Namespace) -> int:
     low = confidence.get("lowConfidenceFields", [])
     if low:
         print(f"Low-confidence fields ({len(low)}): {', '.join(low)}")
+
+    usage = getattr(extractor, "last_usage", None)
+    if usage:
+        cost = estimate_cost(getattr(args, "model", DEFAULT_MODEL), usage)
+        if cost is not None:
+            print(
+                f"Estimated cost: ~${cost:.4f} (estimate; exact figure in the "
+                "Anthropic Console)"
+            )
 
     if errors:
         print(
@@ -230,6 +266,7 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
         confidence_threshold=args.confidence_threshold,
         escalate=not args.no_escalate,
         use_batch=not args.no_batch,
+        fewshot=not args.no_fewshot,
         validated_by=args.by,
     )
 
@@ -238,6 +275,9 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
     print(f"  valid:          {counts['valid']}/{counts['total']}")
     print(f"  escalated:      {counts['escalated']}")
     print(f"  low-confidence: {counts['lowConfidence']}")
+    est = manifest.get("cost", {}).get("estimatedCostUsd")
+    if est is not None:
+        print(f"  est. cost:      ~${est:.4f} (estimate; see Anthropic Console)")
     print(f"  manifest:       {Path(manifest['outDir']) / 'manifest.json'}")
 
     # Non-zero exit if any draft still has schema violations after escalation.

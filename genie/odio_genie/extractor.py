@@ -18,6 +18,8 @@ import copy
 import json
 import os
 from abc import ABC, abstractmethod
+from functools import lru_cache
+from pathlib import Path
 from typing import Any
 
 from .models import ConfidenceSignals
@@ -27,6 +29,133 @@ from .models import ConfidenceSignals
 # for little accuracy gain here. Sonnet balances quality and cost; for high-volume bulk
 # ingest, override to Haiku ("claude-haiku-4-5-20251001") via the CLI ``--model`` flag.
 DEFAULT_MODEL = "claude-sonnet-4-6"
+
+
+# --- few-shot examples ------------------------------------------------------------
+
+# Curated, small, high-quality reference docs loaded from the repo ``examples/``.
+# Two diverse devices (a video/control HDBaseT extender and an IT/PoE switch) exercise
+# connector/link/signals, count, poe, and multiple domains between them; one bundle
+# covers the kit/assembly shape. Given to Haiku as a cached system block so it sees a
+# worked example and emits far fewer schema-invalid drafts (cuts the escalation rate).
+_DEVICE_EXAMPLE_FILES = (
+    "extron-dtp2-t-211.odio.json",
+    "netgear-m4250-poe.odio.json",
+)
+_BUNDLE_EXAMPLE_FILES = (("bundles", "crestron-uc-cx100-t-wm.odio.json"),)
+
+
+def _examples_dir() -> Path:
+    """Locate the repo ``examples/`` dir relative to this package.
+
+    The package lives at ``<repo>/genie/odio_genie``; the examples are a frozen repo
+    input at ``<repo>/examples`` (same resolution pattern as the schema lookup in
+    pipeline.py — walk up from here looking for the directory).
+    """
+    here = Path(__file__).resolve()
+    for parent in here.parents:
+        candidate = parent / "examples"
+        if candidate.is_dir():
+            return candidate
+    # Fall back to the conventional location two levels up (genie/odio_genie -> repo).
+    return here.parents[2] / "examples"
+
+
+def _load_example(*parts: str) -> dict[str, Any]:
+    path = _examples_dir().joinpath(*parts)
+    with path.open("r", encoding="utf-8") as fh:
+        return json.load(fh)
+
+
+@lru_cache(maxsize=4)
+def _cached_examples(kind: str) -> tuple[dict[str, Any], ...]:
+    if kind == "bundle":
+        return tuple(_load_example(*parts) for parts in _BUNDLE_EXAMPLE_FILES)
+    return tuple(_load_example(name) for name in _DEVICE_EXAMPLE_FILES)
+
+
+def default_examples(kind: str = "device") -> list[dict[str, Any]]:
+    """Return the curated few-shot reference ODIO docs for ``kind``.
+
+    ``kind="device"`` -> 2 compact, diverse device docs; ``kind="bundle"`` -> 1 bundle
+    doc. Returns fresh deep copies so callers can mutate freely. Used as the default
+    ``examples=`` for real extraction (overridable via ``--no-fewshot``).
+    """
+    return [copy.deepcopy(ex) for ex in _cached_examples(kind)]
+
+
+# --- pricing (USD per million tokens; approximate / configurable) -----------------
+
+# Rates are intentionally approximate and easy to tweak; the authoritative cost is
+# always the Anthropic Console. Batch requests are billed at -50% (see ``estimate_cost``).
+# Each entry: input / output / cache-read / cache-write (5-min ephemeral) per 1M tokens.
+PRICING_USD_PER_MTOK: dict[str, dict[str, float]] = {
+    "claude-haiku-4-5-20251001": {
+        "input": 1.0,
+        "output": 5.0,
+        "cache_read": 0.10,
+        "cache_write": 1.25,
+    },
+    "claude-sonnet-4-6": {
+        "input": 3.0,
+        "output": 15.0,
+        "cache_read": 0.30,
+        "cache_write": 3.75,
+    },
+    "claude-opus-4-8": {
+        "input": 15.0,
+        "output": 75.0,
+        "cache_read": 1.50,
+        "cache_write": 18.75,
+    },
+}
+
+
+def usage_dict(usage: Any) -> dict[str, int]:
+    """Normalize an Anthropic ``message.usage`` (object or dict) into a plain dict.
+
+    Captures the four token counters used for cost. Missing fields default to 0 so an
+    older/partial usage payload never crashes downstream cost math.
+    """
+
+    def _get(name: str) -> int:
+        if usage is None:
+            return 0
+        if isinstance(usage, dict):
+            value = usage.get(name)
+        else:
+            value = getattr(usage, name, None)
+        return int(value) if value is not None else 0
+
+    return {
+        "input_tokens": _get("input_tokens"),
+        "output_tokens": _get("output_tokens"),
+        "cache_creation_input_tokens": _get("cache_creation_input_tokens"),
+        "cache_read_input_tokens": _get("cache_read_input_tokens"),
+    }
+
+
+def estimate_cost(
+    model: str, usage: dict[str, int] | None, *, batch: bool = False
+) -> float | None:
+    """Estimate USD cost for one request from its token usage.
+
+    Returns ``None`` for an unknown model (caller treats cost as unavailable rather than
+    crashing). ``batch=True`` halves the total to reflect the Batches API -50% discount.
+    This is an ESTIMATE; the exact figure is in the Anthropic Console.
+    """
+    rates = PRICING_USD_PER_MTOK.get(model)
+    if rates is None or not usage:
+        return None
+    cost = (
+        usage.get("input_tokens", 0) * rates["input"]
+        + usage.get("output_tokens", 0) * rates["output"]
+        + usage.get("cache_read_input_tokens", 0) * rates["cache_read"]
+        + usage.get("cache_creation_input_tokens", 0) * rates["cache_write"]
+    ) / 1_000_000.0
+    if batch:
+        cost *= 0.5
+    return round(cost, 6)
 
 
 class Extractor(ABC):
@@ -312,6 +441,8 @@ class ClaudeExtractor(Extractor):
         self.max_tokens = max_tokens
         self._api_key = api_key
         self._last_signals = ConfidenceSignals()
+        # Token usage from the most recent ``extract`` (None until the first call).
+        self.last_usage: dict[str, int] | None = None
 
     @property
     def _is_bundle(self) -> bool:
@@ -396,6 +527,7 @@ class ClaudeExtractor(Extractor):
             ],
         )
 
+        self.last_usage = usage_dict(getattr(response, "usage", None))
         tool_input = self._first_tool_use(response)
         document = tool_input.get(key, {})
         self._last_signals = ConfidenceSignals(

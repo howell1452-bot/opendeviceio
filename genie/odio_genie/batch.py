@@ -30,6 +30,9 @@ from .extractor import (
     DEFAULT_MODEL,
     ClaudeExtractor,
     _tool_schema,
+    default_examples,
+    estimate_cost,
+    usage_dict,
 )
 from .models import ConfidenceSignals, ExtractedText
 from .pipeline import (
@@ -72,20 +75,23 @@ class Candidate:
 
     ``document`` is the candidate ODIO dict (``{}`` if the request failed), ``signals``
     are the model's self-reported per-field confidences, and ``error`` carries a
-    per-request failure message so one bad doc never crashes the whole batch.
+    per-request failure message so one bad doc never crashes the whole batch. ``usage``
+    is the request's token counts (input/output/cache) when the API reported them.
     """
 
-    __slots__ = ("document", "signals", "error")
+    __slots__ = ("document", "signals", "error", "usage")
 
     def __init__(
         self,
         document: dict[str, Any],
         signals: ConfidenceSignals | None = None,
         error: str | None = None,
+        usage: dict[str, int] | None = None,
     ) -> None:
         self.document = document
         self.signals = signals or ConfidenceSignals()
         self.error = error
+        self.usage = usage
 
 
 class BatchExtractorProtocol(Protocol):
@@ -264,11 +270,12 @@ class BatchExtractor:
             return custom_id, Candidate({}, error=detail)
 
         message = _get(inner, "message")
+        usage = usage_dict(_get(message, "usage"))
         try:
             document, signals = self._extract_tool_use(message)
         except GenieError as exc:
-            return custom_id, Candidate({}, error=str(exc))
-        return custom_id, Candidate(document, signals)
+            return custom_id, Candidate({}, error=str(exc), usage=usage)
+        return custom_id, Candidate(document, signals, usage=usage)
 
     def _extract_tool_use(self, message: Any) -> tuple[dict[str, Any], ConfidenceSignals]:
         key = self._proto._document_key
@@ -332,6 +339,46 @@ def _build_draft_from_candidate(
     return document, errors
 
 
+_USAGE_KEYS = (
+    "input_tokens",
+    "output_tokens",
+    "cache_creation_input_tokens",
+    "cache_read_input_tokens",
+)
+
+
+def _empty_usage() -> dict[str, int]:
+    return {k: 0 for k in _USAGE_KEYS}
+
+
+def _add_usage(into: dict[str, int], usage: dict[str, int] | None) -> None:
+    if not usage:
+        return
+    for k in _USAGE_KEYS:
+        into[k] = into.get(k, 0) + int(usage.get(k, 0) or 0)
+
+
+def _doc_usage_and_cost(
+    attempts: list[tuple[str, dict[str, int] | None]], *, use_batch: bool
+) -> tuple[dict[str, int], float | None]:
+    """Sum a document's attempts into total token usage + estimated USD cost.
+
+    Cost is the sum of each attempt's estimated cost (Haiku pass + any Sonnet
+    escalation). Returns ``cost = None`` only if no attempt had a known price *and*
+    produced usage; otherwise unknown-model attempts contribute 0 to the sum.
+    """
+    totals = _empty_usage()
+    cost = 0.0
+    any_cost = False
+    for model, usage in attempts:
+        _add_usage(totals, usage)
+        attempt_cost = estimate_cost(model, usage, batch=use_batch)
+        if attempt_cost is not None:
+            cost += attempt_cost
+            any_cost = True
+    return totals, (round(cost, 6) if any_cost else None)
+
+
 def _overall_confidence(draft: dict[str, Any]) -> float:
     conf = draft.get("provenance", {}).get("confidence", {})
     return float(conf.get("overall", 0.0))
@@ -369,6 +416,7 @@ def ingest_directory(
     confidence_threshold: float = DEFAULT_CONFIDENCE_THRESHOLD,
     escalate: bool = True,
     use_batch: bool = True,
+    fewshot: bool = True,
     schema_path: str | None = None,
     validated_by: str | None = None,
     extractor_factory: Callable[..., BatchExtractorProtocol] | None = None,
@@ -401,7 +449,9 @@ def ingest_directory(
     else:
         tool_schema = load_schema(schema_path)
 
-    factory = extractor_factory or _default_factory(use_batch, api_key=None)
+    factory = extractor_factory or _default_factory(
+        use_batch, api_key=None, fewshot=fewshot
+    )
 
     out_root = Path(out_dir)
     out_root.mkdir(parents=True, exist_ok=True)
@@ -432,6 +482,9 @@ def ingest_directory(
     drafts: dict[str, dict[str, Any]] = {}
     errors_by_slug: dict[str, list[str]] = {}
     chosen_model: dict[str, str] = {}
+    # Every extraction attempt's token usage, per slug, as ``(model, usage)`` so the
+    # manifest can sum the Haiku attempt + any Sonnet escalation into a per-doc cost.
+    attempts_by_slug: dict[str, list[tuple[str, dict[str, int] | None]]] = {}
     for slug in order:
         candidate = candidates.get(
             slug, Candidate({}, error="No result returned for this request.")
@@ -446,6 +499,7 @@ def ingest_directory(
         drafts[slug] = draft
         errors_by_slug[slug] = errors
         chosen_model[slug] = model
+        attempts_by_slug[slug] = [(model, candidate.usage)]
 
     # --- pass 2: confidence-gated escalation (Sonnet) ---
     escalated_slugs: set[str] = set()
@@ -466,6 +520,9 @@ def ingest_directory(
                 candidate = re_candidates.get(slug)
                 if candidate is None:
                     continue
+                # Record the escalation attempt's usage regardless of whether we keep
+                # its draft — the API call was still billed.
+                attempts_by_slug[slug].append((escalate_model, candidate.usage))
                 new_draft, new_errors = _build_draft_from_candidate(
                     candidate,
                     slugs[slug],
@@ -484,6 +541,11 @@ def ingest_directory(
     # --- write drafts + reports + manifest ---
     manifest_docs: list[dict[str, Any]] = []
     used_stems: set[str] = set()
+    # Aggregate token usage + estimated cost across the whole run, and per model.
+    total_usage = _empty_usage()
+    total_cost = 0.0
+    any_cost = False
+    cost_by_model: dict[str, dict[str, Any]] = {}
     for slug in order:
         draft = drafts[slug]
         errors = errors_by_slug[slug]
@@ -508,6 +570,25 @@ def ingest_directory(
         report = render_review_report(draft, errors)
         report_path.write_text(report, encoding="utf-8")
 
+        doc_usage, doc_cost = _doc_usage_and_cost(
+            attempts_by_slug[slug], use_batch=use_batch
+        )
+        _add_usage(total_usage, doc_usage)
+        if doc_cost is not None:
+            total_cost += doc_cost
+            any_cost = True
+        # Per-model breakdown (tokens always; cost only for priced attempts).
+        for attempt_model, usage in attempts_by_slug[slug]:
+            entry = cost_by_model.setdefault(
+                attempt_model, {"usage": _empty_usage(), "estimatedCostUsd": None}
+            )
+            _add_usage(entry["usage"], usage)
+            attempt_cost = estimate_cost(attempt_model, usage, batch=use_batch)
+            if attempt_cost is not None:
+                entry["estimatedCostUsd"] = round(
+                    (entry["estimatedCostUsd"] or 0.0) + attempt_cost, 6
+                )
+
         manifest_docs.append(
             {
                 "slug": slug,
@@ -520,6 +601,8 @@ def ingest_directory(
                 "overallConfidence": _overall_confidence(draft),
                 "lowConfidenceFieldCount": _low_confidence_count(draft),
                 "errorCount": len(errors),
+                "usage": doc_usage,
+                "estimatedCostUsd": doc_cost,
             }
         )
 
@@ -532,6 +615,17 @@ def ingest_directory(
         "escalateModel": escalate_model if escalate else None,
         "confidenceThreshold": confidence_threshold,
         "useBatch": use_batch,
+        "fewshot": fewshot,
+        "usage": total_usage,
+        "cost": {
+            # ESTIMATE only — the authoritative figure is in the Anthropic Console.
+            "estimatedCostUsd": round(total_cost, 6) if any_cost else None,
+            "note": (
+                "Estimated from approximate per-token pricing; the exact cost is in "
+                "the Anthropic Console."
+            ),
+            "byModel": cost_by_model,
+        },
         "counts": {
             "total": total,
             "valid": sum(1 for d in manifest_docs if d["valid"]),
@@ -578,10 +672,11 @@ class _SequentialBatchExtractor:
         *,
         kind: str = "device",
         model: str = DEFAULT_BATCH_MODEL,
+        examples: list[dict[str, Any]] | None = None,
         api_key: str | None = None,
     ) -> None:
         self._extractor = ClaudeExtractor(
-            schema=schema, kind=kind, model=model, api_key=api_key
+            schema=schema, kind=kind, model=model, examples=examples, api_key=api_key
         )
 
     def extract_batch(self, items: dict[str, str]) -> dict[str, Candidate]:
@@ -590,7 +685,9 @@ class _SequentialBatchExtractor:
             try:
                 document = self._extractor.extract(text)
                 results[custom_id] = Candidate(
-                    document, self._extractor.signals()
+                    document,
+                    self._extractor.signals(),
+                    usage=self._extractor.last_usage,
                 )
             except (GenieError, MissingExtraError):
                 raise
@@ -600,25 +697,36 @@ class _SequentialBatchExtractor:
 
 
 def _default_factory(
-    use_batch: bool, *, api_key: str | None
+    use_batch: bool, *, api_key: str | None, fewshot: bool = True
 ) -> Callable[..., BatchExtractorProtocol]:
     """Return the real extractor factory used when no ``extractor_factory`` is injected.
 
     Loads ``.env`` so ``ANTHROPIC_API_KEY`` can live in a gitignored file, then returns
     a factory producing either a :class:`BatchExtractor` (Batches API) or a
-    :class:`_SequentialBatchExtractor` (one synchronous call per doc).
+    :class:`_SequentialBatchExtractor` (one synchronous call per doc). When ``fewshot``
+    is set (default), the curated few-shot examples for the kind are attached as a
+    cached system block so Haiku sees a worked example — amortized across the batch.
     """
     env.load_dotenv()
 
     def factory(
         *, schema: dict[str, Any], kind: str, model: str
     ) -> BatchExtractorProtocol:
+        examples = default_examples(kind) if fewshot else None
         if use_batch:
             return BatchExtractor(
-                schema=schema, kind=kind, model=model, api_key=api_key
+                schema=schema,
+                kind=kind,
+                model=model,
+                examples=examples,
+                api_key=api_key,
             )
         return _SequentialBatchExtractor(
-            schema=schema, kind=kind, model=model, api_key=api_key
+            schema=schema,
+            kind=kind,
+            model=model,
+            examples=examples,
+            api_key=api_key,
         )
 
     return factory
