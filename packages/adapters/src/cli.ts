@@ -61,7 +61,7 @@ function parseArgs(argv: string[]): CliArgs {
 function printUsage(): void {
   process.stderr.write(
     [
-      "Usage: odio-export <input.odio.json> [--target <id>] [-o <out>]",
+      "Usage: odio-export <input.odio> [--target <id>] [-o <out>]   (.odio or legacy .odio.json)",
       "",
       `  --target, -t   adapter id (default: easyschematic): ${adapterIds.join(", ")}`,
       "  --es-format    EasySchematic envelope: array | bulk (default: array)",
@@ -82,7 +82,7 @@ function main(): void {
   }
 
   if (!args.input) {
-    process.stderr.write("Error: missing <input.odio.json>.\n");
+    process.stderr.write("Error: missing <input.odio> (or legacy .odio.json).\n");
     printUsage();
     process.exit(2);
   }

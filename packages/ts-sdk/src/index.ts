@@ -2,6 +2,16 @@
 
 export * from "./types.js";
 
+// File-format identity: media type + `.odio` / `.odio.json` extension helpers.
+export {
+  ODIO_MEDIA_TYPE,
+  ODIO_EXTENSION,
+  ODIO_LEGACY_EXTENSION,
+  ODIO_VERSION,
+  isOdioPath,
+  odioFilename
+} from "./media.js";
+
 // The generated root document interface is `OpenDeviceIODevice` (from the
 // schema title). Re-export it under the friendlier alias `OdioDevice` for the
 // full document, while the generated `Device` remains the identity sub-object.
