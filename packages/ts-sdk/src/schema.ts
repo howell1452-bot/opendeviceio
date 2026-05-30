@@ -408,6 +408,9 @@ const deviceSchema = {
             "classWatts": {
               "type": "number",
               "exclusiveMinimum": 0
+            },
+            "notes": {
+              "type": "string"
             }
           },
           "patternProperties": {
@@ -1095,6 +1098,9 @@ const deviceSchema = {
               "standard": {
                 "type": "string",
                 "description": "For PoE inputs, e.g. '802.3at'."
+              },
+              "notes": {
+                "type": "string"
               }
             },
             "patternProperties": {
@@ -1132,6 +1138,9 @@ const deviceSchema = {
         "redundant": {
           "type": "boolean",
           "description": "True if the device has redundant power supplies."
+        },
+        "notes": {
+          "type": "string"
         }
       },
       "patternProperties": {
@@ -1207,6 +1216,9 @@ const deviceSchema = {
           "description": "e.g. 'IP20', 'IP65'."
         },
         "color": {
+          "type": "string"
+        },
+        "notes": {
           "type": "string"
         }
       },

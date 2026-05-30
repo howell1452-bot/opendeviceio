@@ -164,7 +164,8 @@
           "properties": {
             "standard": { "type": "string", "enum": ["802.3af", "802.3at", "802.3bt-type3", "802.3bt-type4", "passive", "other"] },
             "role": { "type": "string", "enum": ["pse", "pd"], "description": "pse = sources power; pd = consumes power." },
-            "classWatts": { "type": "number", "exclusiveMinimum": 0 }
+            "classWatts": { "type": "number", "exclusiveMinimum": 0 },
+            "notes": { "type": "string" }
           },
           "patternProperties": { "^x-": {} },
           "additionalProperties": false
@@ -365,7 +366,8 @@
               "nominalVoltage": { "type": "number", "description": "Volts (typically for DC)." },
               "frequencyHz": { "type": "string", "description": "e.g. '50/60'." },
               "connector": { "type": "string", "description": "Connector vocabulary value, e.g. 'iec-c14', 'barrel-dc'." },
-              "standard": { "type": "string", "description": "For PoE inputs, e.g. '802.3at'." }
+              "standard": { "type": "string", "description": "For PoE inputs, e.g. '802.3at'." },
+              "notes": { "type": "string" }
             },
             "patternProperties": { "^x-": {} },
             "additionalProperties": false
@@ -382,7 +384,8 @@
           "additionalProperties": false
         },
         "heatBtuPerHour": { "type": "number", "minimum": 0, "description": "Optional; derivable from watts (W x 3.412) if absent." },
-        "redundant": { "type": "boolean", "description": "True if the device has redundant power supplies." }
+        "redundant": { "type": "boolean", "description": "True if the device has redundant power supplies." },
+        "notes": { "type": "string" }
       },
       "patternProperties": { "^x-": {} },
       "additionalProperties": false
@@ -411,7 +414,8 @@
           "items": { "type": "string", "enum": ["rack", "surface", "wall", "under-table", "pole", "ceiling", "din-rail", "vesa", "desktop"] }
         },
         "ipRating": { "type": "string", "description": "e.g. 'IP20', 'IP65'." },
-        "color": { "type": "string" }
+        "color": { "type": "string" },
+        "notes": { "type": "string" }
       },
       "patternProperties": { "^x-": {} },
       "additionalProperties": false
