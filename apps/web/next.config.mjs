@@ -11,7 +11,7 @@ const monorepoRoot = join(__dirname, "..", "..");
 const nextConfig = {
   // The SDK ships as ESM+CJS but is consumed from source-shaped dist; transpile it
   // so Next can bundle it for both server and client where used.
-  transpilePackages: ["@opendeviceio/sdk"],
+  transpilePackages: ["@opendeviceio/sdk", "@opendeviceio/adapters"],
   outputFileTracingRoot: monorepoRoot,
   async headers() {
     return [

@@ -84,13 +84,15 @@ export default async function RegistryDetailPage({
         </div>
 
         <div className="mt-5">
-          <a
-            href={`/registry/download/${row.id}`}
-            className="inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-brand-700"
-            download
-          >
-            <span aria-hidden>⬇</span> Download .odio.json
-          </a>
+          <div className="text-xs uppercase tracking-wide text-slate-400">
+            Download
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <DownloadLink id={row.id} format="odio" label="ODIO JSON" primary />
+            <DownloadLink id={row.id} format="easyschematic" label="EasySchematic" />
+            <DownloadLink id={row.id} format="dxf" label="DXF (CAD)" />
+            <DownloadLink id={row.id} format="visio" label="Visio (VSDX)" />
+          </div>
         </div>
       </header>
 
@@ -156,6 +158,31 @@ export default async function RegistryDetailPage({
         </section>
       ) : null}
     </div>
+  );
+}
+
+function DownloadLink({
+  id,
+  format,
+  label,
+  primary
+}: {
+  id: string;
+  format: "odio" | "easyschematic" | "dxf" | "visio";
+  label: string;
+  primary?: boolean;
+}) {
+  const cls = primary
+    ? "inline-flex items-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-brand-700"
+    : "inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-brand-400 hover:text-brand-700";
+  return (
+    <a
+      href={`/registry/download/${id}?format=${format}`}
+      className={cls}
+      download
+    >
+      <span aria-hidden>⬇</span> {label}
+    </a>
   );
 }
 
