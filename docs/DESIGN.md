@@ -472,3 +472,24 @@ These span video switching/control, DSP/audio, networked AV, microphones, displa
 AV-over-IP, and assistive listening — broad coverage to stress the vocabulary and seed the
 free database. Manufacturer-verified entries are the priority (highest-trust + best
 training data).
+
+### Ingest workflow (tooling is built)
+Per manufacturer:
+
+1. **Acquire** the spec-sheet PDFs into a directory, e.g. `corpus/<manufacturer>/`.
+2. **Bulk-extract** with Genie (Haiku batch + Sonnet escalation, §12 economics):
+   ```
+   genie ingest corpus/<manufacturer> -o staging/<manufacturer>
+   ```
+   → one draft `.odio.json` + `.review.md` per sheet, plus `manifest.json` (model used,
+   valid?, confidence, low-confidence fields).
+3. **Review** the drafts/manifest; fix and set `provenance.validation.status` to
+   `reviewed` (or `manufacturer-verified`).
+4. **Publish** the reviewed files to the registry:
+   ```
+   node tools/seed-registry.mjs staging/<manufacturer> --status=reviewed,manufacturer-verified --apply
+   ```
+   (needs `SUPABASE_SECRET_KEY`; or pipe the printed SQL through an admin connection.)
+
+The same `manifest.json` + reviewed files accumulate the labeled dataset for the §12
+local-model step.
