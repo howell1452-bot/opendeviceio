@@ -153,31 +153,46 @@ export async function getFacets(): Promise<RegistryFacets> {
   const supabase = getSupabase();
   if (!supabase) return EMPTY_FACETS;
   try {
-    const { data, error } = await supabase
-      .from("registry")
-      .select("kind,manufacturer,category,connectors");
-    if (error || !data) return EMPTY_FACETS;
     const kinds = new Set<string>();
     const manufacturers = new Set<string>();
     const categories = new Set<string>();
     const connectors = new Set<string>();
-    for (const r of data as Array<{
-      kind: string | null;
-      manufacturer: string | null;
-      category: string | null;
-      connectors: string[] | null;
-    }>) {
-      if (r.kind) kinds.add(r.kind);
-      if (r.manufacturer) manufacturers.add(r.manufacturer);
-      if (r.category) categories.add(r.category);
-      for (const c of r.connectors ?? []) connectors.add(c);
+
+    // Page through every row — a single select is capped (PostgREST default ~1000),
+    // which would drop manufacturers seeded beyond the first page (e.g. QSC after
+    // ~1.8k Crestron rows). We only pull the small facet columns.
+    const PAGE = 1000;
+    const MAX_ROWS = 50000; // safety bound
+    for (let from = 0; from < MAX_ROWS; from += PAGE) {
+      const { data, error } = await supabase
+        .from("registry")
+        .select("kind,manufacturer,category,connectors")
+        .range(from, from + PAGE - 1);
+      if (error) return from === 0 ? EMPTY_FACETS : pack();
+      if (!data || data.length === 0) break;
+      for (const r of data as Array<{
+        kind: string | null;
+        manufacturer: string | null;
+        category: string | null;
+        connectors: string[] | null;
+      }>) {
+        if (r.kind) kinds.add(r.kind);
+        if (r.manufacturer) manufacturers.add(r.manufacturer);
+        if (r.category) categories.add(r.category);
+        for (const c of r.connectors ?? []) connectors.add(c);
+      }
+      if (data.length < PAGE) break;
     }
-    return {
-      kinds: [...kinds].sort(),
-      manufacturers: [...manufacturers].sort((a, b) => a.localeCompare(b)),
-      categories: [...categories].sort(),
-      connectors: [...connectors].sort()
-    };
+
+    function pack(): RegistryFacets {
+      return {
+        kinds: [...kinds].sort(),
+        manufacturers: [...manufacturers].sort((a, b) => a.localeCompare(b)),
+        categories: [...categories].sort(),
+        connectors: [...connectors].sort()
+      };
+    }
+    return pack();
   } catch {
     return EMPTY_FACETS;
   }
