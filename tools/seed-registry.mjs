@@ -11,8 +11,13 @@
 //     SQL connection, e.g. the Supabase MCP, with no key at all.)
 //
 // Usage:
-//   node tools/seed-registry.mjs                 # print SQL
-//   node tools/seed-registry.mjs --apply         # upsert via REST (needs a secret key)
+//   node tools/seed-registry.mjs                              # print SQL for examples/
+//   node tools/seed-registry.mjs <dir>                        # print SQL for a staging dir
+//   node tools/seed-registry.mjs <dir> --status=reviewed,manufacturer-verified
+//   node tools/seed-registry.mjs <dir> --status=reviewed --apply   # upsert reviewed only (needs secret key)
+//
+// Default dir is examples/. --status filters by validation_status (comma-separated)
+// so the catalog-ingest flow can push only human-reviewed drafts to the registry.
 
 import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -75,8 +80,23 @@ function rowFor(doc) {
   };
 }
 
-const files = walkOdioFiles(examplesDir).sort();
-const rows = files.map((f) => rowFor(JSON.parse(readFileSync(f, "utf8"))));
+// --- CLI args ------------------------------------------------------------------
+// Positional: input directory to ingest (default: examples/). Flags: --apply,
+// --status=reviewed,manufacturer-verified (only upsert rows whose
+// validation_status is in the set — use this to push only reviewed catalog files).
+const argv = process.argv.slice(2);
+const positionals = argv.filter((a) => !a.startsWith("--"));
+const inputDir = positionals[0] ? resolve(positionals[0]) : examplesDir;
+const statusArg =
+  argv.find((a) => a.startsWith("--status="))?.slice("--status=".length) ??
+  (argv.includes("--status") ? argv[argv.indexOf("--status") + 1] : null);
+const statusFilter = statusArg
+  ? new Set(statusArg.split(",").map((s) => s.trim()).filter(Boolean))
+  : null;
+
+const files = walkOdioFiles(inputDir).sort();
+let rows = files.map((f) => rowFor(JSON.parse(readFileSync(f, "utf8"))));
+if (statusFilter) rows = rows.filter((r) => statusFilter.has(r.validation_status));
 
 // --- SQL emission --------------------------------------------------------------
 const dq = (s) => (s == null ? "null" : `$q$${s}$q$`);
@@ -98,9 +118,11 @@ const updateCols = cols
   .join(", ");
 
 const sql =
-  `insert into public.registry (${cols}) values\n` +
-  rows.map(valuesFor).join(",\n") +
-  `\non conflict (id) do update set ${updateCols};`;
+  rows.length === 0
+    ? "-- seed-registry: no matching .odio.json rows to upsert."
+    : `insert into public.registry (${cols}) values\n` +
+      rows.map(valuesFor).join(",\n") +
+      `\non conflict (id) do update set ${updateCols};`;
 
 function loadDotEnv() {
   // Minimal, non-overriding .env loader (repo root) so the service key can live
@@ -124,6 +146,10 @@ function loadDotEnv() {
 }
 
 async function apply() {
+  if (rows.length === 0) {
+    console.error("No matching .odio.json rows to upsert (check the directory / --status filter).");
+    return;
+  }
   loadDotEnv();
   const url = process.env.SUPABASE_URL || "https://vkbgtbvawhuajkortcka.supabase.co";
   // sb_secret_... (modern) or, for older projects, a service_role key.
