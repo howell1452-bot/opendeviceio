@@ -89,8 +89,7 @@ export default async function RegistryDetailPage({
             Download
           </div>
           <div className="mt-2 flex flex-wrap gap-2">
-            <DownloadLink id={row.id} format="odio" label="ODIO JSON" primary />
-            <DownloadLink id={row.id} format="easyschematic" label="EasySchematic" />
+            <DownloadLink id={row.id} format="odio" label="ODIO (.odio)" primary />
             <DownloadLink id={row.id} format="dxf" label="DXF (CAD)" />
             <DownloadLink id={row.id} format="svg" label="I/O table (SVG)" />
           </div>
@@ -172,7 +171,7 @@ function DownloadLink({
   primary
 }: {
   id: string;
-  format: "odio" | "easyschematic" | "dxf" | "svg";
+  format: "odio" | "dxf" | "svg";
   label: string;
   primary?: boolean;
 }) {

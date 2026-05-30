@@ -11,27 +11,25 @@ import { getRegistryRow } from "@/lib/registry";
 // because a catch-all segment must be the last part of a route.)
 //
 // Format is selected via ?format= :
-//   odio         (default) — the raw .odio.json document
-//   easyschematic          — EasySchematic bulk-import JSON
+//   odio         (default) — the raw .odio document (JSON)
 //   dxf                    — AutoCAD DXF (text)
 //   svg                    — standardized ODIO I/O table (SVG; opens in any browser)
+//
+// Design-tool vendors (EasySchematic, etc.) integrate via the SDK / public API
+// rather than a per-vendor download here, so the public registry stays
+// vendor-neutral.
 //
 // Bundles are expanded internally by each adapter, so this works for devices,
 // bundles, and cables alike.
 export const dynamic = "force-dynamic";
 
-type Format = "odio" | "easyschematic" | "dxf" | "svg";
+type Format = "odio" | "dxf" | "svg";
 
 // adapter id (in @opendeviceio/adapters) + the download metadata per format.
 const FORMATS: Record<
   Exclude<Format, "odio">,
   { adapterId: string; contentType: string; ext: string }
 > = {
-  easyschematic: {
-    adapterId: "easyschematic",
-    contentType: "application/json; charset=utf-8",
-    ext: "easyschematic.json"
-  },
   dxf: {
     adapterId: "dxf",
     contentType: "application/dxf",
@@ -45,7 +43,7 @@ const FORMATS: Record<
 };
 
 function isFormat(v: string | null): v is Format {
-  return v === "odio" || v === "easyschematic" || v === "dxf" || v === "svg";
+  return v === "odio" || v === "dxf" || v === "svg";
 }
 
 export async function GET(
@@ -67,13 +65,14 @@ export async function GET(
     return NextResponse.json({ error: "not found", id }, { status: 404 });
   }
 
-  // Raw ODIO document — the original behaviour, no adapter involved.
+  // Raw ODIO document — no adapter involved. Served as a .odio file with the ODIO
+  // media type (content is JSON).
   if (format === "odio") {
     return new NextResponse(JSON.stringify(row.document, null, 2), {
       status: 200,
       headers: {
-        "Content-Type": "application/json; charset=utf-8",
-        "Content-Disposition": `attachment; filename="${slug}.odio.json"`,
+        "Content-Type": "application/vnd.odio+json; charset=utf-8",
+        "Content-Disposition": `attachment; filename="${slug}.odio"`,
         "Cache-Control": "no-store"
       }
     });
