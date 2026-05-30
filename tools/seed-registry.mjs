@@ -98,6 +98,23 @@ const files = walkOdioFiles(inputDir).sort();
 let rows = files.map((f) => rowFor(JSON.parse(readFileSync(f, "utf8"))));
 if (statusFilter) rows = rows.filter((r) => statusFilter.has(r.validation_status));
 
+// Collapse duplicate ids before upsert: two source documents can extract to the
+// same device id (e.g. amp-x300.pdf + amp-x300_1.pdf), but `id` is the registry's
+// primary key and a single upsert command cannot touch the same id twice. Last
+// wins (files are sorted, so this is deterministic); report what was collapsed.
+{
+  const byId = new Map();
+  const collapsed = [];
+  for (const r of rows) {
+    if (byId.has(r.id)) collapsed.push(r.id);
+    byId.set(r.id, r);
+  }
+  if (collapsed.length > 0) {
+    console.error(`Collapsed ${collapsed.length} duplicate id(s) (last wins): ${collapsed.join(", ")}`);
+  }
+  rows = [...byId.values()];
+}
+
 // --- SQL emission --------------------------------------------------------------
 const dq = (s) => (s == null ? "null" : `$q$${s}$q$`);
 const arr = (a) => `array[${a.map((x) => `$q$${x}$q$`).join(",")}]::text[]`;
