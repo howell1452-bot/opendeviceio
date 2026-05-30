@@ -27,6 +27,7 @@ export default async function RegistryPage({
   const query = {
     search: first(sp.q),
     kind: first(sp.kind),
+    manufacturer: first(sp.manufacturer),
     category: first(sp.category),
     connector: first(sp.connector)
   };
@@ -55,7 +56,7 @@ export default async function RegistryPage({
 
       <div className="mt-6">
         {rows.length === 0 ? (
-          <EmptyState unavailable={unavailable} filtered={Boolean(query.search || query.kind || query.category || query.connector)} />
+          <EmptyState unavailable={unavailable} filtered={Boolean(query.search || query.kind || query.manufacturer || query.category || query.connector)} />
         ) : (
           <>
             <p className="mb-4 text-sm text-slate-500">

@@ -5,6 +5,7 @@ import { useState, useEffect, type FormEvent } from "react";
 
 export interface FilterOptions {
   kinds: string[];
+  manufacturers: string[];
   categories: string[];
   connectors: string[];
 }
@@ -19,7 +20,7 @@ export function RegistryFilters({
   initial
 }: {
   options: FilterOptions;
-  initial: { search: string; kind: string; category: string; connector: string };
+  initial: { search: string; kind: string; manufacturer: string; category: string; connector: string };
 }) {
   const router = useRouter();
   const params = useSearchParams();
@@ -45,7 +46,11 @@ export function RegistryFilters({
   }
 
   const hasAny =
-    initial.search || initial.kind || initial.category || initial.connector;
+    initial.search ||
+    initial.kind ||
+    initial.manufacturer ||
+    initial.category ||
+    initial.connector;
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4">
@@ -71,7 +76,13 @@ export function RegistryFilters({
         </button>
       </form>
 
-      <div className="mt-3 grid gap-3 sm:grid-cols-3">
+      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Select
+          label="Manufacturer"
+          value={initial.manufacturer}
+          options={options.manufacturers}
+          onChange={(v) => pushWith({ manufacturer: v })}
+        />
         <Select
           label="Kind"
           value={initial.kind}

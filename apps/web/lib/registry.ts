@@ -137,36 +137,48 @@ export async function getRegistryRow(id: string): Promise<RegistryRow | null> {
 /** Distinct, sorted facet values for the filter UI (best-effort). */
 export interface RegistryFacets {
   kinds: string[];
+  manufacturers: string[];
   categories: string[];
   connectors: string[];
 }
 
+const EMPTY_FACETS: RegistryFacets = {
+  kinds: [],
+  manufacturers: [],
+  categories: [],
+  connectors: []
+};
+
 export async function getFacets(): Promise<RegistryFacets> {
   const supabase = getSupabase();
-  if (!supabase) return { kinds: [], categories: [], connectors: [] };
+  if (!supabase) return EMPTY_FACETS;
   try {
     const { data, error } = await supabase
       .from("registry")
-      .select("kind,category,connectors");
-    if (error || !data) return { kinds: [], categories: [], connectors: [] };
+      .select("kind,manufacturer,category,connectors");
+    if (error || !data) return EMPTY_FACETS;
     const kinds = new Set<string>();
+    const manufacturers = new Set<string>();
     const categories = new Set<string>();
     const connectors = new Set<string>();
     for (const r of data as Array<{
       kind: string | null;
+      manufacturer: string | null;
       category: string | null;
       connectors: string[] | null;
     }>) {
       if (r.kind) kinds.add(r.kind);
+      if (r.manufacturer) manufacturers.add(r.manufacturer);
       if (r.category) categories.add(r.category);
       for (const c of r.connectors ?? []) connectors.add(c);
     }
     return {
       kinds: [...kinds].sort(),
+      manufacturers: [...manufacturers].sort((a, b) => a.localeCompare(b)),
       categories: [...categories].sort(),
       connectors: [...connectors].sort()
     };
   } catch {
-    return { kinds: [], categories: [], connectors: [] };
+    return EMPTY_FACETS;
   }
 }
