@@ -13,6 +13,14 @@ export { AvcadAdapter } from "./stubs.js";
 export { TableSvgAdapter, renderTableSvg } from "./table-svg.js";
 export { TableHtmlAdapter, renderTableHtml } from "./table-html.js";
 export {
+  buildDeviceProgram,
+  buildDevicePrograms,
+  type DrawProgram,
+  type DrawOp,
+  type DrawAlign,
+  type DocumentPrograms
+} from "./drawops.js";
+export {
   buildIoTable,
   IO_GROUP_ORDER,
   type IoTable,
