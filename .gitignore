@@ -28,3 +28,7 @@ out/
 
 # Local scratch / experiments (not part of the repo)
 _scratch/
+
+# Downloaded spec-sheet PDFs + Genie ingest drafts (large; not part of the repo)
+corpus/
+staging/
