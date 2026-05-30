@@ -530,12 +530,20 @@ class ClaudeExtractor(Extractor):
         self.last_usage = usage_dict(getattr(response, "usage", None))
         tool_input = self._first_tool_use(response)
         document = tool_input.get(key, {})
-        self._last_signals = ConfidenceSignals(
-            field_confidence={
-                k: float(v) for k, v in (tool_input.get("_confidence") or {}).items()
-            },
-            notes=dict(tool_input.get("_notes") or {}),
-        )
+        # Coerce _confidence robustly: the model occasionally drops a textual
+        # rationale where a number belongs; keep it as a note rather than raising.
+        raw_conf = tool_input.get("_confidence") or {}
+        field_confidence: dict[str, float] = {}
+        spilled: dict[str, str] = {}
+        if isinstance(raw_conf, dict):
+            for k, v in raw_conf.items():
+                try:
+                    field_confidence[k] = float(v)
+                except (TypeError, ValueError):
+                    spilled[k] = str(v)
+        notes = dict(tool_input.get("_notes") or {})
+        notes.update(spilled)
+        self._last_signals = ConfidenceSignals(field_confidence=field_confidence, notes=notes)
         return document
 
     @staticmethod
