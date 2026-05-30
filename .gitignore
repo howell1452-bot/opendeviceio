@@ -32,3 +32,6 @@ _scratch/
 # Downloaded spec-sheet PDFs + Genie ingest drafts (large; not part of the repo)
 corpus/
 staging/
+
+# Reference vendor stencils/blocks (not part of the repo; used to learn formats)
+references/
