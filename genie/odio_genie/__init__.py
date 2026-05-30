@@ -14,6 +14,13 @@ from __future__ import annotations
 __version__ = "0.1.0"
 GENERATOR = f"genie/{__version__}"
 
+from .batch import (
+    BatchExtractor,
+    Candidate,
+    discover_documents,
+    ingest_directory,
+    slugify,
+)
 from .extractor import Extractor, MockExtractor
 from .models import ConfidenceSignals, ExtractedText
 from .pipeline import (
@@ -54,4 +61,9 @@ __all__ = [
     "bundle_tool_schema",
     "validate_kind",
     "write_review_report",
+    "BatchExtractor",
+    "Candidate",
+    "ingest_directory",
+    "discover_documents",
+    "slugify",
 ]

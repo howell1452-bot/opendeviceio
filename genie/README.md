@@ -73,6 +73,79 @@ genie parse datasheet.txt -o device.odio.json --review-report report.md --mock
 genie parse kit-datasheet.pdf -o kit.odio.json --kind bundle
 ```
 
+### Bulk-ingest a catalog of datasheets
+
+`genie ingest` turns a whole directory of spec sheets into reviewed-ready drafts in two
+passes over the Anthropic **Message Batches API**:
+
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...
+genie ingest ./datasheets -o ./drafts
+```
+
+What it does, end to end:
+
+1. **Discover** every `*.pdf` / `*.txt` / `*.md` under `<input_dir>` (recursively).
+2. **Ingest** each to text (`pipeline.ingest`; the PDF backend stays lazy).
+3. **Bulk extract** them all in **one batch** with **Haiku** (`claude-haiku-4-5-20251001`),
+   reusing the exact same schema-shaped tool-use and `cache_control`-marked system blocks
+   as `ClaudeExtractor` — so prompt caching applies across the whole batch. `custom_id` is
+   a slug of the source filename.
+4. **Validate + score + assemble** each result into a `status: draft` document.
+5. **Escalate** (confidence-gated): any draft that is schema-**invalid** or whose
+   `provenance.confidence.overall` is `<= --confidence-threshold` (default `0.6`) is
+   re-extracted in a **second batch** with **Sonnet** (`claude-sonnet-4-6`). The better
+   result is kept — valid beats invalid, then higher confidence wins.
+6. **Write** `<out_dir>/<id-or-slug>.odio.json` + a `.review.md` per doc, plus a
+   `manifest.json` summarizing every document (source file, chosen model, valid,
+   overall confidence, low-confidence field count, error count).
+
+Options:
+
+- `-o, --out-dir` — output directory for drafts + manifest (required)
+- `--model` — bulk extraction model (default Haiku `claude-haiku-4-5-20251001`)
+- `--escalate-model` — model for weak drafts (default Sonnet `claude-sonnet-4-6`)
+- `--no-escalate` — skip the second pass; keep the Haiku drafts as-is
+- `--no-batch` — sequential `ClaudeExtractor` calls instead of the Batches API
+  (handy for small runs / debug; full price, no batch discount)
+- `--confidence-threshold` — escalation gate (default `0.6`)
+- `--kind {device,bundle}` — extract a device (default) or a bundle for every doc
+- `--by EMAIL` — record a reviewer in each draft's `provenance.validation.by`
+
+Exit codes: `0` all drafts valid, `2` at least one draft still has schema violations
+after escalation (see the per-doc `.review.md`), `3` the `anthropic` extra is missing.
+
+#### Cost story
+
+Bulk catalog ingest is built to be cheap by stacking four levers:
+
+- **Haiku by default** — extraction is structured parsing, not deep reasoning, so the
+  cheapest tier handles the bulk of the corpus.
+- **Batches API (-50%)** — every batch request runs at half the synchronous token price.
+- **Prompt caching** — the schema + few-shot system blocks are identical and
+  `cache_control`-marked across every request, so they're billed once and read cheaply
+  thereafter.
+- **Confidence-gated escalation** — only the documents that actually come back weak are
+  re-run on the pricier Sonnet model, so you pay for the strong model exactly where it
+  earns its keep.
+
+#### End-to-end catalog workflow
+
+```
+acquire PDFs  ->  genie ingest ./datasheets -o ./drafts  ->  review drafts + manifest
+              ->  promote the reviewed files  ->  push to the registry
+                  with  node ../tools/seed-registry.mjs
+```
+
+1. **Acquire** the datasheet PDFs into a directory.
+2. **`genie ingest`** to produce drafts + `manifest.json`.
+3. **Human review**: open `manifest.json`, work the low-confidence / invalid docs first
+   (the `.review.md` reports list exactly which fields to verify), and edit the
+   `.odio.json` drafts. Flip `provenance.validation.status` to `published` (and set
+   `validation.by`/`date`) once a draft is checked.
+4. **Promote** the reviewed `.odio.json` files into the corpus.
+5. **Push to the registry** with `tools/seed-registry.mjs`.
+
 ### Validate an existing ODIO file
 
 ```bash
