@@ -1,13 +1,19 @@
 # OpenDeviceIO (ODIO) — Specification, Version 0.1
 
 **Status:** Normative · **Format version:** `0.1.0` ·
-**Canonical schema:** [`schema/v0.1/device.schema.json`](../schema/v0.1/device.schema.json)
-(`$id`: `https://opendeviceio.org/schema/v0.1/device.schema.json`)
+**Canonical schemas:** [`schema/v0.1/device.schema.json`](../schema/v0.1/device.schema.json)
+(`$id`: `https://opendeviceio.org/schema/v0.1/device.schema.json`),
+[`schema/v0.1/bundle.schema.json`](../schema/v0.1/bundle.schema.json),
+[`schema/v0.1/cable.schema.json`](../schema/v0.1/cable.schema.json)
 
 This document is the human-readable, normative specification of the OpenDeviceIO
 (ODIO) format, version 0.1. It is written **from** the canonical JSON Schema, which is
 the single source of truth. Where this prose and the schema disagree, **the schema
 governs** and the discrepancy is a defect to be fixed in the prose.
+
+ODIO defines three **document kinds** — *device* (the default, no `kind` field), *bundle*,
+and *cable* — sharing one connector and signal vocabulary. §2–§13 specify the device
+document; §14–§16 specify the bundle and cable documents and the `kind` discriminator.
 
 This specification is licensed under the
 [Creative Commons Attribution 4.0 International License (CC BY 4.0)](../LICENSE-docs).
@@ -26,10 +32,13 @@ appear in all capitals.
 
 ### 1.2 Conformance
 
-An ODIO document is a single JSON value (RFC 8259) that is a JSON object.
+An ODIO document is a single JSON value (RFC 8259) that is a JSON object. It is one of
+three **kinds** (§14): a *device*, a *bundle*, or a *cable*.
 
-> A file is **conformant** to ODIO 0.1 if and only if it validates against
-> `schema/v0.1/device.schema.json` under JSON Schema draft 2020-12.
+> A file is **conformant** to ODIO 0.1 if and only if it validates, under JSON Schema
+> draft 2020-12, against the schema for its kind: a *device* against
+> `schema/v0.1/device.schema.json`, a *bundle* against `schema/v0.1/bundle.schema.json`,
+> and a *cable* against `schema/v0.1/cable.schema.json`.
 
 There are no additional conformance requirements beyond schema validation. Any rule in
 this prose that is not expressible in, or enforced by, the schema is **advisory** unless
@@ -564,7 +573,355 @@ Each **`sourceDocuments`** item (`additionalProperties: false` + `x-`): `title` 
 
 ---
 
-## 14. Versioning policy
+## 14. Document kinds and the `kind` discriminator
+
+ODIO defines **three document kinds**, distinguished by the top-level `kind` member:
+
+| Kind | `kind` value | Required top-level members | Canonical schema |
+|------|--------------|----------------------------|------------------|
+| Device | *absent* | `odioVersion`, `id`, `device`, `ports` | `device.schema.json` |
+| Bundle | `"bundle"` | `odioVersion`, `kind`, `id`, `bundle`, `components` | `bundle.schema.json` |
+| Cable | `"cable"` | `odioVersion`, `kind`, `id`, `cable` | `cable.schema.json` |
+
+A **device** document has **no** `kind` member; it is the default kind and is specified by
+§2–§13, **unchanged** by the addition of bundles and cables. A **bundle** document MUST set
+`kind` to `"bundle"`; a **cable** document MUST set `kind` to `"cable"`.
+
+A consumer **MUST** route on `kind`: a document with no `kind` is a device and MUST be
+validated against `device.schema.json`; `kind: "bundle"` selects `bundle.schema.json`;
+`kind: "cable"` selects `cable.schema.json`. Consumers MUST validate against the schema for
+the resolved kind before relying on the document (§1.2).
+
+All three kinds share the slug-based `id` (§3, identical pattern), the
+**`additionalProperties: false`** closed core, and the **`^x-`** extension rule (§4) on
+every object. Bundle and cable documents reuse the device schema's `connector` and `signal`
+`$def`s by reference, so a connector or signal that is valid in a device is valid,
+identically, in a bundle component or a cable.
+
+---
+
+## 15. `bundle` — kits and assemblies
+
+A **bundle** is one orderable part number that contains multiple component devices, nested
+sub-assemblies, factory-terminated cables, and non-I/O accessories. Component devices remain
+full ODIO devices (a consumer renders each as its own block); the bundle groups and bills
+them under the kit part number. The device schema is **not** overloaded — the
+"one file = one device" promise (§2) is preserved.
+
+### 15.1 Top-level bundle object
+
+`type: object`. **Required:** `odioVersion`, `kind`, `id`, `bundle`, `components`.
+`additionalProperties: false` (+ `x-`).
+
+| Key | Type | Req. | Meaning |
+|-----|------|------|---------|
+| `$schema` | string | MAY | SHOULD be the canonical `$id` `https://opendeviceio.org/schema/v0.1/bundle.schema.json`. |
+| `odioVersion` | string | MUST | Same pattern and value (`"0.1.0"`) as a device document (§2). |
+| `kind` | const | MUST | `"bundle"`. The discriminator (§14). |
+| `id` | string | MUST | Stable, URL-safe identifier. **Same slug rule and pattern as a device `id`** (§3); for a kit the model segment is the orderable kit part number. |
+| `bundle` | object | MUST | Kit identity. See §15.2. |
+| `components` | array of `component` | MUST | The kit contents. `minItems: 1`. See §15.3. |
+| `standards` | array of `standard` | MAY | Reuses the device `standard` object (§11). |
+| `parameters` | object | MAY | Reuses the device `parameters` object (§12). |
+| `provenance` | object | MAY | Reuses the device `provenance` object (§13). |
+
+### 15.2 `bundle` — kit identity
+
+`type: object`. **Required:** `manufacturer`, `model`. `additionalProperties: false` (+ `x-`).
+The kit's `model` is the **orderable kit part number**.
+
+| Key | Type | Notes |
+|-----|------|-------|
+| `manufacturer` | string (minLength 1) | REQUIRED. |
+| `model` | string (minLength 1) | REQUIRED. Kit/assembly part number. |
+| `revision` | string | |
+| `category` | string | Dotted taxonomy path; same pattern as `device.category` (§5), e.g. `av/conferencing/kit`, `av/assembly`. |
+| `productLine` | string | |
+| `sku` | string | |
+| `gtin` | string | Pattern `^\d{8,14}$`. |
+| `productUrl` | string (`format: uri`) | |
+| `datasheetUrl` | string (`format: uri`) | |
+| `description` | string | Free-text kit description. |
+
+### 15.3 `components` — kit contents
+
+`components` is a non-empty array. Each component is an object whose **`type`** member
+discriminates the shape; the schema requires each component to match **exactly one** of four
+sub-schemas (`oneOf`):
+
+| `type` | Meaning | Body |
+|--------|---------|------|
+| `"device"` | A component device (§15.4). | inline `device`+`ports` **or** `ref`. |
+| `"bundle"` | A nested sub-assembly (§15.5). | inline `bundle`+`components` **or** `ref`. |
+| `"cable"` | A cable in the kit (§15.6). | inline `cable` **or** `ref`. |
+| `"accessory"` | A non-I/O BOM line item (§15.7). | `name` (+ optional model/manufacturer/description). |
+
+**Inline vs. `ref` (§15.8).** For the `device`, `bundle`, and `cable` types, a component
+MUST supply **exactly one** of an inline body or a `ref` (enforced by `oneOf` in the schema).
+An inline body embeds the full device/bundle/cable; a `ref` `{ id?, url? }` points at an
+external document (§15.8). The `accessory` type has no inline-vs-`ref` choice.
+
+**Quantity.** The `device`, `bundle`, `cable`, and `accessory` components each carry an
+optional `quantity` (integer ≥ 1, **default 1**). Quantities are **per-component**: when a
+consumer flattens a bundle into a flat BOM or block list, it **multiplies quantities down the
+tree** (a component appearing `q` times inside a sub-assembly that itself appears `n` times
+contributes `n × q`).
+
+**Expansion.** Importers expand a bundle into separate device blocks plus
+cables-as-connections, all keyed by the kit part number (`bundle.model`). A nested bundle is
+expanded recursively.
+
+### 15.4 `device` component
+
+`type: "device"`. `additionalProperties: false` (+ `x-`). MUST provide **either** an inline
+device (`device` **and** `ports`) **or** a `ref` — exactly one (`oneOf`).
+
+| Key | Type | Notes |
+|-----|------|-------|
+| `type` | const | `"device"`. |
+| `quantity` | integer ≥ 1 | Default 1. |
+| `designator` | string | MAY. Role/label within the kit, e.g. `Wall Mount Touch Screen`, `UC Engine`. |
+| `id` | string | MAY. Optional component-local id; pattern `^[a-z0-9][a-z0-9._-]*$` (the device `port.id` pattern, not the document slug). |
+| `device` | object | The device identity object (§5). Part of the inline form. |
+| `ports` | array of `port` | The device ports (§6). Part of the inline form. |
+| `power` | object | MAY (inline form). Device-level power (§9). |
+| `physical` | object | MAY (inline form). Dimensions/mounting (§10). |
+| `standards` | array of `standard` | MAY (inline form). |
+| `parameters` | object | MAY (inline form). |
+| `ref` | object | The reference form (§15.8). |
+
+The inline `device`/`ports`/`power`/`physical`/`standards`/`parameters` members are the same
+`$def`s as a top-level device document, so a component device carries the full three-layer
+port model (§6).
+
+### 15.5 `bundle` component (nested sub-assembly)
+
+`type: "bundle"`. `additionalProperties: false` (+ `x-`). A bundle within a bundle. MUST
+provide **either** an inline sub-assembly (`bundle` **and** `components`) **or** a `ref` —
+exactly one (`oneOf`).
+
+| Key | Type | Notes |
+|-----|------|-------|
+| `type` | const | `"bundle"`. |
+| `quantity` | integer ≥ 1 | Default 1. |
+| `designator` | string | MAY. |
+| `id` | string | MAY. Pattern `^[a-z0-9][a-z0-9._-]*$`. |
+| `bundle` | object | Kit identity (§15.2). Part of the inline form. |
+| `components` | array of `component` | `minItems: 1`. The sub-assembly's own components, recursively. Part of the inline form. |
+| `ref` | object | The reference form (§15.8). |
+
+Nesting is how a kit models a preassembled sub-assembly (e.g. a bracket carrying several
+devices). The inline `components` array uses the same `component` schema as §15.3, so
+sub-assemblies may themselves nest to any depth.
+
+### 15.6 `cable` component
+
+`type: "cable"`. `additionalProperties: false` (+ `x-`). MUST provide **either** an inline
+`cable` **or** a `ref` — exactly one (`oneOf`).
+
+| Key | Type | Notes |
+|-----|------|-------|
+| `type` | const | `"cable"`. |
+| `quantity` | integer ≥ 1 | Default 1. |
+| `designator` | string | MAY. Role, e.g. `Primary display`, `UC Engine LAN`. |
+| `id` | string | MAY. Pattern `^[a-z0-9][a-z0-9._-]*$`. |
+| `cable` | object | The cable body (§16.2). Part of the inline form. |
+| `ref` | object | The reference form (§15.8). |
+
+The inline `cable` is exactly the `cable` body specified in §16.2 (the same `$def` the
+standalone cable document wraps).
+
+### 15.7 `accessory` component
+
+`type: "accessory"`. **Required:** `type`, `name`. `additionalProperties: false` (+ `x-`).
+A non-I/O BOM line item — mounting hardware, brackets, screws — with no ports and no inline
+device. There is no `ref` form.
+
+| Key | Type | Notes |
+|-----|------|-------|
+| `type` | const | `"accessory"`. |
+| `name` | string (minLength 1) | REQUIRED. |
+| `quantity` | integer ≥ 1 | Default 1. |
+| `designator` | string | MAY. |
+| `model` | string | Part number, if any. |
+| `manufacturer` | string | |
+| `description` | string | |
+
+### 15.8 References (`ref`)
+
+A `ref` points at an external device, bundle, or cable document instead of embedding it.
+
+`type: object`. `additionalProperties: false` (+ `x-`). At least one of `id` or `url` is
+REQUIRED (`anyOf`).
+
+| Key | Type | Notes |
+|-----|------|-------|
+| `id` | string | Document id of the referenced device/bundle/cable, e.g. `crestron/tsw-1070-b-s-t-v`. |
+| `url` | string (`format: uri`) | Location of the referenced document. |
+
+A `ref` lets standalone products be cited without duplication. **Full by-reference
+resolution awaits the device registry** (a future addition; see §3 and `DESIGN.md` §10/§11);
+inline components work today and are the recommended form for self-contained kit files.
+
+### 15.9 Bundle example (trimmed)
+
+A trimmed `crestron/uc-cx100-t-wm` showing one of each component type — a device, a nested
+sub-assembly (itself containing a device and an accessory), a cable, and a top-level
+accessory:
+
+```json
+{
+  "$schema": "https://opendeviceio.org/schema/v0.1/bundle.schema.json",
+  "odioVersion": "0.1.0",
+  "kind": "bundle",
+  "id": "crestron/uc-cx100-t-wm",
+  "bundle": {
+    "manufacturer": "Crestron",
+    "model": "UC-CX100-T-WM",
+    "category": "av/conferencing/kit",
+    "productLine": "Crestron Flex"
+  },
+  "components": [
+    {
+      "type": "device",
+      "designator": "Wall Mount Touch Screen",
+      "device": { "manufacturer": "Crestron", "model": "TSW-1070-B-S-T-V", "category": "av/control/touch-panel" },
+      "ports": [
+        {
+          "id": "lan", "label": "LAN", "direction": "bidirectional", "connector": "rj45",
+          "link": { "type": "ethernet", "speed": "1g", "poe": { "standard": "802.3at", "role": "pd", "classWatts": 30 } },
+          "signals": [{ "domain": "network", "transport": "control-network", "managed": true }]
+        }
+      ]
+    },
+    {
+      "type": "bundle",
+      "designator": "UC Bracket Assembly",
+      "bundle": { "manufacturer": "Crestron", "model": "UC-BRKT-260-P-T-ASSY", "category": "av/assembly" },
+      "components": [
+        {
+          "type": "device",
+          "designator": "UC Engine",
+          "device": { "manufacturer": "Crestron", "model": "UC-ENGINE", "category": "it/compute/uc-engine" },
+          "ports": [
+            {
+              "id": "display", "label": "DISPLAY", "direction": "output", "connector": "hdmi-type-a", "count": 2,
+              "link": { "type": "hdmi" },
+              "signals": [{ "domain": "video", "transport": "hdmi", "maxResolution": "1920x1080", "maxRefreshHz": 60 }]
+            }
+          ]
+        },
+        { "type": "accessory", "name": "Mounting hardware", "description": "Bracket mounting hardware (no I/O)." }
+      ]
+    },
+    {
+      "type": "cable",
+      "designator": "Primary display",
+      "quantity": 1,
+      "cable": {
+        "manufacturer": "Crestron", "model": "CBL-HD-6", "factoryTerminated": true,
+        "lengthMeters": 1.8, "lengthLabel": "6 ft (1.8 m)",
+        "carries": [{ "domain": "video", "transport": "hdmi" }],
+        "ends": [
+          { "connector": "hdmi-type-a", "gender": "male" },
+          { "connector": "hdmi-type-a", "gender": "male" }
+        ]
+      }
+    },
+    { "type": "accessory", "name": "Mounting hardware" }
+  ]
+}
+```
+
+---
+
+## 16. `cable` — typed cables and connections
+
+A **cable** describes a (usually factory-terminated) cable by its typed ends and the signals
+it carries. A cable is both a **BOM line item** and, on a schematic, the **edge** between two
+devices. A cable MAY be a standalone document (`kind: "cable"`) or embedded inline as a
+bundle `cable` component (§15.6) — both use the same `cable` body (§16.2).
+
+### 16.1 Standalone cable document
+
+`type: object`. **Required:** `odioVersion`, `kind`, `id`, `cable`.
+`additionalProperties: false` (+ `x-`).
+
+| Key | Type | Req. | Meaning |
+|-----|------|------|---------|
+| `$schema` | string | MAY | SHOULD be the canonical `$id` `https://opendeviceio.org/schema/v0.1/cable.schema.json`. |
+| `odioVersion` | string | MUST | As in a device document (§2). |
+| `kind` | const | MUST | `"cable"`. The discriminator (§14). |
+| `id` | string | MUST | Stable, URL-safe identifier; **same slug rule and pattern as a device `id`** (§3). |
+| `cable` | object | MUST | The cable body. See §16.2. |
+| `provenance` | object | MAY | Reuses the device `provenance` object (§13). |
+
+### 16.2 `cable` body
+
+`type: object`. **Required:** `ends`. `additionalProperties: false` (+ `x-`). This is the
+shared body, identical whether wrapped as a standalone document (§16.1) or embedded in a
+bundle component (§15.6).
+
+| Key | Type | Notes |
+|-----|------|-------|
+| `manufacturer` | string | |
+| `model` | string | Cable part number / model. |
+| `sku` | string | |
+| `label` | string | |
+| `factoryTerminated` | boolean | True if terminated at the factory (vs. field-terminated). |
+| `lengthMeters` | number > 0 | SI length. |
+| `lengthLabel` | string | Length as printed, e.g. `6 ft (1.8 m)`. |
+| `shielded` | boolean | |
+| `plenum` | boolean | Plenum-rated jacket. |
+| `carries` | array of `signal` | The signal(s) the cable conveys end to end. Reuses the device `signal` model (§6.3/§7) — e.g. a DisplayPort→HDMI cable carries a `video` signal. |
+| `ends` | array of `cableEnd` | REQUIRED. The cable's terminations. `minItems: 1`. See §16.3. |
+| `notes` | string | |
+
+### 16.3 `cableEnd`
+
+Each `ends` item is an object. **Required:** `connector`. `additionalProperties: false`
+(+ `x-`). Conditional rule: when `connector` is `"other"`, `connectorOther` is REQUIRED
+(schema `if/then`).
+
+| Key | Type | Notes |
+|-----|------|-------|
+| `connector` | enum | REQUIRED. The **same `connector` vocabulary as device ports** (§6.1); use `"other"` with `connectorOther` when the jack is not listed. |
+| `connectorOther` | string | REQUIRED when `connector` is `"other"`. |
+| `gender` | enum | MAY. `male` \| `female`. |
+| `id` | string | MAY. |
+| `label` | string | MAY. e.g. `Display end`, `To RX`, `A`, `B`. |
+
+A cable usually has **2** ends; **more are allowed** for breakout, snake, or Y-cables
+(`minItems: 1`).
+
+### 16.4 Standalone cable example
+
+A DisplayPort-to-HDMI factory cable carrying a video signal:
+
+```json
+{
+  "$schema": "https://opendeviceio.org/schema/v0.1/cable.schema.json",
+  "odioVersion": "0.1.0",
+  "kind": "cable",
+  "id": "crestron/cbl-4k-dp-hd-6",
+  "cable": {
+    "manufacturer": "Crestron",
+    "model": "CBL-4K-DP-HD-6",
+    "factoryTerminated": true,
+    "lengthMeters": 1.8,
+    "lengthLabel": "6 ft (1.8 m)",
+    "carries": [{ "domain": "video", "transport": "displayport" }],
+    "ends": [
+      { "label": "Source", "connector": "displayport", "gender": "male" },
+      { "label": "Display", "connector": "hdmi-type-a", "gender": "male" }
+    ]
+  }
+}
+```
+
+---
+
+## 17. Versioning policy
 
 - **`odioVersion`** is a semantic version (`MAJOR.MINOR.PATCH`, with optional
   pre-release). For this specification it is `0.1.0`.
@@ -583,9 +940,15 @@ Because every domain enum has an `other` + `*Other` free-text escape, a missing
 vocabulary entry **never blocks** an otherwise-valid file; the term can be standardized in
 a later MINOR release without breaking existing documents.
 
+**Bundles and cables are additive.** The bundle and cable kinds (§14–§16) leave
+`device.schema.json` **unchanged**, so every existing device document remains conformant.
+While pre-1.0 the new schemas live under `schema/v0.1/` to avoid churn; at the first tagged
+release the `$schema` URL **MAY** bump to `/v0.2/` per the MINOR-bump policy above. Bundle
+examples live in `examples/bundles/` so the device conformance corpus (§1.3) is unaffected.
+
 ---
 
-## 15. Worked references
+## 18. Worked references
 
 The repository's `examples/` directory contains complete, conformant documents that
 exercise the model end to end, including:
@@ -596,6 +959,9 @@ exercise the model end to end, including:
   ports.
 - `examples/extron-dtp2-t-211.odio.json`, `examples/netgear-m4250-poe.odio.json` — real
   device shapes including HDBaseT links and PoE.
+- `examples/bundles/crestron-uc-cx100-t-wm.odio.json` — a kit (§15) demonstrating a nested
+  sub-assembly, device components, factory-terminated cable components (§16), and an
+  accessory.
 
 The `examples/invalid/` directory documents, by counter-example, the conformance rules in
 §1–§7 (missing required field, unsatisfied `other`→`*Other` requirement, and an unknown

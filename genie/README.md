@@ -60,18 +60,30 @@ Options:
 - `--model` — Claude model id (default `claude-opus-4-8`)
 - `--by EMAIL` — record a reviewer in `provenance.validation.by`
 - `--mock` — use the deterministic offline extractor (no API key, no network)
+- `--kind {device,bundle}` — extract a single `device` (default) or a `bundle`
+  (a kit/assembly: one orderable part number with a `components[]` list of contained
+  devices, nested sub-assemblies, factory-terminated cables, and accessories)
 
 Offline smoke test with the mock extractor:
 
 ```bash
 genie parse datasheet.txt -o device.odio.json --review-report report.md --mock
+
+# extract a kit/assembly bundle instead of a single device
+genie parse kit-datasheet.pdf -o kit.odio.json --kind bundle
 ```
 
 ### Validate an existing ODIO file
 
 ```bash
-genie validate device.odio.json
+genie validate device.odio.json   # device, bundle, or cable .odio.json
 ```
+
+`genie validate` selects the schema from the document's top-level `kind`
+discriminator: `bundle` validates against `bundle.schema.json`, `cable` against
+`cable.schema.json`, and everything else (no `kind`) against `device.schema.json`.
+All three schemas are loaded into one `referencing` registry so the cross-document
+`$ref`s (bundle/cable → device, bundle → cable) resolve **offline, with no network**.
 
 Exit codes: `0` valid / clean draft, `1` invalid or runtime error, `2` draft emitted
 but has schema violations, `3` a required optional extra is not installed.

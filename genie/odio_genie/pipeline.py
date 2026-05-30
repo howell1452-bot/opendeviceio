@@ -8,6 +8,7 @@ inside :func:`ingest`.
 
 from __future__ import annotations
 
+import copy
 import datetime as _dt
 import hashlib
 import json
@@ -16,6 +17,8 @@ from pathlib import Path
 from typing import Any
 
 from jsonschema import Draft202012Validator
+from referencing import Registry, Resource
+from referencing.jsonschema import DRAFT202012
 
 from . import __version__
 from .extractor import Extractor
@@ -24,6 +27,19 @@ from .models import ConfidenceSignals, ExtractedText, SourceDocument, as_signals
 GENERATOR = f"genie/{__version__}"
 METHOD = "llm-extraction"
 ODIO_VERSION = "0.1.0"
+
+# Canonical $id URLs for the three document schemas. bundle/cable $ref device (and
+# bundle $refs cable) by these FULL URLs, so all three must live in one referencing
+# Registry for cross-refs to resolve offline (no network).
+DEVICE_SCHEMA_URL = "https://opendeviceio.org/schema/v0.1/device.schema.json"
+BUNDLE_SCHEMA_URL = "https://opendeviceio.org/schema/v0.1/bundle.schema.json"
+CABLE_SCHEMA_URL = "https://opendeviceio.org/schema/v0.1/cable.schema.json"
+
+# Top-level "kind" discriminator -> schema $id URL. Device documents have no "kind".
+_KIND_TO_URL = {
+    "bundle": BUNDLE_SCHEMA_URL,
+    "cable": CABLE_SCHEMA_URL,
+}
 
 # Fields the scorer treats as the "spine" of a draft. If a heuristic flags any of
 # these as low-confidence, reviewers should look first.
@@ -41,19 +57,17 @@ class MissingExtraError(GenieError):
 # --- Schema loading ----------------------------------------------------------------
 
 
-def _candidate_schema_paths() -> list[Path]:
-    """Locations to search for the canonical device schema, most-specific first.
+def _candidate_schema_paths(filename: str = "device.schema.json") -> list[Path]:
+    """Locations to search for a v0.1 schema file, most-specific first.
 
-    The schema is a frozen repo input at ``<repo>/schema/v0.1/device.schema.json``.
-    The package lives at ``<repo>/genie/odio_genie``, so we walk up from here, and
-    also honor an explicit override via the environment.
+    The schemas are frozen repo inputs at ``<repo>/schema/v0.1/<filename>``. The
+    package lives at ``<repo>/genie/odio_genie``, so we walk up from here. (The
+    ``ODIO_SCHEMA_PATH`` override applies to the device schema; bundle/cable schemas
+    are loaded relative to it.)
     """
     here = Path(__file__).resolve()
-    rel = Path("schema") / "v0.1" / "device.schema.json"
-    paths: list[Path] = []
-    for parent in here.parents:
-        paths.append(parent / rel)
-    return paths
+    rel = Path("schema") / "v0.1" / filename
+    return [parent / rel for parent in here.parents]
 
 
 def find_schema_path() -> Path:
@@ -76,6 +90,24 @@ def find_schema_path() -> Path:
     )
 
 
+def _find_sibling_schema_path(filename: str) -> Path:
+    """Return the path to a schema file sitting next to ``device.schema.json``.
+
+    Resolved relative to :func:`find_schema_path` (so the ``ODIO_SCHEMA_PATH`` override
+    is honored), falling back to walking up from the package.
+    """
+    device_path = find_schema_path()
+    sibling = device_path.with_name(filename)
+    if sibling.is_file():
+        return sibling
+    for candidate in _candidate_schema_paths(filename):
+        if candidate.is_file():
+            return candidate
+    raise GenieError(
+        f"Could not locate schema/v0.1/{filename} next to the device schema."
+    )
+
+
 @lru_cache(maxsize=4)
 def load_schema(path: str | None = None) -> dict[str, Any]:
     """Load and cache the canonical ODIO device JSON Schema as a dict."""
@@ -85,10 +117,120 @@ def load_schema(path: str | None = None) -> dict[str, Any]:
 
 
 @lru_cache(maxsize=4)
-def _validator(path: str | None = None) -> Draft202012Validator:
-    schema = load_schema(path)
+def load_bundle_schema() -> dict[str, Any]:
+    """Load and cache the ODIO bundle (kit/assembly) JSON Schema as a dict."""
+    with _find_sibling_schema_path("bundle.schema.json").open(
+        "r", encoding="utf-8"
+    ) as fh:
+        return json.load(fh)
+
+
+@lru_cache(maxsize=4)
+def load_cable_schema() -> dict[str, Any]:
+    """Load and cache the ODIO cable JSON Schema as a dict."""
+    with _find_sibling_schema_path("cable.schema.json").open(
+        "r", encoding="utf-8"
+    ) as fh:
+        return json.load(fh)
+
+
+@lru_cache(maxsize=1)
+def _registry(device_path: str | None = None) -> Registry:
+    """Build a ``referencing`` Registry holding device/bundle/cable schemas.
+
+    All three are keyed by their ``$id`` so the FULL-URL cross-refs
+    (bundle/cable -> device, bundle -> cable) resolve entirely offline.
+    """
+    device = load_schema(device_path)
+    bundle = load_bundle_schema()
+    cable = load_cable_schema()
+    resources = [
+        (DEVICE_SCHEMA_URL, device),
+        (BUNDLE_SCHEMA_URL, bundle),
+        (CABLE_SCHEMA_URL, cable),
+    ]
+    registry = Registry().with_resources(
+        [
+            (url, Resource.from_contents(schema, default_specification=DRAFT202012))
+            for url, schema in resources
+        ]
+    )
+    return registry
+
+
+def _inline_external_refs(node: Any, mapping: dict[str, str]) -> Any:
+    """Rewrite FULL-URL ``$ref``s to local ``#/...`` refs, recursively.
+
+    ``mapping`` maps an external schema ``$id`` URL to a local ``$defs`` key under
+    which that schema's body has been embedded.
+    """
+    if isinstance(node, dict):
+        out: dict[str, Any] = {}
+        for key, value in node.items():
+            if key == "$ref" and isinstance(value, str):
+                for url, local in mapping.items():
+                    if value.startswith(url + "#"):
+                        value = "#/$defs/" + local + value[len(url) + 1:]
+                        break
+                    if value == url:
+                        value = "#/$defs/" + local
+                        break
+                out[key] = value
+            else:
+                out[key] = _inline_external_refs(value, mapping)
+        return out
+    if isinstance(node, list):
+        return [_inline_external_refs(item, mapping) for item in node]
+    return node
+
+
+def bundle_tool_schema() -> dict[str, Any]:
+    """Return a self-contained bundle schema for use as an LLM tool ``input_schema``.
+
+    The on-disk bundle schema ``$ref``s the device and cable schemas by FULL URL, which
+    an Anthropic tool ``input_schema`` cannot resolve. This embeds those two schemas
+    under ``$defs`` and rewrites the external refs to local ones so the tool schema is
+    standalone.
+    """
+    bundle = copy.deepcopy(load_bundle_schema())
+    device = load_schema()
+    cable = load_cable_schema()
+    mapping = {
+        DEVICE_SCHEMA_URL: "_device",
+        CABLE_SCHEMA_URL: "_cable",
+    }
+    inlined = _inline_external_refs(bundle, mapping)
+    defs = inlined.setdefault("$defs", {})
+    defs["_device"] = _inline_external_refs(copy.deepcopy(device), mapping)
+    defs["_cable"] = _inline_external_refs(copy.deepcopy(cable), mapping)
+    return inlined
+
+
+def validate_kind(doc: dict[str, Any]) -> str:
+    """Return the document kind: ``"bundle"``, ``"cable"`` or ``"device"``.
+
+    Routing is driven by the top-level ``kind`` discriminator. Device documents have
+    no ``kind``; anything unrecognized falls back to ``"device"``.
+    """
+    kind = doc.get("kind") if isinstance(doc, dict) else None
+    if kind in _KIND_TO_URL:
+        return kind
+    return "device"
+
+
+@lru_cache(maxsize=8)
+def _validator(
+    path: str | None = None, kind: str = "device"
+) -> Draft202012Validator:
+    registry = _registry(path)
+    if kind == "bundle":
+        schema = load_bundle_schema()
+    elif kind == "cable":
+        schema = load_cable_schema()
+    else:
+        schema = load_schema(path)
     Draft202012Validator.check_schema(schema)
-    return Draft202012Validator(schema)
+    return Draft202012Validator(schema, registry=registry)
 
 
 # --- Stage 1: ingest ---------------------------------------------------------------
@@ -193,11 +335,15 @@ def extract(text: str, extractor: Extractor) -> dict[str, Any]:
 
 
 def validate(doc: dict[str, Any], schema_path: str | None = None) -> list[str]:
-    """Validate ``doc`` against the canonical schema; return human-readable errors.
+    """Validate ``doc`` against the schema for its kind; return human-readable errors.
 
-    An empty list means the document is valid.
+    The schema is selected by the document's ``kind`` discriminator: ``"bundle"`` ->
+    bundle schema, ``"cable"`` -> cable schema, otherwise the device schema. All are
+    validated against a shared registry so the FULL-URL ``$ref``s between them resolve
+    offline. An empty list means the document is valid.
     """
-    validator = _validator(schema_path)
+    kind = validate_kind(doc)
+    validator = _validator(schema_path, kind)
     errors = sorted(validator.iter_errors(doc), key=lambda e: list(e.absolute_path))
     messages: list[str] = []
     for err in errors:
@@ -295,11 +441,13 @@ def assemble(
     Sets ``provenance.generator`` = ``genie/0.1.0``, ``method`` = ``llm-extraction``,
     and ``validation.status`` = ``draft``. Preserves any confidence already attached by
     :func:`score`. Records the source document when provided.
+
+    The document's ``kind`` (if any) is never clobbered, and the top-level ``$schema``
+    is set to the device/bundle/cable schema URL matching that kind.
     """
     doc.setdefault("odioVersion", ODIO_VERSION)
-    doc.setdefault(
-        "$schema", "https://opendeviceio.org/schema/v0.1/device.schema.json"
-    )
+    kind = validate_kind(doc)
+    doc.setdefault("$schema", _KIND_TO_URL.get(kind, DEVICE_SCHEMA_URL))
 
     provenance = doc.setdefault("provenance", {})
     provenance["generator"] = GENERATOR
@@ -358,8 +506,8 @@ def render_review_report(
     overall = confidence.get("overall")
     low_fields = confidence.get("lowConfidenceFields", [])
 
-    dev = doc.get("device", {})
-    title = f"{dev.get('manufacturer', '?')} {dev.get('model', '?')}".strip()
+    identity = doc.get("device") or doc.get("bundle") or doc.get("cable") or {}
+    title = f"{identity.get('manufacturer', '?')} {identity.get('model', '?')}".strip()
 
     lines: list[str] = []
     lines.append(f"# Genie review report - {title}")

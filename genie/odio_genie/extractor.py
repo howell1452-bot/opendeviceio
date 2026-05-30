@@ -111,19 +111,90 @@ _MOCK_CANDIDATE: dict[str, Any] = {
 }
 
 
+# Deterministic bundle candidate returned by MockExtractor when asked for a kit. A
+# deliberately small but *schema-valid* bundle: one orderable part number whose
+# components[] contains a device and a factory-terminated cable.
+_MOCK_BUNDLE_CANDIDATE: dict[str, Any] = {
+    "$schema": "https://opendeviceio.org/schema/v0.1/bundle.schema.json",
+    "odioVersion": "0.1.0",
+    "kind": "bundle",
+    "id": "acme/kit-100",
+    "bundle": {
+        "manufacturer": "Acme",
+        "model": "KIT-100",
+        "category": "av/conferencing/kit",
+        "description": "Acme extender kit: one transmitter plus a factory-terminated cable.",
+    },
+    "components": [
+        {
+            "type": "device",
+            "designator": "Transmitter",
+            "device": {
+                "manufacturer": "Acme",
+                "model": "EXT-100",
+                "category": "av/extender/transmitter",
+            },
+            "ports": [
+                {
+                    "id": "hdmi-in",
+                    "label": "HDMI INPUT",
+                    "direction": "input",
+                    "connector": "hdmi-type-a",
+                    "link": {"type": "hdmi", "standard": "hdmi-2.0"},
+                    "signals": [
+                        {"domain": "video", "transport": "hdmi", "maxResolution": "3840x2160"}
+                    ],
+                }
+            ],
+        },
+        {
+            "type": "cable",
+            "designator": "HDMI patch",
+            "quantity": 1,
+            "cable": {
+                "manufacturer": "Acme",
+                "model": "CBL-HD-2",
+                "factoryTerminated": True,
+                "lengthMeters": 0.6,
+                "lengthLabel": "2 ft (0.6 m)",
+                "carries": [{"domain": "video", "transport": "hdmi"}],
+                "ends": [
+                    {"connector": "hdmi-type-a", "gender": "male"},
+                    {"connector": "hdmi-type-a", "gender": "male"},
+                ],
+            },
+        },
+        {
+            "type": "accessory",
+            "name": "Mounting hardware",
+            "description": "Bracket and screws (no I/O).",
+        },
+    ],
+}
+
+
 class MockExtractor(Extractor):
     """Deterministic extractor returning a fixed, schema-valid candidate.
 
     Optionally accepts a ``candidate`` to return verbatim, and ``signals`` to report,
-    so tests can exercise the scorer with arbitrary inputs. ``text`` is ignored.
+    so tests can exercise the scorer with arbitrary inputs. ``text`` is ignored. Pass
+    ``kind="bundle"`` to return the built-in valid bundle candidate instead of the
+    device candidate (an explicit ``candidate`` always wins).
     """
 
     def __init__(
         self,
         candidate: dict[str, Any] | None = None,
         signals: ConfidenceSignals | None = None,
+        *,
+        kind: str = "device",
     ) -> None:
-        self._candidate = candidate if candidate is not None else _MOCK_CANDIDATE
+        if candidate is not None:
+            self._candidate = candidate
+        elif kind == "bundle":
+            self._candidate = _MOCK_BUNDLE_CANDIDATE
+        else:
+            self._candidate = _MOCK_CANDIDATE
         self._signals = signals or ConfidenceSignals(
             field_confidence={
                 # The mock pretends it was unsure about the max power figure.
@@ -160,18 +231,42 @@ _SYSTEM_PROMPT = (
 )
 
 
-def _tool_schema(device_schema: dict[str, Any]) -> dict[str, Any]:
-    """Build the tool-use input schema: the device schema plus a confidence sidecar.
+_BUNDLE_SYSTEM_PROMPT = (
+    "You are Genie, an expert AV/IT systems engineer that converts hardware KIT / "
+    "ASSEMBLY datasheets into OpenDeviceIO (ODIO) bundle documents. You read the "
+    "supplied datasheet text and emit ONE bundle object that conforms exactly to the "
+    "ODIO v0.1 bundle JSON Schema provided below. A bundle is one orderable part number "
+    "(`bundle.model`) whose `components[]` lists every contained item: each component "
+    "is typed `device`, `bundle` (a nested sub-assembly), `cable`, or `accessory`. "
+    "Model each contained device as a full ODIO device (device identity + ports[], "
+    "modelling only externally observable I/O exactly as for a standalone device). "
+    "Nest sub-assemblies as `type: bundle` components with their own `components[]`. "
+    "Describe factory-terminated cables as `type: cable` with typed `ends[]` and length; "
+    "list non-I/O items (brackets, mounting hardware, power packs) as `type: accessory`. "
+    "Set `quantity` when a kit ships more than one of an item. Set top-level "
+    "`kind: \"bundle\"`. Use the controlled vocabularies; when a value is not listed use "
+    "the relevant `*Other` free-text field. Never invent specifications: if the "
+    "datasheet does not state a value, omit the field. For every field you are uncertain "
+    "about, record its JSON path and a 0..1 confidence in the tool call's `_confidence` "
+    "map so a human can review it."
+)
 
-    Anthropic tool ``input_schema`` is a JSON Schema. We wrap the canonical device
-    schema in an envelope so the model returns both the document and its self-reported
-    confidence in one structured call.
+
+def _tool_schema(
+    document_schema: dict[str, Any], *, key: str = "device_document"
+) -> dict[str, Any]:
+    """Build the tool-use input schema: the ODIO schema plus a confidence sidecar.
+
+    Anthropic tool ``input_schema`` is a JSON Schema. We wrap the canonical document
+    schema (device or bundle) in an envelope so the model returns both the document and
+    its self-reported confidence in one structured call. ``key`` is the property name
+    holding the emitted document.
     """
-    device_props = copy.deepcopy(device_schema)
+    doc_props = copy.deepcopy(document_schema)
     return {
         "type": "object",
         "properties": {
-            "device_document": device_props,
+            key: doc_props,
             "_confidence": {
                 "type": "object",
                 "description": (
@@ -185,7 +280,7 @@ def _tool_schema(device_schema: dict[str, Any]) -> dict[str, Any]:
                 "additionalProperties": {"type": "string"},
             },
         },
-        "required": ["device_document"],
+        "required": [key],
     }
 
 
@@ -201,17 +296,27 @@ class ClaudeExtractor(Extractor):
         self,
         schema: dict[str, Any],
         *,
+        kind: str = "device",
         model: str = DEFAULT_MODEL,
         examples: list[dict[str, Any]] | None = None,
         max_tokens: int = 8192,
         api_key: str | None = None,
     ) -> None:
         self.schema = schema
+        self.kind = kind
         self.model = model
         self.examples = examples or []
         self.max_tokens = max_tokens
         self._api_key = api_key
         self._last_signals = ConfidenceSignals()
+
+    @property
+    def _is_bundle(self) -> bool:
+        return self.kind == "bundle"
+
+    @property
+    def _document_key(self) -> str:
+        return "bundle_document" if self._is_bundle else "device_document"
 
     def _client(self) -> Any:
         try:
@@ -239,11 +344,13 @@ class ClaudeExtractor(Extractor):
         The schema and examples are large and identical across requests, so they are
         marked with ``cache_control`` to hit Anthropic's prompt cache.
         """
-        blocks: list[dict[str, Any]] = [{"type": "text", "text": _SYSTEM_PROMPT}]
+        prompt = _BUNDLE_SYSTEM_PROMPT if self._is_bundle else _SYSTEM_PROMPT
+        label = "ODIO v0.1 bundle JSON Schema:\n" if self._is_bundle else "ODIO v0.1 JSON Schema:\n"
+        blocks: list[dict[str, Any]] = [{"type": "text", "text": prompt}]
         blocks.append(
             {
                 "type": "text",
-                "text": "ODIO v0.1 JSON Schema:\n" + json.dumps(self.schema),
+                "text": label + json.dumps(self.schema),
                 "cache_control": {"type": "ephemeral"},
             }
         )
@@ -262,10 +369,12 @@ class ClaudeExtractor(Extractor):
 
     def extract(self, text: str) -> dict[str, Any]:
         client = self._client()
+        key = self._document_key
+        doc_word = "bundle" if self._is_bundle else "device"
         tool = {
             "name": "emit_odio_document",
-            "description": "Emit the extracted ODIO device document plus confidence.",
-            "input_schema": _tool_schema(self.schema),
+            "description": f"Emit the extracted ODIO {doc_word} document plus confidence.",
+            "input_schema": _tool_schema(self.schema, key=key),
         }
         response = client.messages.create(
             model=self.model,
@@ -277,15 +386,15 @@ class ClaudeExtractor(Extractor):
                 {
                     "role": "user",
                     "content": (
-                        "Extract an ODIO device document from this datasheet text:\n\n"
-                        + text
+                        f"Extract an ODIO {doc_word} document from this datasheet "
+                        "text:\n\n" + text
                     ),
                 }
             ],
         )
 
         tool_input = self._first_tool_use(response)
-        document = tool_input.get("device_document", {})
+        document = tool_input.get(key, {})
         self._last_signals = ConfidenceSignals(
             field_confidence={
                 k: float(v) for k, v in (tool_input.get("_confidence") or {}).items()

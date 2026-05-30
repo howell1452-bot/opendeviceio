@@ -21,11 +21,15 @@ from .pipeline import (
     MissingExtraError,
     assemble,
     build_draft,
+    bundle_tool_schema,
     extract,
     ingest,
+    load_bundle_schema,
+    load_cable_schema,
     load_schema,
     score,
     validate,
+    validate_kind,
     write_review_report,
 )
 
@@ -45,5 +49,9 @@ __all__ = [
     "assemble",
     "build_draft",
     "load_schema",
+    "load_bundle_schema",
+    "load_cable_schema",
+    "bundle_tool_schema",
+    "validate_kind",
     "write_review_report",
 ]

@@ -24,6 +24,7 @@ from .pipeline import (
     GenieError,
     MissingExtraError,
     build_draft,
+    bundle_tool_schema,
     ingest,
     load_schema,
     validate,
@@ -46,6 +47,13 @@ def _build_parser() -> argparse.ArgumentParser:
     p_parse.add_argument("input", help="Input datasheet (.pdf, .txt, .md).")
     p_parse.add_argument(
         "-o", "--output", required=True, help="Output .odio.json draft path."
+    )
+    p_parse.add_argument(
+        "--kind",
+        choices=("device", "bundle"),
+        default="device",
+        help="Document kind to extract: a single 'device' (default) or a "
+        "'bundle' (kit/assembly with components[]).",
     )
     p_parse.add_argument(
         "--review-report",
@@ -80,10 +88,14 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def _make_extractor(args: argparse.Namespace) -> Extractor:
+    kind = getattr(args, "kind", "device")
     if args.mock:
-        return MockExtractor()
-    schema = load_schema()
-    return ClaudeExtractor(schema=schema, model=args.model)
+        return MockExtractor(kind=kind)
+    if kind == "bundle":
+        return ClaudeExtractor(
+            schema=bundle_tool_schema(), kind="bundle", model=args.model
+        )
+    return ClaudeExtractor(schema=load_schema(), kind="device", model=args.model)
 
 
 def _cmd_parse(args: argparse.Namespace) -> int:
