@@ -165,6 +165,14 @@ def _build_parser() -> argparse.ArgumentParser:
         metavar="EMAIL",
         help="Record this reviewer in each draft's provenance.validation.by.",
     )
+    p_ingest.add_argument(
+        "--resume-batch-id",
+        metavar="ID",
+        default=None,
+        help="Recover an already-submitted, completed batch (msgbatch_...) instead of "
+        "submitting a new one — re-fetches its results (free for ~29 days) and runs the "
+        "rest of the pipeline. Use after a downstream failure to avoid re-paying.",
+    )
     p_ingest.set_defaults(func=_cmd_ingest)
 
     return parser
@@ -268,6 +276,7 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
         use_batch=not args.no_batch,
         fewshot=not args.no_fewshot,
         validated_by=args.by,
+        resume_batch_id=args.resume_batch_id,
     )
 
     counts = manifest["counts"]

@@ -176,6 +176,10 @@ class BatchExtractor:
         self._api_key = api_key
         self.max_wait_seconds = max_wait_seconds
         self.poll_seconds = poll_seconds
+        # When set, extract_batch fetches this already-submitted batch instead of
+        # creating a new one — lets us recover a completed batch's results (re-fetchable
+        # for ~29 days) without re-paying after a downstream parsing failure.
+        self.resume_batch_id: str | None = None
 
     def _client(self) -> Any:
         # Delegates to ClaudeExtractor._client(): lazy ``import anthropic`` raising
@@ -214,12 +218,19 @@ class BatchExtractor:
             return {}
 
         client = self._client()
-        requests = [
-            {"custom_id": custom_id, "params": self._request_params(text)}
-            for custom_id, text in items.items()
-        ]
-        batch = client.messages.batches.create(requests=requests)
-        batch_id = getattr(batch, "id", None) or batch["id"]
+        batch_id = self.resume_batch_id
+        if batch_id:
+            print(f"Resuming existing batch {batch_id} (no new request submitted).", flush=True)
+        else:
+            requests = [
+                {"custom_id": custom_id, "params": self._request_params(text)}
+                for custom_id, text in items.items()
+            ]
+            batch = client.messages.batches.create(requests=requests)
+            batch_id = getattr(batch, "id", None) or batch["id"]
+            # Log the id so a completed batch can be recovered with --resume-batch-id
+            # if a later step fails (results are re-fetchable for ~29 days).
+            print(f"Submitted batch {batch_id} ({len(requests)} requests).", flush=True)
 
         self._poll_until_ended(client, batch_id)
 
@@ -273,20 +284,30 @@ class BatchExtractor:
         usage = usage_dict(_get(message, "usage"))
         try:
             document, signals = self._extract_tool_use(message)
-        except GenieError as exc:
-            return custom_id, Candidate({}, error=str(exc), usage=usage)
+        except Exception as exc:  # noqa: BLE001
+            # A single malformed message (bad tool args, etc.) must degrade to a
+            # recorded per-doc error, never abort parsing of the whole batch.
+            return custom_id, Candidate({}, error=f"parse error: {exc}", usage=usage)
         return custom_id, Candidate(document, signals, usage=usage)
 
     def _extract_tool_use(self, message: Any) -> tuple[dict[str, Any], ConfidenceSignals]:
         key = self._proto._document_key
         tool_input = ClaudeExtractor._first_tool_use(message)
         document = tool_input.get(key, {})
-        signals = ConfidenceSignals(
-            field_confidence={
-                k: float(v) for k, v in (tool_input.get("_confidence") or {}).items()
-            },
-            notes=dict(tool_input.get("_notes") or {}),
-        )
+        raw_conf = tool_input.get("_confidence") or {}
+        field_confidence: dict[str, float] = {}
+        spilled_notes: dict[str, str] = {}
+        if isinstance(raw_conf, dict):
+            for k, v in raw_conf.items():
+                try:
+                    field_confidence[k] = float(v)
+                except (TypeError, ValueError):
+                    # The model occasionally drops a textual rationale into _confidence
+                    # instead of a number; keep it as a note rather than crashing.
+                    spilled_notes[k] = str(v)
+        notes = dict(tool_input.get("_notes") or {})
+        notes.update(spilled_notes)
+        signals = ConfidenceSignals(field_confidence=field_confidence, notes=notes)
         return document, signals
 
 
@@ -420,6 +441,7 @@ def ingest_directory(
     schema_path: str | None = None,
     validated_by: str | None = None,
     extractor_factory: Callable[..., BatchExtractorProtocol] | None = None,
+    resume_batch_id: str | None = None,
 ) -> dict[str, Any]:
     """Bulk-ingest every datasheet under ``input_dir`` into drafts + a manifest.
 
@@ -476,6 +498,9 @@ def ingest_directory(
 
     # --- pass 1: bulk extraction (Haiku) ---
     primary = factory(schema=tool_schema, kind=kind, model=model)
+    # Recover a previously-submitted, completed batch instead of paying again.
+    if resume_batch_id:
+        setattr(primary, "resume_batch_id", resume_batch_id)
     items = {slug: extracted.combined for slug, extracted in slugs.items()}
     candidates = primary.extract_batch(items) if items else {}
 
