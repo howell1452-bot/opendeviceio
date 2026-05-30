@@ -30,25 +30,36 @@
 //   visio/masters/master1.xml ... masterN.xml   — one <MasterContents> per device
 //   visio/windows.xml                           — window state
 //
-// REPLICATED FROM THE REAL MASTERS (so output opens in Visio):
+// REPLICATED FROM THE REAL MASTERS (so output opens in Visio AND renders on drop):
 //   * <Master> attribute set: IsCustomNameU/IsCustomName, Prompt, IconSize,
 //     AlignName, MatchByName, IconUpdate='1', UniqueID, BaseID, PatternFlags,
-//     Hidden, MasterType='2', a <PageSheet> sized to the shape, and <Rel r:id>.
-//   * The master shape is a Group (Type='Group') carrying the <Section N='Connection'>
-//     (Rows T='Connection' IX from 0, cells X/Y/DirX/DirY/Type/AutoGen/Prompt) plus
-//     a child <Shape Type='Shape'> with the rectangle <Section N='Geometry'> and the
-//     <Text> label. All shapes reference the document's Normal style (Line/Fill/Text
-//     Style 3) so they inherit the StyleSheets carried in document.xml.
+//     Hidden, MasterType='2', a <PageSheet> sized to the shape, an <Icon> bitmap,
+//     and <Rel r:id>.
+//   * The master content is a single top-level <Shape Type='Shape'> that — exactly
+//     like a real master's root shape — carries a NameU/Name (IsCustomNameU/
+//     IsCustomName), the full placement cell set (PinX/PinY/Width/Height/LocPinX/
+//     LocPinY/Angle/FlipX/FlipY/ResizeMode), a drawn rectangle <Section N='Geometry'>,
+//     a <Section N='Character'> + <Section N='Paragraph'> with a <Text> block using
+//     the <cp/><pp/> run markers, and the <Section N='Connection'> (one Row per
+//     physical connector). This is the canonical minimal renderable master.
+//
+// WHY THIS FIXES "Error 313 — the master is empty":
+//   The previous version made the root shape a Type='Group' with NO NameU/Name and
+//   delegated all geometry to an (also unnamed) child shape. A master whose root
+//   shape has no name and no geometry of its own is treated by Visio as empty on
+//   drop. We now emit a single named shape that draws its own rectangle, so Visio
+//   always has renderable geometry to instantiate.
 //
 // SIMPLIFIED vs the real masters (intentional, noted for Visio verification):
-//   * One plain rectangle child shape per device (the real Extron masters draw the
-//     full faceplate with dozens of nested sub-shapes). Ports become text lines +
+//   * One labelled rectangle per device (the real Extron masters draw the full
+//     faceplate with dozens of nested sub-shapes). Ports become text lines +
 //     connection points rather than individually drawn jacks.
-//   * Static <Icon> bitmaps are OMITTED. The real masters carry a base64 preview
-//     bitmap but also set IconUpdate='1', which tells Visio to regenerate the icon
-//     from the shape geometry — so the preview is produced on load without us
-//     shipping a bitmap.
-//   * Cell formulas (F='Width*..') are omitted; we emit resolved literal values.
+//   * A tiny generic <Icon> (a framed-box 32x32 4bpp bitmap) is shipped for every
+//     master, matching the fact that real masters always carry an <Icon>. We also
+//     set IconUpdate='1' so Visio regenerates the preview from the geometry.
+//   * Cell geometry formulas (F='Width*..') are omitted; we emit resolved literals
+//     (Visio reads the V value), but each Geometry/placement row carries the same
+//     cell NAMES the real shapes use.
 
 import { zipSync, strToU8, type Zippable } from "fflate";
 
@@ -221,6 +232,27 @@ const CUSTOM_XML =
   '<property fmtid="{D5CDD505-2E9C-101B-9397-08002B2CF9AE}" pid="5" name="IsMetric"><vt:bool>false</vt:bool></property>' +
   "</Properties>";
 
+// A valid 32x32 4bpp ICO bitmap (a framed device box), lifted verbatim from the
+// ground-truth reference stencil. Every real master carries an <Icon>; shipping
+// one — rather than relying on IconUpdate alone — keeps the master from being
+// treated as empty and gives a sensible stencil-pane preview. The same generic
+// frame is used for all masters (IconUpdate='1' lets Visio refine it on load).
+const MASTER_ICON =
+  "AAABAAEAICAQLwAAAADoAgAAFgAAACgAAAAgAAAAQAAAAAEABAAAAAAAgAIAAAAAAAAAAAAAAAAA\n" +
+  "AAAAAAAAAAAAAACAAACAAAAAgIAAgAAAAIAAgACAgAAAgICAAMDAwAAAAP8AAP8AAAD//wD/AAAA\n" +
+  "/wD/AP//AAD///8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n" +
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n" +
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n" +
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n" +
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n" +
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n" +
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n" +
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n" +
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n" +
+  "AAAAAAAAAAAAAAD/////////////////5+f//+PH///hx///4e///+H////h////4f///+H////j\n" +
+  "////4f///+P////h////4f///+HH///jx///4Yf//+HH///jx///4Yf//+HH///hh///4cf//+HH\n" +
+  "///jh///4Af//+dn///wB///8A///////w==";
+
 // --- Master geometry (inches; Visio's default page units) -------------------
 const SHAPE_W = 2.25; // master rectangle width (matches the reference ~2.25in)
 const PORT_ROW = 0.28; // vertical pitch between port rows
@@ -232,34 +264,36 @@ function shapeHeight(termCount: number): number {
 }
 
 /**
- * Build the <MasterContents> XML for one device master. The master content is a
- * single top-level Group shape (matching the reference, where each device master
- * is a Group). The Group carries:
- *   * a <Section N='Connection'> — one Row per physical connector, inputs on the
- *     left edge (X=0), outputs/bidirectional on the right edge (X=Width), evenly
- *     spaced by Y below the title band, each with a Prompt naming the port; and
- *   * a child <Shape Type='Shape'> with the rectangle <Section N='Geometry'> and
- *     the <Text> (title + one line per port).
- * All shapes use the Normal style (Line/Fill/Text style 3 from document.xml).
+ * Emit a fully-formed top-level <Shape Type='Shape'> for one master. This is the
+ * single building block both device and cable masters use, and it mirrors a real
+ * master's root shape so Visio always has renderable geometry on drop:
+ *   * NameU/Name (IsCustomNameU/IsCustomName) — a master's root shape MUST be named,
+ *     otherwise Visio reports "Error 313 — the master is empty";
+ *   * the full placement cell set (PinX/PinY/Width/Height/LocPinX/LocPinY/Angle/
+ *     FlipX/FlipY/ResizeMode);
+ *   * a drawn rectangle <Section N='Geometry'> (closed MoveTo/LineTo path) carrying
+ *     the same NoFill/NoLine/NoShow/NoSnap/NoQuickDrag cells the real shapes use;
+ *   * a <Section N='Character'> + <Section N='Paragraph'> and a <Text> block with
+ *     the <cp/><pp/> run markers (so the text actually renders);
+ *   * the <Section N='Connection'> (one Row per physical connector) when provided.
+ * The shape references the document's Normal style (Line/Fill/Text style 3), which
+ * is defined in document.xml with a visible black hairline + solid fill.
  */
-function masterContentsXml(view: DeviceView): { xml: string; width: number; height: number } {
-  const terms = expandConnectors(view);
-  const h = shapeHeight(terms.length);
-  const w = SHAPE_W;
-  const groupUid = deterministicGuid(`group:${deviceTitle(view.device)}`);
-  const childUid = deterministicGuid(`child:${deviceTitle(view.device)}`);
-
+function shapeXml(opts: {
+  id: number;
+  name: string;
+  width: number;
+  height: number;
+  text: string;
+  connectors?: ExpandedConnector[];
+}): string {
+  const { id, name, width: w, height: h, text } = opts;
+  const uid = deterministicGuid(`shape:${id}:${name}`);
+  const nm = xml(name);
   const parts: string[] = [];
-  parts.push(XML_DECL.trimEnd() + "\n");
   parts.push(
-    "<MasterContents xmlns='http://schemas.microsoft.com/office/visio/2012/main' " +
-      "xmlns:r='http://schemas.openxmlformats.org/officeDocument/2006/relationships' xml:space='preserve'>"
-  );
-  parts.push("<Shapes>");
-
-  // Top-level Group shape (the draggable master body).
-  parts.push(
-    `<Shape ID='1' Type='Group' LineStyle='3' FillStyle='3' TextStyle='3' UniqueID='${groupUid}'>`
+    `<Shape ID='${id}' NameU='${nm}' IsCustomNameU='1' Name='${nm}' IsCustomName='1' ` +
+      `Type='Shape' LineStyle='3' FillStyle='3' TextStyle='3' UniqueID='${uid}'>`
   );
   parts.push(`<Cell N='PinX' V='${(w / 2).toFixed(6)}'/>`);
   parts.push(`<Cell N='PinY' V='${(h / 2).toFixed(6)}'/>`);
@@ -273,7 +307,9 @@ function masterContentsXml(view: DeviceView): { xml: string; width: number; heig
   parts.push("<Cell N='ResizeMode' V='0'/>");
 
   // Connection points: one Row per physical connector (T='Connection', IX from 0,
-  // matching the reference). Inputs left, outputs/bidirectional right.
+  // matching the reference). Inputs on the left edge (X=0), outputs/bidirectional
+  // on the right edge (X=Width). DirX/DirY=0 as in the reference masters.
+  const terms = opts.connectors ?? [];
   if (terms.length > 0) {
     parts.push("<Section N='Connection'>");
     for (let i = 0; i < terms.length; i++) {
@@ -281,12 +317,11 @@ function masterContentsXml(view: DeviceView): { xml: string; width: number; heig
       const y = h - TITLE_BAND - (i + 0.5) * PORT_ROW;
       const onLeft = t.direction === "input";
       const x = onLeft ? 0 : w;
-      const dirX = onLeft ? -1 : 1; // alignment vector points outward from the edge
       parts.push(
         `<Row T='Connection' IX='${i}'>` +
           `<Cell N='X' V='${x.toFixed(6)}'/>` +
           `<Cell N='Y' V='${y.toFixed(6)}'/>` +
-          `<Cell N='DirX' V='${dirX}'/>` +
+          `<Cell N='DirX' V='0'/>` +
           `<Cell N='DirY' V='0'/>` +
           `<Cell N='Type' V='0'/>` +
           `<Cell N='AutoGen' V='0'/>` +
@@ -297,20 +332,17 @@ function masterContentsXml(view: DeviceView): { xml: string; width: number; heig
     parts.push("</Section>");
   }
 
-  // Child shape: the rectangle body + the text label.
-  parts.push("<Shapes>");
+  // Character + Paragraph sections so the <Text> run (referenced by <cp/>/<pp/>)
+  // has a defined font/colour/alignment — matching how real text shapes render.
   parts.push(
-    `<Shape ID='2' Type='Shape' LineStyle='3' FillStyle='3' TextStyle='3' UniqueID='${childUid}'>`
+    "<Section N='Character'><Row IX='0'>" +
+      "<Cell N='Font' V='Arial'/><Cell N='Color' V='#000000'/><Cell N='Size' V='0.1111111111111111'/>" +
+      "</Row></Section>"
   );
-  parts.push(`<Cell N='PinX' V='${(w / 2).toFixed(6)}'/>`);
-  parts.push(`<Cell N='PinY' V='${(h / 2).toFixed(6)}'/>`);
-  parts.push(`<Cell N='Width' V='${w.toFixed(6)}'/>`);
-  parts.push(`<Cell N='Height' V='${h.toFixed(6)}'/>`);
-  parts.push(`<Cell N='LocPinX' V='${(w / 2).toFixed(6)}'/>`);
-  parts.push(`<Cell N='LocPinY' V='${(h / 2).toFixed(6)}'/>`);
-  parts.push("<Cell N='Angle' V='0'/>");
-  parts.push("<Cell N='FlipX' V='0'/>");
-  parts.push("<Cell N='FlipY' V='0'/>");
+  parts.push(
+    "<Section N='Paragraph'><Row IX='0'><Cell N='HorzAlign' V='1'/></Row></Section>"
+  );
+
   // Rectangle geometry (closed path), matching the reference's Geometry cell set.
   parts.push(
     "<Section N='Geometry' IX='0'>" +
@@ -323,18 +355,46 @@ function masterContentsXml(view: DeviceView): { xml: string; width: number; heig
       "<Row T='LineTo' IX='5'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>" +
       "</Section>"
   );
-  // Shape text: title on the first line, one port label per following line.
-  const lines = [deviceTitle(view.device)];
-  for (const t of terms) lines.push(`${t.label} (${portTypeLabel(t)})`);
-  parts.push(`<Text>${xml(lines.join("\n"))}</Text>`);
+  // Shape text: the <cp/>/<pp/> markers reference the Character/Paragraph rows.
+  parts.push(`<Text><cp IX='0'/><pp IX='0'/>${xml(text)}</Text>`);
   parts.push("</Shape>");
-  parts.push("</Shapes>"); // close child shapes
+  return parts.join("");
+}
 
-  parts.push("</Shape>"); // close group
-  parts.push("</Shapes>"); // close top-level shapes
-  parts.push("</MasterContents>");
+/** Wrap one or more top-level shapes in a <MasterContents> document. */
+function masterContentsDoc(shapesXml: string): string {
+  return (
+    XML_DECL.trimEnd() +
+    "\n" +
+    "<MasterContents xmlns='http://schemas.microsoft.com/office/visio/2012/main' " +
+    "xmlns:r='http://schemas.openxmlformats.org/officeDocument/2006/relationships' xml:space='preserve'>" +
+    "<Shapes>" +
+    shapesXml +
+    "</Shapes></MasterContents>"
+  );
+}
 
-  return { xml: parts.join(""), width: w, height: h };
+/**
+ * Build the <MasterContents> XML for one device master: a single labelled
+ * rectangle carrying one connection point per physical connector and a text
+ * block (device title + one line per port).
+ */
+function masterContentsXml(view: DeviceView): { xml: string; width: number; height: number } {
+  const terms = expandConnectors(view);
+  const h = shapeHeight(terms.length);
+  const w = SHAPE_W;
+  const title = deviceTitle(view.device);
+  const lines = [title];
+  for (const t of terms) lines.push(`${t.label} (${portTypeLabel(t)})`);
+  const shape = shapeXml({
+    id: 1,
+    name: title,
+    width: w,
+    height: h,
+    text: lines.join("\n"),
+    connectors: terms
+  });
+  return { xml: masterContentsDoc(shape), width: w, height: h };
 }
 
 /**
@@ -345,54 +405,8 @@ function masterContentsXml(view: DeviceView): { xml: string; width: number; heig
 function cableMasterContentsXml(label: string): { xml: string; width: number; height: number } {
   const w = 3.0;
   const h = 0.5;
-  const groupUid = deterministicGuid(`group:${label}`);
-  const childUid = deterministicGuid(`child:${label}`);
-  const parts: string[] = [];
-  parts.push(XML_DECL.trimEnd() + "\n");
-  parts.push(
-    "<MasterContents xmlns='http://schemas.microsoft.com/office/visio/2012/main' " +
-      "xmlns:r='http://schemas.openxmlformats.org/officeDocument/2006/relationships' xml:space='preserve'>"
-  );
-  parts.push("<Shapes>");
-  parts.push(
-    `<Shape ID='1' Type='Group' LineStyle='3' FillStyle='3' TextStyle='3' UniqueID='${groupUid}'>`
-  );
-  parts.push(`<Cell N='PinX' V='${(w / 2).toFixed(6)}'/>`);
-  parts.push(`<Cell N='PinY' V='${(h / 2).toFixed(6)}'/>`);
-  parts.push(`<Cell N='Width' V='${w.toFixed(6)}'/>`);
-  parts.push(`<Cell N='Height' V='${h.toFixed(6)}'/>`);
-  parts.push(`<Cell N='LocPinX' V='${(w / 2).toFixed(6)}'/>`);
-  parts.push(`<Cell N='LocPinY' V='${(h / 2).toFixed(6)}'/>`);
-  parts.push("<Cell N='Angle' V='0'/><Cell N='FlipX' V='0'/><Cell N='FlipY' V='0'/><Cell N='ResizeMode' V='0'/>");
-  parts.push("<Shapes>");
-  parts.push(
-    `<Shape ID='2' Type='Shape' LineStyle='3' FillStyle='3' TextStyle='3' UniqueID='${childUid}'>`
-  );
-  parts.push(`<Cell N='PinX' V='${(w / 2).toFixed(6)}'/>`);
-  parts.push(`<Cell N='PinY' V='${(h / 2).toFixed(6)}'/>`);
-  parts.push(`<Cell N='Width' V='${w.toFixed(6)}'/>`);
-  parts.push(`<Cell N='Height' V='${h.toFixed(6)}'/>`);
-  parts.push(`<Cell N='LocPinX' V='${(w / 2).toFixed(6)}'/>`);
-  parts.push(`<Cell N='LocPinY' V='${(h / 2).toFixed(6)}'/>`);
-  parts.push("<Cell N='Angle' V='0'/><Cell N='FlipX' V='0'/><Cell N='FlipY' V='0'/>");
-  parts.push(
-    "<Section N='Geometry' IX='0'>" +
-      "<Cell N='NoFill' V='0'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/>" +
-      "<Cell N='NoSnap' V='0'/><Cell N='NoQuickDrag' V='0'/>" +
-      "<Row T='MoveTo' IX='1'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>" +
-      `<Row T='LineTo' IX='2'><Cell N='X' V='${w.toFixed(6)}'/><Cell N='Y' V='0'/></Row>` +
-      `<Row T='LineTo' IX='3'><Cell N='X' V='${w.toFixed(6)}'/><Cell N='Y' V='${h.toFixed(6)}'/></Row>` +
-      `<Row T='LineTo' IX='4'><Cell N='X' V='0'/><Cell N='Y' V='${h.toFixed(6)}'/></Row>` +
-      "<Row T='LineTo' IX='5'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>" +
-      "</Section>"
-  );
-  parts.push(`<Text>${xml(label)}</Text>`);
-  parts.push("</Shape>");
-  parts.push("</Shapes>");
-  parts.push("</Shape>");
-  parts.push("</Shapes>");
-  parts.push("</MasterContents>");
-  return { xml: parts.join(""), width: w, height: h };
+  const shape = shapeXml({ id: 1, name: label, width: w, height: h, text: label });
+  return { xml: masterContentsDoc(shape), width: w, height: h };
 }
 
 /** One master, accumulated before serialisation into masters.xml + master#.xml. */
@@ -412,8 +426,9 @@ interface MasterEntry {
 }
 
 // masters.xml — replicates the reference <Master> attribute set + a PageSheet
-// sized to the shape + a Layer section + the <Rel>. Static <Icon> is omitted in
-// favour of IconUpdate='1' (Visio regenerates the preview from the shape).
+// sized to the shape + a Layer section + an <Icon> + the <Rel>, in the reference's
+// element order (PageSheet, Icon, Rel). Each master ships the generic frame icon
+// and also sets IconUpdate='1' so Visio refines the preview on load.
 function masterXml(e: MasterEntry): string {
   const uniqueId = deterministicGuid(`unique:${e.index}:${e.name}`);
   const baseId = deterministicGuid(`base:${e.index}:${e.name}`);
@@ -436,6 +451,7 @@ function masterXml(e: MasterEntry): string {
     `<Cell N='Glue' V='1'/><Cell N='NameUniv' V='0'/><Cell N='ColorTrans' V='0'/>` +
     `</Row></Section>` +
     `</PageSheet>` +
+    `<Icon>\n${MASTER_ICON}</Icon>` +
     `<Rel r:id='rId${e.index}'/>` +
     `</Master>`
   );

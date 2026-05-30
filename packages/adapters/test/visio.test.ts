@@ -128,8 +128,10 @@ describe("Visio adapter — VSSX stencil of masters", () => {
     expect(master).toContain("Lightware UCX-4x2-HC60D");
     expect(master).toContain("HDMI IN 1 (hdmi)");
     expect(master).toContain("Dante (dante)");
-    // Master shape is a Group carrying geometry + connection (matches reference).
-    expect(master).toContain("Type='Group'");
+    // Master shape is a single named, renderable Shape (not a Group) — see the
+    // Error 313 fix: a master's root shape must be named and draw its own geometry.
+    expect(master).toContain("Type='Shape'");
+    expect(master).not.toContain("Type='Group'");
     expect(master).toContain("N='Geometry'");
     expect(master).toContain("N='Connection'");
     // One Connection Row per physical connector, matching expandConnectors.
@@ -142,6 +144,48 @@ describe("Visio adapter — VSSX stencil of masters", () => {
     expect(master).toContain("<Cell N='Prompt'");
     // The Prompt names a real port (label identifiable on the connection point).
     expect(master).toContain("N='Prompt' V='HDMI IN 1'");
+  });
+
+  it("master1.xml's root shape has the cells Visio needs to place it (Error 313 fix)", () => {
+    const entries = runVisio(loadDevice("lightware-ucx-4x2-hc60d.odio.json"));
+    const master = strFromU8(entries["visio/masters/master1.xml"]);
+    // The root shape MUST be named — an unnamed root shape is "empty" on drop.
+    expect(master).toMatch(/<Shape ID='1'[^>]*NameU='Lightware UCX-4x2-HC60D'/);
+    expect(master).toMatch(/<Shape ID='1'[^>]*IsCustomNameU='1'/);
+    // Full placement cell set so Visio can position/size the shape.
+    for (const cell of ["PinX", "PinY", "Width", "Height", "LocPinX", "LocPinY"]) {
+      expect(master).toContain(`<Cell N='${cell}' V=`);
+    }
+    expect(master).toContain("<Cell N='Angle' V='0'/>");
+    expect(master).toContain("<Cell N='ResizeMode' V='0'/>");
+    // A real drawn rectangle: a Geometry section with a MoveTo + LineTo rows that
+    // actually close the path, plus the fill/line/show flags.
+    expect(master).toContain("<Section N='Geometry' IX='0'>");
+    expect(master).toContain("<Cell N='NoFill' V='0'/>");
+    expect(master).toContain("<Cell N='NoLine' V='0'/>");
+    expect(master).toContain("<Cell N='NoShow' V='0'/>");
+    expect(master).toContain("<Row T='MoveTo' IX='1'>");
+    const lineRows = (master.match(/<Row T='LineTo' IX='\d+'>/g) ?? []).length;
+    expect(lineRows).toBeGreaterThanOrEqual(4);
+    // Character + Paragraph sections backing the text run.
+    expect(master).toContain("<Section N='Character'>");
+    expect(master).toContain("<Section N='Paragraph'>");
+    // Non-empty text attached via the <cp/><pp/> run markers.
+    const textMatch = master.match(/<Text><cp IX='0'\/><pp IX='0'\/>([\s\S]*?)<\/Text>/);
+    expect(textMatch).not.toBeNull();
+    expect((textMatch?.[1] ?? "").trim().length).toBeGreaterThan(0);
+  });
+
+  it("masters.xml ships an <Icon> per master so the master is not treated as empty", () => {
+    const entries = runVisio(loadDevice("lightware-ucx-4x2-hc60d.odio.json"));
+    const masters = strFromU8(entries["visio/masters/masters.xml"]);
+    const iconCount = (masters.match(/<Icon>/g) ?? []).length;
+    const masterCount = (masters.match(/<Master /g) ?? []).length;
+    expect(iconCount).toBe(masterCount);
+    // The icon is a valid base64 ICO (decodes to the ICONDIR magic 00 00 01 00).
+    const icon = masters.match(/<Icon>\s*([\s\S]*?)<\/Icon>/)?.[1] ?? "";
+    const bytes = Buffer.from(icon.replace(/\s+/g, ""), "base64");
+    expect([bytes[0], bytes[1], bytes[2], bytes[3]]).toEqual([0x00, 0x00, 0x01, 0x00]);
   });
 
   it("connection-point count equals the expanded connector count", () => {
