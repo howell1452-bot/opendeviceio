@@ -493,3 +493,91 @@ Per manufacturer:
 
 The same `manifest.json` + reviewed files accumulate the labeled dataset for the §12
 local-model step.
+
+## 14. Functional layer: the `.odio` extension, the I/O-table projection & a viewer (active track)
+
+ODIO today is a clean data contract. This track makes it *functional* without
+compromising that: a custom file extension, a **standardized I/O table** that a single
+`.odio` file populates (so manufacturers author once and drop the table straight onto a
+spec sheet), and a viewer so anyone can open a file and instantly see its I/O.
+
+### 14.1 Governing principle — data is canonical, presentation is derived
+
+The file remains the single source of truth. The I/O table (and every other visual) is a
+**deterministic projection** of that data, defined by a normative spec and produced by a
+reference renderer — never hand-maintained, never stored as drift-prone bytes inside the
+file. Edit the data → every view regenerates and stays correct. This is the rule that
+keeps "more functional" from re-creating the spec-sheet-retyping problem we exist to kill.
+
+### 14.2 The `.odio` extension
+
+- The canonical file is **JSON** with the extension **`.odio`** (content unchanged; same
+  schema). Like `.ipynb`/`.geojson`/`.webmanifest`, a custom extension gives identity and
+  file-association while every JSON tool (the SDK, validators, `jq`, git diffs, the
+  registry) keeps working and "view source" stays trivial.
+- Media type: **`application/vnd.odio+json`**; the legacy `.odio.json` is accepted as an
+  alias through a transition window (loaders/CLI/registry/website accept both).
+- **Not** a zip container. A container could embed a frozen render + assets, but loses
+  diffability/grep/view-source and risks the embedded picture drifting from the data. The
+  "one portable file you can hand someone" need is met better by an HTML export (§14.5).
+
+### 14.3 The I/O-table projection (normative)
+
+A new normative section of the SPECIFICATION defines how an `.odio` file maps to a table,
+so every manufacturer's table is identical in structure (reader familiarity → adoption):
+
+- **Rows**: one per *physical connector*, using the same count-expansion + primary-signal
+  model the adapters already share (`packages/adapters/src/ports.ts`).
+- **Grouping**: Inputs · Outputs · Bidirectional · Power (power rows derived from
+  `power.inputs` + `consumptionWatts`); bundles add a components/cable sub-table.
+- **Columns**: Label · Direction · Connector · Link (type/standard/speed, PoE/USB-PD) ·
+  Signals (domains + transports/standards) · Notes.
+- Fully derivable from existing data; the spec fixes ordering and collapse rules so two
+  renderers produce the same table.
+
+### 14.4 Reference renderer (fits the adapter architecture)
+
+The renderer is a set of new **adapter targets** reusing `ports.ts` + the shared
+`block.ts` model — no schema disruption. Output formats, in build priority:
+
+1. **SVG + PDF** — vector table a manufacturer drops onto a spec sheet (InDesign/Word/PDF).
+   The core "don't duplicate work" deliverable.
+2. **HTML viewer** — opendeviceio.org drag-and-drop / upload: an `.odio` → the standardized
+   I/O table **and** the schematic block. Also the "quickly view a file's I/O" answer.
+3. (Later) **Markdown + CSV** — docs/READMEs and BOM/spreadsheet use.
+4. (Later) **VS Code preview** — render `.odio` files as the table on open.
+
+### 14.5 `odio pack` — the shareable artifact
+
+`odio pack <file>.odio` emits a **self-contained `.html`**: one file embedding the `.odio`
+JSON plus the renderer, opening in any browser with no app or association and showing the
+table immediately. More seamless than a custom zip (no handler needed) while keeping the
+canonical file clean JSON. Also emits SVG/PDF on request.
+
+### 14.6 Minimal, optional presentation hints
+
+A few **optional, additive** fields, used only where pure derivation isn't enough (the
+table must still render correctly without them):
+
+- `ports[].location.face` — `front` | `rear` (faceplate side), for spec-sheet realism.
+- `physical.rackUnits` — already-physical sizing surfaced for the header.
+- `ports[].shortLabel` — a terse cell label when the full `label` is too long.
+
+These stay optional and never change the *meaning* of the data — they only refine layout.
+
+### 14.7 Build plan (phased)
+
+1. **Extension + media type**: accept `.odio` (and legacy `.odio.json`) across SDK loader,
+   Genie, adapters CLI, registry, website downloads; register the media type. Examples and
+   docs adopt `.odio`.
+2. **I/O-table spec**: add the normative projection section to `docs/SPECIFICATION.md`.
+3. **Renderer**: `table-svg` + `table-pdf` adapter targets on the shared model; golden tests.
+4. **HTML viewer**: web route (drag-drop) rendering table + block; then `odio pack` → `.html`.
+5. **Presentation hints**: additive schema bump (`physical.rackUnits` exists; add
+   `location.face`, `shortLabel`); conformance fixtures.
+6. (Later) Markdown/CSV targets; VS Code preview extension.
+
+### 14.8 Bonus (separable): tamper-evidence
+
+A future optional `provenance.signature` block makes a published `.odio` tamper-evident,
+reinforcing the registry's *manufacturer-verified* trust tier. Tracked, not in this phase.
