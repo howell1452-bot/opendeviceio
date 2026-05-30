@@ -174,20 +174,99 @@ describe("EasySchematic adapter — specific mappings", () => {
     expect(template.poeBudgetW).toBe(240);
   });
 
-  it("lightware UCX HDMI IN (count 2) -> at least 2 ports with signalType 'hdmi'", () => {
+  it("lightware UCX emits ONE port per connector instance (per-connector model, not per-signal)", () => {
     const { template } = runEs("lightware-ucx-4x2-hc60d.odio.json");
-    const hdmiPorts = template.ports.filter((p) => p.signalType === "hdmi");
-    expect(hdmiPorts.length).toBeGreaterThanOrEqual(2);
+    // The old per-signal exporter exploded this device to 35 ports. The
+    // per-connector model collapses each ODIO port to one ES port per instance
+    // (respecting count) — roughly one per physical connector (~16-17 logical
+    // connectors, ~22 instances once count-expanded). Assert it dropped well
+    // below the old 35.
+    expect(template.ports.length).toBeLessThan(30);
+    // No port should carry a per-signal "usb-data" fan-out in its label.
+    for (const p of template.ports) {
+      expect(p.label).not.toContain("usb-data");
+    }
   });
 
-  it("av-processor lan-a -> emits dante, aes67, and ethernet/control flows (>=3 ports)", () => {
+  it("lightware UCX HDMI IN (count 2) -> exactly 2 ports labeled 'HDMI IN N' typed hdmi", () => {
+    const { template } = runEs("lightware-ucx-4x2-hc60d.odio.json");
+    const hdmiIn = template.ports.filter((p) => p.section === "HDMI IN");
+    expect(hdmiIn.length).toBe(2);
+    for (const p of hdmiIn) {
+      expect(p.signalType).toBe("hdmi");
+      expect(p.connectorType).toBe("hdmi");
+    }
+    expect(new Set(hdmiIn.map((p) => p.label))).toEqual(new Set(["HDMI IN 1", "HDMI IN 2"]));
+  });
+
+  it("lightware UCX USB-C IN (count 2) -> 2 ports typed displayport (primary=video) noting the other flows", () => {
+    const { template } = runEs("lightware-ucx-4x2-hc60d.odio.json");
+    const usbcIn = template.ports.filter((p) => p.section === "USB-C IN");
+    expect(usbcIn.length).toBe(2);
+    for (const p of usbcIn) {
+      expect(p.signalType).toBe("displayport");
+      expect(p.connectorType).toBe("usb-c");
+      // The non-primary flows must be summarized so the multi-flow detail
+      // isn't lost.
+      expect(p.notes ?? "").toContain("usb-data");
+      expect(p.notes ?? "").toContain("power");
+    }
+  });
+
+  it("lightware UCX Dante connector -> single port typed dante", () => {
+    const { template } = runEs("lightware-ucx-4x2-hc60d.odio.json");
+    const dante = template.ports.filter((p) => p.section === "Dante");
+    expect(dante.length).toBe(1);
+    expect(dante[0].signalType).toBe("dante");
+  });
+
+  it("lightware UCX: no port label contains a 'usb-data' signal suffix", () => {
+    const { template } = runEs("lightware-ucx-4x2-hc60d.odio.json");
+    expect(template.ports.some((p) => p.label.includes("usb-data"))).toBe(false);
+  });
+
+  it("av-processor lan-a -> ONE port (per-connector) with the primary (video) signalType", () => {
     const { template } = runEs("av-processor-crosscutting.odio.json");
     const lanPorts = template.ports.filter((p) => p.id.startsWith("lan-a"));
-    expect(lanPorts.length).toBeGreaterThanOrEqual(3);
-    const types = new Set(lanPorts.map((p) => p.signalType));
-    expect(types.has("dante")).toBe(true);
-    expect(types.has("aes67")).toBe(true);
-    expect(types.has("ethernet")).toBe(true);
+    // One physical RJ45 connector -> exactly one ES port, not five.
+    expect(lanPorts.length).toBe(1);
+    // Primary by domain priority video>audio>...: video av-over-ip -> st2110.
+    expect(lanPorts[0].signalType).toBe("st2110");
+    // The other concurrent flows are summarized in the notes.
+    const notes = lanPorts[0].notes ?? "";
+    expect(notes).toContain("dante");
+    expect(notes).toContain("aes67");
+  });
+
+  it("primary-signal priority: audio+control+video -> signalType from the video mapping", () => {
+    // Synthetic single-port device exercising the domain-priority selection.
+    const device = {
+      $schema: "https://opendeviceio.org/schema/v0.1/device.schema.json",
+      odioVersion: "0.1.0",
+      id: "test/priority",
+      device: { manufacturer: "Test", model: "PRIORITY-1", category: "av/switcher/matrix" },
+      ports: [
+        {
+          id: "multi",
+          label: "MULTI",
+          direction: "bidirectional",
+          connector: "hdmi-type-a",
+          signals: [
+            { domain: "audio", transport: "analog" },
+            { domain: "control", transport: "rs-232" },
+            { domain: "video", transport: "hdmi", maxResolution: "3840x2160", maxRefreshHz: 60 }
+          ]
+        }
+      ]
+    } as unknown as OdioDevice;
+    const result = EasySchematicAdapter.export(device);
+    const arr = JSON.parse(result.files[0].content) as EsDeviceTemplate[];
+    const ports = arr[0].ports;
+    expect(ports.length).toBe(1);
+    expect(ports[0].signalType).toBe("hdmi");
+    // The non-primary audio + control flows are noted.
+    expect(ports[0].notes ?? "").toContain("analog");
+    expect(ports[0].notes ?? "").toContain("rs-232");
   });
 
   it("embedded HDMI lpcm audio does NOT create a separate audio/custom port", () => {

@@ -52,6 +52,33 @@ function sig(signal: Signal): SignalView {
 const EMBEDDED_AUDIO_TRANSPORTS = new Set(["lpcm", "arc", "earc"]);
 
 /**
+ * Domain priority for choosing a connector's single PRIMARY signal. EasySchematic
+ * models one port = one physical connector with exactly one signalType, so an
+ * ODIO port carrying multiple flows must collapse to one. The first present
+ * domain in this order wins.
+ */
+const PRIMARY_DOMAIN_PRIORITY = ["video", "audio", "control", "network", "data", "power"] as const;
+
+/** Pick the primary signal of an ODIO port by domain priority (first present). */
+function pickPrimary(signals: SignalView[]): SignalView | undefined {
+  for (const domain of PRIMARY_DOMAIN_PRIORITY) {
+    const found = signals.find((s) => s.domain === domain);
+    if (found) return found;
+  }
+  return signals[0];
+}
+
+/**
+ * Concise descriptor for a signal in carried-signal notes. Uses the transport
+ * when present (e.g. "displayport", "usb-data"), except for the power domain
+ * where the broad "power" reads better than transports like "usb-pd"/"dc".
+ */
+function signalDescriptor(view: SignalView): string {
+  if (view.domain === "power") return "power";
+  return view.transport ?? view.domain;
+}
+
+/**
  * The set of deviceType values EasySchematic's in-app importer accepts. The
  * importer HARD-ERRORS on any value outside this set, so every emitted template
  * must use exactly one of these.
@@ -284,8 +311,16 @@ function portContext(port: Port): PortContext {
 }
 
 /**
- * Build the EasySchematic ports for a single ODIO port, expanding one ES port
- * per emitted signal and replicating across `count`.
+ * Build the EasySchematic ports for a single ODIO port. EasySchematic models one
+ * port = one physical connector with a SINGLE signalType, so we emit exactly ONE
+ * ES port per ODIO port INSTANCE (replicated across `count`), NOT one per signal.
+ *
+ * Each emitted port takes its signalType from a single PRIMARY signal chosen by
+ * domain priority (video > audio > control > network > data > power). The other
+ * flows carried on the same connector are not lost: they are summarized in the
+ * port's `notes` (e.g. "Carries: displayport, usb-data, power"). Embedded audio
+ * (lpcm/arc/earc on a video connector) is folded into the same note rather than
+ * becoming its own port, as before.
  */
 function expandPort(
   port: Port,
@@ -306,102 +341,83 @@ function expandPort(
 
   const signals = port.signals.map(sig);
 
-  // Determine embedded audio: present only when there is a video signal AND an
-  // audio signal whose transport is lpcm/arc/earc. Those audio flows ride the
-  // video connector, so we do not emit a separate port for them — we note them
-  // on the video port instead.
-  const hasVideo = signals.some((s) => s.domain === "video");
+  // The single primary signal that types this connector.
+  const primary = pickPrimary(signals);
+  const hasVideo = primary?.domain === "video" || signals.some((s) => s.domain === "video");
+
+  // Embedded audio: audio flows on lpcm/arc/earc that ride a co-located video
+  // connector. These were never separate ports; we fold them into the note.
   const embeddedAudio = hasVideo
     ? signals.filter(
         (s) => s.domain === "audio" && EMBEDDED_AUDIO_TRANSPORTS.has(s.transport ?? "")
       )
     : [];
+
+  const signalType: EsSignalType = primary
+    ? mapSignalType(primary.domain, primary.transport, warnings, portId)
+    : "custom";
+
+  // The other (non-primary) signals carried on this connector, for the note.
+  const carried = signals
+    .filter((s) => s !== primary && !embeddedAudio.includes(s))
+    .map(signalDescriptor);
+  // Distinct, order-preserving.
+  const carriedDistinct = carried.filter((d, i, arr) => arr.indexOf(d) === i);
+
   const embeddedNote =
     embeddedAudio.length > 0
       ? `Embedded audio: ${embeddedAudio
           .map((s) => s.transport ?? "audio")
           .join(", ")} (carried on the video connector).`
       : undefined;
+  const carriesNote = carriedDistinct.length > 0 ? `Carries: ${carriedDistinct.join(", ")}` : undefined;
 
-  // Signals that get their own ES port.
-  const emittedSignals = signals.filter((s) => !embeddedAudio.includes(s));
+  // Note shared by every replicated unit: existing port note + the other carried
+  // flows + any embedded-audio fold-in.
+  const noteParts: string[] = [];
+  if (typeof port.notes === "string" && port.notes.length > 0) noteParts.push(port.notes);
+  if (carriesNote) noteParts.push(carriesNote);
+  if (embeddedNote) noteParts.push(embeddedNote);
+  const notes = noteParts.length > 0 ? noteParts.join(" ") : undefined;
 
-  // For the embedded note we attach it to the first video signal's port.
-  let embeddedNoteAttached = false;
+  const caps = primary ? buildCapabilities(primary) : undefined;
+  const channelCount =
+    primary && typeof primary.channels === "number" && primary.channels > 1
+      ? primary.channels
+      : undefined;
+  // Direction: prefer the ODIO port direction, fall back to the primary signal's.
+  const direction = mapDirection(port.direction, primary?.direction ?? "bidirectional");
 
   const result: EsPort[] = [];
 
   for (let unit = 1; unit <= count; unit++) {
     const unitSuffix = count > 1 ? ` ${unit}` : "";
-    for (let si = 0; si < emittedSignals.length; si++) {
-      const view = emittedSignals[si];
-      const signalType: EsSignalType = mapSignalType(
-        view.domain,
-        view.transport,
-        warnings,
-        portId
-      );
+    const label = `${portLabel ?? portId}${unitSuffix}`;
 
-      // Label: when the port carries a single emitted signal, use the port
-      // label; otherwise combine the port label with the signal descriptor.
-      const signalDescriptor = view.transport ?? view.domain;
-      const baseLabel =
-        emittedSignals.length === 1
-          ? portLabel ?? `${portId} ${signalDescriptor}`
-          : `${portLabel ?? portId} — ${signalDescriptor}`;
-      const label = `${baseLabel}${unitSuffix}`;
-
-      // Unique id.
-      const baseId = `${slug(portId)}-${slug(signalDescriptor)}${count > 1 ? `-${unit}` : ""}`;
-      let id = baseId;
-      let dedupe = 1;
-      while (usedIds.has(id)) {
-        id = `${baseId}-${dedupe++}`;
-      }
-      usedIds.add(id);
-
-      const esPort: EsPort = {
-        id,
-        label,
-        signalType,
-        direction: mapDirection(view.direction, port.direction),
-        connectorType,
-        section: groupLabel
-      };
-
-      const caps = buildCapabilities(view);
-      if (caps) esPort.capabilities = caps;
-
-      if (typeof view.channels === "number" && view.channels > 1) {
-        esPort.channelCount = view.channels;
-      }
-
-      if (typeof ctx.poePd === "number") {
-        esPort.poeDrawW = ctx.poePd;
-      }
-
-      if (ctx.linkSpeed && view.domain === "network") {
-        esPort.linkSpeed = ctx.linkSpeed;
-      }
-
-      // Combine port notes + embedded-audio note onto the first video port.
-      const noteParts: string[] = [];
-      if (typeof port.notes === "string" && port.notes.length > 0) {
-        noteParts.push(port.notes);
-      }
-      if (!embeddedNoteAttached && embeddedNote && view.domain === "video") {
-        noteParts.push(embeddedNote);
-        embeddedNoteAttached = true;
-      }
-      if (noteParts.length > 0) {
-        esPort.notes = noteParts.join(" ");
-      }
-
-      result.push(esPort);
+    const baseId = `${slug(portId)}${count > 1 ? `-${unit}` : ""}`;
+    let id = baseId;
+    let dedupe = 1;
+    while (usedIds.has(id)) {
+      id = `${baseId}-${dedupe++}`;
     }
-    // Reset embedded-note attachment per unit so each replicated unit records
-    // its embedded audio on its own first video port.
-    embeddedNoteAttached = false;
+    usedIds.add(id);
+
+    const esPort: EsPort = {
+      id,
+      label,
+      signalType,
+      direction,
+      connectorType,
+      section: groupLabel
+    };
+
+    if (caps) esPort.capabilities = caps;
+    if (typeof channelCount === "number") esPort.channelCount = channelCount;
+    if (typeof ctx.poePd === "number") esPort.poeDrawW = ctx.poePd;
+    if (ctx.linkSpeed && primary?.domain === "network") esPort.linkSpeed = ctx.linkSpeed;
+    if (notes) esPort.notes = notes;
+
+    result.push(esPort);
   }
 
   return result;
