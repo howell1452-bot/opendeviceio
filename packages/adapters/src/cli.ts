@@ -141,7 +141,7 @@ function main(): void {
 
   try {
     if (primary.bytes) {
-      // Binary target (e.g. VSDX zip): write bytes verbatim, not utf8 text.
+      // Binary target (e.g. the VSSX stencil zip): write bytes verbatim, not utf8 text.
       writeFileSync(outPath, primary.bytes);
     } else {
       writeFileSync(outPath, primary.content ?? "", "utf8");

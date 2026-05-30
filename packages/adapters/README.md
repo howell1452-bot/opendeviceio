@@ -73,29 +73,45 @@ library).
 
 ## Microsoft Visio target (`--target visio`)
 
-Emits a `.vsdx`, which is an **OPC (zip) package** of XML parts. The adapter
-builds a minimal but well-formed package with all required parts
-(`[Content_Types].xml`, `_rels/.rels`, `docProps/{core,app}.xml`,
-`visio/document.xml`, `visio/_rels/document.xml.rels`,
-`visio/pages/pages.xml`, `visio/pages/_rels/pages.xml.rels`,
-`visio/pages/page1.xml`, `visio/windows.xml`). Each device is a rectangle
-**Shape** titled `<manufacturer> <model>`, with explicit rectangle `Geometry`,
-the port labels rendered in the shape text (`<label> (<type>)`), and one
-`Connection` point per terminal (inputs on the left edge, others on the right)
-so Visio's connector tool can snap wires. **Bundles** place one device shape per
-leaf device on the page (laid out in a row); cables are added as text shapes.
+Emits a **`.vssx` STENCIL** (not a `.vsdx` drawing): an **OPC (zip) package** of
+XML parts whose content is a collection of **master shapes** — the draggable
+blocks that appear in Visio's *Shapes* stencil pane. Each ODIO device becomes
+one **master** that renders like an EasySchematic block: a labeled rectangle
+with **one connection point per physical connector**, so a user can drag the
+master onto a page and wire cables to the green ✕ connection points.
 
-The `.vsdx` is **binary** — the adapter returns the zip as `files[0].bytes`
-(not `content`), and the CLI writes those bytes verbatim.
+The package contains all required stencil parts: `[Content_Types].xml`,
+`_rels/.rels`, `docProps/{core,app}.xml`, `visio/document.xml` (with the
+**stencil** content type `application/vnd.ms-visio.stencil.main+xml`),
+`visio/_rels/document.xml.rels`, `visio/masters/masters.xml` (the `<Masters>`
+index, one `<Master>` per device), `visio/masters/_rels/masters.xml.rels`,
+`visio/masters/master1.xml … masterN.xml` (one `<MasterContents>` per device),
+and `visio/windows.xml`.
 
-> **VSDX real-Visio validation caveat.** This is a hand-built minimal package.
-> It targets the documented VSDX (MS-VSDX) schema closely enough to be a valid
-> OPC zip containing every required part, with the device rectangle + labeled
-> ports in the page XML, but it emits explicit shape `Geometry`/`Text` rather
-> than the full Master/stencil machinery a pristine Visio file produces. Like
-> the EasySchematic target before it was validated against the real app,
-> round-tripping cleanly in the actual Microsoft Visio application still needs
-> verification; see the comments in `src/visio.ts`.
+Each `master#.xml` holds a single `<Shape>`: an explicit rectangle `Geometry`
+sized to the port count, the device title + one line per port in the shape
+`Text`, and a `<Section N="Connection">` with one `Row` per physical connector.
+**Inputs** are placed on the **left** edge (`X=0`), **outputs/bidirectional** on
+the **right** edge (`X=Width`), distributed evenly down the rectangle by `Y`;
+each connection point carries a `Prompt` cell set to the port label so it is
+identifiable. **Bundles** emit one master per leaf device; cables become simple
+text-only masters (no connection points). The `.vssx` is **binary** — the
+adapter returns the zip as `files[0].bytes` (not `content`).
+
+Format basis (researched): **[MS-VSDX]** open spec (Document/Masters/Master XML
+parts, content-type + relationship URIs) and the **Visio XML reference** on
+learn.microsoft.com (`Cell`/`Row`/`Section` model; Connection-row cells
+`X`/`Y`/`DirX`/`DirY`/`Type`/`Prompt`; `Master_Type` attributes + child `Rel`).
+
+> **VSSX real-Visio validation caveat.** This is a hand-built minimal stencil. It
+> targets the documented schema and is a valid OPC zip carrying real master
+> shapes with geometry + per-connector connection points, but it omits the bytes
+> a pristine Visio writes (master `Icon` bitmaps, full `StyleSheet`/`Theme`
+> machinery, `PageSheet` defaults). The stencil **document content type**
+> `application/vnd.ms-visio.stencil.main+xml` follows the `.vssx` naming
+> convention — MS-VSDX itself only documents the `.drawing.` variant. Opening in
+> the actual Microsoft Visio application still needs verification; see the
+> comments in `src/visio.ts`.
 
 ## Install
 
@@ -161,10 +177,10 @@ const { files, warnings } = EasySchematicAdapter.export(device);
 | ------------- | --------------- | ------------------------------- |
 | EasySchematic | `easyschematic` | Implemented                     |
 | AutoCAD DXF   | `dxf`           | Implemented (schematic block)   |
-| Visio         | `visio`         | Implemented (schematic block) † |
+| Visio         | `visio`         | Implemented (`.vssx` stencil) † |
 | AVCAD         | `avcad`         | Stub (planned)                  |
 
-† The Visio `.vsdx` is a valid OPC package with the device rectangle + labeled
-ports; round-tripping in the real Microsoft Visio app still needs validation
-(see the caveat above). AVCAD throws `NotImplementedError`; its planned output
+† The Visio `.vssx` is a valid OPC stencil package of master shapes with one
+connection point per connector; round-tripping in the real Microsoft Visio app
+still needs validation (see the caveat above). AVCAD throws `NotImplementedError`; its planned output
 is documented in `src/stubs.ts`.
