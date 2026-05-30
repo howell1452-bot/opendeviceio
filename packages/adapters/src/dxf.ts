@@ -52,11 +52,12 @@ const COL_GAP = 10; // min clear gap between the left and right label columns
 const LINE_OFFSET = 1.9; // half the gap between a row's two label lines
 const MIN_BODY_WIDTH = 64;
 const MAX_BODY_WIDTH = 220;
-// Conservative glyph-width fraction. AutoCAD's STANDARD text style can resolve to
-// fonts noticeably wider than a naive 0.6; we size boxes AND truncate labels with
-// the same generous factor so text fits by construction regardless of the host
-// font (real width <= this => no overflow).
-const CHAR_W = 0.82;
+// Glyph-width fraction used for BOTH box sizing and label truncation. It must be
+// >= the host font's real advance width or truncation can't guarantee fit; cap-
+// heavy strings (HDMI, model numbers) in AutoCAD's STANDARD style run ~0.85-0.9,
+// so we use 0.95 to stay safely above it. Boxes end up a touch wide rather than
+// overrun — the explicit trade for "fits by construction" without a renderer.
+const CHAR_W = 0.95;
 const BLOCK_GAP = 40; // horizontal gap between blocks in a bundle row
 
 const LAYER_DEVICE = "DEVICE";
