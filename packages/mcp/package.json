@@ -1,0 +1,23 @@
+{
+  "name": "@opendeviceio/mcp",
+  "version": "0.1.0",
+  "description": "Model Context Protocol server over the OpenDeviceIO registry: lets AI agents search devices, fetch .odio documents and render-ready I/O tables, and validate proposed designs (incl. modular-chassis slot fit) as tools — ground truth for AV/IT system-design assistants.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "bin": { "odio-mcp": "./dist/index.js" },
+  "main": "./dist/index.js",
+  "files": ["dist", "README.md"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@opendeviceio/sdk": "*",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.2"
+  }
+}

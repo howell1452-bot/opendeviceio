@@ -97,6 +97,15 @@ const DEV_TOOLS: Tool[] = [
       "Pull any registry device by id — the raw .odio, or render-ready projections via ?format=draw (DrawProgram), table, or svg. CORS-enabled, no key.",
     href: "/implement#api",
     cta: "API guide"
+  },
+  {
+    name: "MCP server",
+    tag: "For AI agents",
+    description:
+      "@opendeviceio/mcp — a Model Context Protocol server so Claude and other agents search devices, fetch .odio documents and I/O tables, and validate designs (incl. chassis slot fit) as tools. Ground truth for AV/IT design assistants.",
+    href: `${REPO}/tree/main/packages/mcp`,
+    cta: "Get it on GitHub",
+    external: true
   }
 ];
 
