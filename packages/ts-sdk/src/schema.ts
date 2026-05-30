@@ -46,6 +46,9 @@ const deviceSchema = {
     "physical": {
       "$ref": "#/$defs/physical"
     },
+    "network": {
+      "$ref": "#/$defs/networkDevice"
+    },
     "slots": {
       "type": "array",
       "description": "For a modular chassis/frame: the card slots it exposes. Cards (themselves devices with a `card` block) are assigned to these slots in a bundle (component.slot). Omit for fixed-I/O devices.",
@@ -221,6 +224,43 @@ const deviceSchema = {
           "type": "number",
           "minimum": 0,
           "description": "Power the card draws from the frame, in watts."
+        },
+        "notes": {
+          "type": "string"
+        }
+      },
+      "patternProperties": {
+        "^x-": {}
+      },
+      "additionalProperties": false
+    },
+    "networkDevice": {
+      "type": "object",
+      "description": "Device-level networking capability (for switches/routers/gateways). A coarse, queryable classification — not internal routing/forwarding behavior.",
+      "properties": {
+        "osiLayers": {
+          "type": "array",
+          "description": "OSI layers this device operates at, e.g. [2] for an L2 switch, [3] for a router, [2,3] for an L2+/multilayer switch.",
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 7
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "managed": {
+          "type": "string",
+          "enum": [
+            "managed",
+            "smart",
+            "unmanaged"
+          ],
+          "description": "Management class of a switch."
+        },
+        "routing": {
+          "type": "boolean",
+          "description": "Whether the device performs L3 routing."
         },
         "notes": {
           "type": "string"

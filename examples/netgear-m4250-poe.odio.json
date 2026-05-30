@@ -19,11 +19,29 @@
         "type": "ethernet",
         "standard": "1000base-t",
         "speed": "1g",
-        "poe": { "standard": "802.3at", "role": "pse", "classWatts": 30 }
+        "poe": {
+          "standard": "802.3at",
+          "role": "pse",
+          "classWatts": 30
+        }
       },
-      "location": { "face": "front", "group": "network", "order": 1 },
+      "location": {
+        "face": "front",
+        "group": "network",
+        "order": 1
+      },
       "signals": [
-        { "domain": "network", "transport": "av-network", "vlanCapable": true, "managed": true, "protocols": ["dante", "ndi", "av-over-ip"] }
+        {
+          "domain": "network",
+          "transport": "av-network",
+          "vlanCapable": true,
+          "managed": true,
+          "protocols": [
+            "dante",
+            "ndi",
+            "av-over-ip"
+          ]
+        }
       ]
     },
     {
@@ -32,42 +50,104 @@
       "direction": "bidirectional",
       "connector": "sfp+",
       "count": 2,
-      "link": { "type": "ethernet", "speed": "10g" },
-      "location": { "face": "front", "group": "uplink", "order": 1 },
-      "signals": [{ "domain": "network", "transport": "vlan-trunk", "vlanCapable": true }]
+      "link": {
+        "type": "ethernet",
+        "speed": "10g"
+      },
+      "location": {
+        "face": "front",
+        "group": "uplink",
+        "order": 1
+      },
+      "signals": [
+        {
+          "domain": "network",
+          "transport": "vlan-trunk",
+          "vlanCapable": true
+        }
+      ]
     },
     {
       "id": "console",
       "label": "CONSOLE",
       "direction": "bidirectional",
       "connector": "usb-c",
-      "link": { "type": "usb", "standard": "usb-2.0", "usbRole": "device" },
-      "location": { "face": "front", "group": "management", "order": 1 },
-      "signals": [{ "domain": "control", "transport": "usb-cdc" }]
+      "link": {
+        "type": "usb",
+        "standard": "usb-2.0",
+        "usbRole": "device"
+      },
+      "location": {
+        "face": "front",
+        "group": "management",
+        "order": 1
+      },
+      "signals": [
+        {
+          "domain": "control",
+          "transport": "usb-cdc"
+        }
+      ]
     }
   ],
   "power": {
-    "inputs": [{ "type": "ac", "voltageRange": "100-240V", "frequencyHz": "50/60", "connector": "iec-c14" }],
-    "consumptionWatts": { "typical": 40, "max": 280 },
+    "inputs": [
+      {
+        "type": "ac",
+        "voltageRange": "100-240V",
+        "frequencyHz": "50/60",
+        "connector": "iec-c14"
+      }
+    ],
+    "consumptionWatts": {
+      "typical": 40,
+      "max": 280
+    },
     "redundant": false
   },
   "physical": {
-    "dimensionsMm": { "width": 328, "height": 43, "depth": 169 },
+    "dimensionsMm": {
+      "width": 328,
+      "height": 43,
+      "depth": 169
+    },
     "weightGrams": 2200,
     "rackUnits": 1,
     "rackMountable": true,
     "rackWidth": "half",
-    "mounting": ["rack", "surface"]
+    "mounting": [
+      "rack",
+      "surface"
+    ]
   },
   "standards": [
-    { "category": "network", "name": "IEEE 802.3at" },
-    { "category": "safety", "name": "UL 62368-1" },
-    { "category": "emc", "name": "FCC Part 15 Class A" }
+    {
+      "category": "network",
+      "name": "IEEE 802.3at"
+    },
+    {
+      "category": "safety",
+      "name": "UL 62368-1"
+    },
+    {
+      "category": "emc",
+      "name": "FCC Part 15 Class A"
+    }
   ],
   "provenance": {
     "generator": "manual",
     "method": "manual",
-    "validation": { "status": "draft" }
+    "validation": {
+      "status": "draft"
+    }
   },
-  "x-note": "Illustrative example for OpenDeviceIO v0.1; values plausible but not manufacturer-verified."
+  "x-note": "Illustrative example for OpenDeviceIO v0.1; values plausible but not manufacturer-verified.",
+  "network": {
+    "osiLayers": [
+      2,
+      3
+    ],
+    "managed": "managed",
+    "routing": true
+  }
 }

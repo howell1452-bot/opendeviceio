@@ -518,6 +518,7 @@ export interface OpenDeviceIODevice {
   ports: Port[];
   power?: Power;
   physical?: Physical;
+  network?: NetworkDevice;
   /**
    * For a modular chassis/frame: the card slots it exposes. Cards (themselves devices with a `card` block) are assigned to these slots in a bundle (component.slot). Omit for fixed-I/O devices.
    */
@@ -652,6 +653,31 @@ export interface Physical {
   notes?: string;
   /**
    * This interface was referenced by `Physical`'s JSON-Schema definition
+   * via the `patternProperty` "^x-".
+   */
+  [k: string]: unknown;
+}
+/**
+ * Device-level networking capability (for switches/routers/gateways). A coarse, queryable classification — not internal routing/forwarding behavior.
+ */
+export interface NetworkDevice {
+  /**
+   * OSI layers this device operates at, e.g. [2] for an L2 switch, [3] for a router, [2,3] for an L2+/multilayer switch.
+   *
+   * @minItems 1
+   */
+  osiLayers?: [number, ...number[]];
+  /**
+   * Management class of a switch.
+   */
+  managed?: "managed" | "smart" | "unmanaged";
+  /**
+   * Whether the device performs L3 routing.
+   */
+  routing?: boolean;
+  notes?: string;
+  /**
+   * This interface was referenced by `NetworkDevice`'s JSON-Schema definition
    * via the `patternProperty` "^x-".
    */
   [k: string]: unknown;
