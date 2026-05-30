@@ -49,8 +49,8 @@ A **producer** is any tool or person that emits ODIO documents. A **consumer** i
 tool that reads them. Consumers MUST validate input against the schema before relying on
 it, and MUST ignore unknown extension keys (see §4).
 
-ODIO files use the extension **`.odio.json`**. The canonical media type intent is
-`application/json`.
+ODIO files use the extension **`.odio`** (the legacy **`.odio.json`** is also accepted);
+the media type is **`application/vnd.odio+json`**. Content is JSON regardless. See §17.
 
 ### 1.3 The conformance corpus
 
