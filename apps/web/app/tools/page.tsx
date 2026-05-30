@@ -170,7 +170,7 @@ export default function ToolsPage() {
       />
       <Section
         title="Design-tool integrations"
-        blurb="Pull devices straight into your drawing or layout."
+        blurb="Pull devices straight into your drawing or layout. Signed, installable builds are published to GitHub Releases; the source links below are for building/contributing."
         tools={INTEGRATIONS}
       />
       <Section

@@ -1,0 +1,124 @@
+# Builds, packages, (optionally) signs, and publishes the downloadable design-tool
+# plugins to a GitHub Release. Runs on a version tag (e.g. plugins-v0.1.0) or manual
+# dispatch.
+#
+# WHAT THIS PRODUCES (per run):
+#   - AutoCAD:  OdioImport-autocad-<ver>.zip  (auto-load .bundle: drop into
+#               %APPDATA%\Autodesk\ApplicationPlugins\)
+#   - Visio:    OdioToVisio-<ver>.zip         (build output)
+#   - InDesign: opendeviceio-<ver>.ccx        (UXP package; install via Creative Cloud)
+#
+# SIGNING (Authenticode for the Windows .dlls/.zip) is applied ONLY when signing
+# secrets are configured — otherwise artifacts are produced UNSIGNED and the run logs a
+# warning. Recommended: Azure Trusted Signing (cloud, no HSM). See integrations/RELEASING.md.
+#
+# Prerequisites for a green run that this repo cannot verify in CI alone:
+#   - the C# projects compile against your target AutoCAD/Visio versions;
+#   - signing secrets are set (for trusted downloads);
+#   - someone tests the installers in the actual apps. CI cannot run AutoCAD/Visio/InDesign.
+
+name: Release plugins
+
+on:
+  push:
+    tags: ["plugins-v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version label for artifacts (e.g. 0.1.0)"
+        required: true
+        default: "0.1.0"
+
+permissions:
+  contents: write
+
+jobs:
+  autocad:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Build
+        working-directory: integrations/autocad
+        run: dotnet build OdioImport.csproj -c Release
+      - name: Assemble .bundle
+        shell: pwsh
+        run: |
+          $b = "OdioImport.bundle"
+          New-Item -ItemType Directory -Force "$b/Contents" | Out-Null
+          Copy-Item integrations/autocad/PackageContents.xml "$b/PackageContents.xml"
+          Copy-Item integrations/autocad/bin/Release/net48/OdioImport.dll "$b/Contents/"
+          Copy-Item integrations/autocad/bin/Release/net48/Newtonsoft.Json.dll "$b/Contents/"
+      - name: Sign (Azure Trusted Signing)
+        if: ${{ secrets.AZURE_CLIENT_ID != '' }}
+        uses: azure/trusted-signing-action@v0
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ secrets.TRUSTED_SIGNING_ENDPOINT }}
+          trusted-signing-account-name: ${{ secrets.TRUSTED_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ secrets.TRUSTED_SIGNING_PROFILE }}
+          files-folder: OdioImport.bundle/Contents
+          files-folder-filter: dll
+      - name: Zip
+        shell: pwsh
+        run: Compress-Archive -Path OdioImport.bundle -DestinationPath "OdioImport-autocad.zip" -Force
+      - uses: actions/upload-artifact@v4
+        with: { name: autocad, path: OdioImport-autocad.zip }
+
+  visio:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Build
+        working-directory: integrations/visio
+        run: dotnet build OdioToVisio.csproj -c Release
+      - name: Sign (Azure Trusted Signing)
+        if: ${{ secrets.AZURE_CLIENT_ID != '' }}
+        uses: azure/trusted-signing-action@v0
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ secrets.TRUSTED_SIGNING_ENDPOINT }}
+          trusted-signing-account-name: ${{ secrets.TRUSTED_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ secrets.TRUSTED_SIGNING_PROFILE }}
+          files-folder: integrations/visio/bin/Release/net48
+          files-folder-filter: dll,exe
+      - name: Zip
+        shell: pwsh
+        run: Compress-Archive -Path integrations/visio/bin/Release/net48/* -DestinationPath "OdioToVisio.zip" -Force
+      - uses: actions/upload-artifact@v4
+        with: { name: visio, path: OdioToVisio.zip }
+
+  indesign:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # A .ccx is a zip of the plugin folder; Creative Cloud installs it. (Adobe
+      # Marketplace re-signs on submission — see RELEASING.md.)
+      - name: Package .ccx
+        run: |
+          cd integrations/indesign
+          zip -r ../../opendeviceio.ccx manifest.json index.html index.js
+      - uses: actions/upload-artifact@v4
+        with: { name: indesign, path: opendeviceio.ccx }
+
+  release:
+    needs: [autocad, visio, indesign]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/plugins-v')
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { path: dist }
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/**/*
+          generate_release_notes: true
