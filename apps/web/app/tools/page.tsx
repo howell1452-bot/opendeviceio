@@ -50,12 +50,14 @@ const INTEGRATIONS: Tool[] = [
     note: "Source scaffold (.NET Framework 4.8) — build in Visual Studio against your AutoCAD. A signed release will follow."
   },
   {
-    name: "Microsoft Visio add-in",
-    tag: "Planned",
+    name: "Microsoft Visio importer",
+    tag: "Developer preview",
     description:
-      "An add-in that draws ODIO blocks onto a Visio page via the Visio API (no stencil files). Same draw-instruction backend as the AutoCAD add-in.",
-    href: "/implement",
-    cta: "Implementer guide"
+      "Draws ODIO blocks onto the active Visio page via the Visio API (no stencil files) — fetched live from the API. Same draw-instruction backend as the AutoCAD add-in.",
+    href: `${REPO}/tree/main/integrations/visio`,
+    cta: "Get it on GitHub",
+    external: true,
+    note: "Source preview (.NET Framework 4.8) — build in Visual Studio; requires Visio at run time."
   },
   {
     name: "Adobe InDesign plugin",

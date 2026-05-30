@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    OpenDeviceIO -> Microsoft Visio importer (developer preview).
+
+    A small console app that attaches to a running Visio (or launches one), fetches
+    a device's DrawProgram from the OpenDeviceIO API (?format=draw), and draws the
+    schematic block onto the active page via the Visio COM API. This deliberately
+    sidesteps .vssx stencil authoring (which proved unreliable) by drawing live
+    shapes. A proper ribbon add-in can wrap the same draw routine later.
+
+    Target: .NET Framework 4.8. The Visio interop assembly comes from NuGet so this
+    builds without Visio installed; Visio is required only at run time.
+
+    NOT compiled/tested in this repo's environment — build in Visual Studio and
+    iterate against your Visio. Visio COM cell names/units are the most likely thing
+    to need tweaking.
+  -->
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>OdioToVisio</AssemblyName>
+    <RootNamespace>OpenDeviceIO.Visio</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Office.Interop.Visio" Version="15.0.4569" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+</Project>
