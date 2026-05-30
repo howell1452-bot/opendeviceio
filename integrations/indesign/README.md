@@ -14,6 +14,14 @@ deterministic projection of the file, the datasheet never drifts from the data.
 - Adobe InDesign 2023 (18.0) or newer (UXP plugins).
 - Adobe UXP Developer Tool (UDT) for loading during development.
 
+## Install (end users)
+
+Download **`opendeviceio.ccx`** from the GitHub Release and double-click it — the Adobe
+Creative Cloud desktop app installs the plugin into InDesign (it appears under
+*Window › Plugins*). For a trusted, listed one-click install, the plugin is submitted to
+**Adobe Exchange**, where Adobe reviews and signs it (this is InDesign's signing model —
+there is no Authenticode here); see [`../RELEASING.md`](../RELEASING.md).
+
 ## Load (development)
 
 1. Open **UXP Developer Tool**.

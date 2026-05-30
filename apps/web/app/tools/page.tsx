@@ -67,7 +67,7 @@ const INTEGRATIONS: Tool[] = [
     href: `${REPO}/tree/main/integrations/indesign`,
     cta: "Get it on GitHub",
     external: true,
-    note: "UXP plugin — load via the Adobe UXP Developer Tool; requires InDesign 2023+."
+    note: "Downloadable .ccx (Creative Cloud installs it); Adobe Exchange listing planned. InDesign 2023+."
   }
 ];
 
