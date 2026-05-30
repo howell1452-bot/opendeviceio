@@ -6,6 +6,7 @@ import { getRegistryRow } from "@/lib/registry";
 import { KindBadge, StatusBadge, Chip } from "@/components/Badge";
 import { DeviceView } from "@/components/DeviceView";
 import { BundleView } from "@/components/BundleView";
+import { IoTableView } from "@/components/IoTableView";
 
 // Fetch the row at request time; build must not depend on the DB.
 export const dynamic = "force-dynamic";
@@ -101,7 +102,10 @@ export default async function RegistryDetailPage({
         {row.kind === "device" ? (
           <DeviceView device={row.document as OdioDevice} />
         ) : row.kind === "bundle" ? (
-          <BundleView bundle={row.document as Bundle} />
+          <div className="space-y-10">
+            <BundleView bundle={row.document as Bundle} />
+            <IoTableView document={row.document as OdioDevice} />
+          </div>
         ) : (
           <CableView doc={doc} />
         )}
