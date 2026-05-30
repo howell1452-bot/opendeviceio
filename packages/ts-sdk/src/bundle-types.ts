@@ -236,6 +236,7 @@ export type Link = {
      */
     role?: "pse" | "pd";
     classWatts?: number;
+    notes?: string;
     /**
      * This interface was referenced by `undefined`'s JSON-Schema definition
      * via the `patternProperty` "^x-".
@@ -951,6 +952,7 @@ export interface Power {
      * For PoE inputs, e.g. '802.3at'.
      */
     standard?: string;
+    notes?: string;
     /**
      * This interface was referenced by `undefined`'s JSON-Schema definition
      * via the `patternProperty` "^x-".
@@ -975,6 +977,7 @@ export interface Power {
    * True if the device has redundant power supplies.
    */
   redundant?: boolean;
+  notes?: string;
   /**
    * This interface was referenced by `Power`'s JSON-Schema definition
    * via the `patternProperty` "^x-".
@@ -1008,6 +1011,7 @@ export interface Physical {
    */
   ipRating?: string;
   color?: string;
+  notes?: string;
   /**
    * This interface was referenced by `Physical`'s JSON-Schema definition
    * via the `patternProperty` "^x-".

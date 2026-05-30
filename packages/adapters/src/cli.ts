@@ -5,10 +5,13 @@
 // Usage:
 //   odio-export <input.odio.json> [--target <id>] [-o <out>]
 //
-//   --target, -t   adapter id (default: easyschematic). One of:
-//                  easyschematic | dxf | visio | avcad
-//   --out,    -o   output file path. Defaults to the adapter's suggested
-//                  filename in the input file's directory.
+//   --target, -t      adapter id (default: easyschematic). One of:
+//                     easyschematic | dxf | visio | avcad
+//   --es-format       EasySchematic output envelope: array | bulk (default: array).
+//                     "array" emits a bare JSON array of templates for the in-app
+//                     importer; "bulk" emits { templates: [...] } for the DB seed.
+//   --out,    -o      output file path. Defaults to the adapter's suggested
+//                     filename in the input file's directory.
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -24,16 +27,23 @@ interface CliArgs {
   input?: string;
   target: string;
   out?: string;
+  esFormat: "array" | "bulk";
 }
 
 function parseArgs(argv: string[]): CliArgs {
-  const args: CliArgs = { target: "easyschematic" };
+  const args: CliArgs = { target: "easyschematic", esFormat: "array" };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--target" || a === "-t") {
       args.target = argv[++i];
     } else if (a === "--out" || a === "-o") {
       args.out = argv[++i];
+    } else if (a === "--es-format") {
+      const v = argv[++i];
+      if (v !== "array" && v !== "bulk") {
+        throw new Error(`Invalid --es-format "${v}": expected "array" or "bulk".`);
+      }
+      args.esFormat = v;
     } else if (a === "--help" || a === "-h") {
       printUsage();
       process.exit(0);
@@ -54,6 +64,7 @@ function printUsage(): void {
       "Usage: odio-export <input.odio.json> [--target <id>] [-o <out>]",
       "",
       `  --target, -t   adapter id (default: easyschematic): ${adapterIds.join(", ")}`,
+      "  --es-format    EasySchematic envelope: array | bulk (default: array)",
       "  --out,    -o   output file path (default: alongside input)",
       ""
     ].join("\n")
@@ -110,8 +121,9 @@ function main(): void {
   let result;
   try {
     // The adapter accepts device, bundle, or cable documents and routes
-    // internally; the OdioDevice cast satisfies the Adapter signature.
-    result = adapter.export(document as unknown as OdioDevice);
+    // internally; the OdioDevice cast satisfies the Adapter signature. The
+    // --es-format option is only consumed by the EasySchematic adapter.
+    result = adapter.export(document as unknown as OdioDevice, { format: args.esFormat });
   } catch (err) {
     process.stderr.write(`Error: ${(err as Error).message}\n`);
     process.exit(1);

@@ -1,5 +1,8 @@
-// The EasySchematic adapter: converts a validated ODIO device into an
-// EasySchematic bulk-import document ({ templates: [DeviceTemplate] }).
+// The EasySchematic adapter: converts a validated ODIO device into EasySchematic
+// device templates. Two output envelopes are supported:
+//   - "array" (default): a bare JSON array of templates, the format accepted by
+//     EasySchematic's in-app device-creation JSON importer.
+//   - "bulk": the { templates: [...] } wrapper used by the vendor-DB seed import.
 
 import {
   validate,
@@ -22,6 +25,8 @@ import type {
   EsConnectorType,
   EsDeviceTemplate,
   EsDirection,
+  EsExportOptions,
+  EsFormat,
   EsPort,
   EsPortCapabilities,
   EsSignalType
@@ -46,38 +51,160 @@ function sig(signal: Signal): SignalView {
 /** Embedded audio transports that ride a co-located video connector. */
 const EMBEDDED_AUDIO_TRANSPORTS = new Set(["lpcm", "arc", "earc"]);
 
-/** Map an ODIO category path to an EasySchematic deviceType. */
-function deriveDeviceType(category: string | undefined): string {
-  if (!category) return "other";
-  const segments = category.split("/");
-  const haystack = category.toLowerCase();
-  // Prefer the most specific (last) segment, then fall back to keyword scan.
-  const direct: Record<string, string> = {
-    switch: "switch",
-    switcher: "switcher",
-    matrix: "switcher",
-    dsp: "dsp",
-    extender: "extender",
-    transmitter: "extender",
-    receiver: "extender",
-    display: "display",
-    monitor: "display",
-    camera: "camera",
-    amplifier: "amplifier",
-    amp: "amplifier"
-  };
-  for (let i = segments.length - 1; i >= 0; i--) {
-    const hit = direct[segments[i]];
-    if (hit) return hit;
+/**
+ * The set of deviceType values EasySchematic's in-app importer accepts. The
+ * importer HARD-ERRORS on any value outside this set, so every emitted template
+ * must use exactly one of these.
+ */
+const VALID_DEVICE_TYPES: ReadonlySet<string> = new Set([
+  "camera","ptz-camera","camera-ccu","graphics","computer","media-player","mouse","keyboard",
+  "video-bar","touch-screen","screen","switcher","router","converter","scaler","adapter",
+  "frame-sync","multiviewer","capture-card","chromakey","da","video-wall-controller","monitor",
+  "tv","projector","recorder","audio-mixer","audio-embedder","audio-interface","audio-dsp",
+  "equalizer","stage-box","audio-splitter","wireless-mic-receiver","speaker","amplifier",
+  "headphone-amplifier","monitor-controller","personal-monitor","ndi-encoder","ndi-decoder",
+  "network-switch","streaming-encoder","av-over-ip","kvm-extender","usb-extender",
+  "hdbaset-extender","wireless-video","intercom","led-processor","led-cabinet","media-server",
+  "lighting-console","moving-light","led-fixture","dmx-splitter","dmx-node","control-processor",
+  "tally-system","ptz-controller","sync-generator","timecode-generator","midi-device",
+  "control-expansion","cable-accessory","wired-mic","iem-transmitter","change-over",
+  "expansion-card","fiber-transmitter","company-switch","frame","power-distribution",
+  "patch-panel","wall-plate","presentation-system","wireless-presentation","cloud-service",
+  "codec","expansion-chassis","power-mixer","hdmi-splitter","network-router","nas",
+  "external-storage","storage-media","lighting-processor","network-wifi","access-point",
+  "intercom-transceiver","controller","button-panel","dock","studio-monitor","video-scope",
+  "audio-meter","assistive-listening","battery","commentary-box","phone-hybrid",
+  "interpreter-desk","table-box","antenna","antenna-distribution","conference-system","di-box",
+  "display","charging-station","audio-bar","mtr-pc","touch-controller","occupancy-sensor"
+]);
+
+/**
+ * Best-effort map from a normalized ODIO category dotted path to a valid
+ * EasySchematic deviceType. Keys are matched against the full lowercased path
+ * (substring) and against individual path segments, most-specific first.
+ */
+const CATEGORY_DEVICE_TYPE: ReadonlyArray<readonly [string, string]> = [
+  // Order matters: earlier, more specific entries win.
+  ["switcher/matrix", "switcher"],
+  ["audio/dsp", "audio-dsp"],
+  ["processor/dsp", "audio-dsp"],
+  ["network/switch", "network-switch"],
+  ["network/adapter", "adapter"],
+  ["extender/transmitter", "hdbaset-extender"],
+  ["control/touch-panel", "touch-screen"],
+  ["compute/uc-engine", "mtr-pc"],
+  ["conferencing/kit", "presentation-system"],
+  ["microphone/mic", "wired-mic"],
+  ["display/monitor", "display"],
+  ["occupancy-sensor", "occupancy-sensor"],
+  // Single-segment / generic fallbacks.
+  ["switcher", "switcher"],
+  ["matrix", "switcher"],
+  ["dsp", "audio-dsp"],
+  ["network-switch", "network-switch"],
+  ["extender", "hdbaset-extender"],
+  ["adapter", "adapter"],
+  ["touch-panel", "touch-screen"],
+  ["uc-engine", "mtr-pc"],
+  ["converter", "converter"],
+  ["transmitter", "wireless-presentation"],
+  ["assembly", "presentation-system"],
+  ["kit", "presentation-system"],
+  ["camera", "camera"],
+  ["microphone", "wired-mic"],
+  ["mic", "wired-mic"],
+  ["monitor", "display"],
+  ["display", "display"],
+  ["amplifier", "amplifier"],
+  ["codec", "codec"],
+  ["dock", "dock"]
+];
+
+/** Per signal-domain fallback deviceType when no category match is found. */
+const DOMAIN_DEVICE_TYPE: Readonly<Record<string, string>> = {
+  video: "converter",
+  audio: "audio-dsp",
+  network: "network-switch",
+  control: "control-processor",
+  data: "converter",
+  power: "power-distribution"
+};
+
+/**
+ * Determine the device's dominant signal domain by counting emitted signals
+ * across all ports. Returns undefined when the device has no signals.
+ */
+function dominantDomain(device: DeviceView): string | undefined {
+  const counts: Record<string, number> = {};
+  for (const port of device.ports) {
+    for (const signal of port.signals) {
+      const domain = sig(signal).domain;
+      if (domain) counts[domain] = (counts[domain] ?? 0) + 1;
+    }
   }
-  if (haystack.includes("switcher") || haystack.includes("matrix")) return "switcher";
-  if (haystack.includes("switch")) return "switch";
-  if (haystack.includes("dsp")) return "dsp";
-  if (haystack.includes("extender")) return "extender";
-  if (haystack.includes("display") || haystack.includes("monitor")) return "display";
-  if (haystack.includes("camera")) return "camera";
-  if (haystack.includes("amplifier") || haystack.includes("amp")) return "amplifier";
-  return "other";
+  let best: string | undefined;
+  let bestN = 0;
+  for (const [domain, n] of Object.entries(counts)) {
+    if (n > bestN) {
+      best = domain;
+      bestN = n;
+    }
+  }
+  return best;
+}
+
+/**
+ * Map an ODIO device to a valid EasySchematic deviceType. Tries the category
+ * dotted path first; on no match, falls back to the dominant signal domain (and
+ * finally "converter"), pushing a warning whenever a fallback is used.
+ */
+function mapDeviceType(device: DeviceView, warnings: string[]): string {
+  const category = device.device.category;
+  const label = `${device.device.manufacturer ?? ""} ${device.device.model ?? ""}`.trim() || "device";
+  if (category) {
+    const haystack = category.toLowerCase();
+    for (const [key, type] of CATEGORY_DEVICE_TYPE) {
+      if (key.includes("/")) {
+        if (haystack.includes(key)) return type;
+      } else {
+        // Single token: match a whole path segment.
+        if (haystack.split("/").includes(key)) return type;
+      }
+    }
+  }
+
+  // Fallback by dominant signal domain.
+  const domain = dominantDomain(device);
+  const fallback = (domain && DOMAIN_DEVICE_TYPE[domain]) || "converter";
+  // Defensive: the fallback table only ever yields known values, but guard
+  // against future edits introducing a typo that would fail the importer.
+  const safeFallback = VALID_DEVICE_TYPES.has(fallback) ? fallback : "converter";
+  warnings.push(
+    `Device "${label}": category "${category ?? "(none)"}" has no deviceType mapping; ` +
+      `falling back to "${safeFallback}"${domain ? ` (dominant domain "${domain}")` : ""}.`
+  );
+  return safeFallback;
+}
+
+/** Build a guaranteed-valid http(s) referenceUrl for a device template. */
+function deviceReferenceUrl(d: DeviceView["device"], documentId: string | undefined): string {
+  const explicit = d.productUrl ?? d.datasheetUrl;
+  if (typeof explicit === "string" && /^https?:\/\//.test(explicit)) return explicit;
+  const id = documentId ?? slug(`${d.manufacturer ?? ""}-${d.model ?? "device"}`);
+  return `https://opendeviceio.org/registry/${id}`;
+}
+
+/** Build a guaranteed-valid http(s) referenceUrl for a cable-accessory template. */
+function cableReferenceUrl(cable: CableBody, documentId: string | undefined): string {
+  const c = cable as { productUrl?: unknown; datasheetUrl?: unknown };
+  const explicit =
+    (typeof c.productUrl === "string" && c.productUrl) ||
+    (typeof c.datasheetUrl === "string" && c.datasheetUrl) ||
+    undefined;
+  if (explicit && /^https?:\/\//.test(explicit)) return explicit;
+  const id =
+    documentId ?? slug(`${cable.manufacturer ?? ""}-${cable.model ?? cable.sku ?? cable.label ?? "cable"}`);
+  return `https://opendeviceio.org/registry/${id}`;
 }
 
 /** Map an ODIO category path to a coarse EasySchematic category. */
@@ -293,6 +420,11 @@ interface TemplateExtras {
   extraSearchTerms?: string[];
   /** Effective quantity for this leaf (>1 -> set template.quantity). */
   quantity?: number;
+  /**
+   * The owning document's id, used to build the fallback registry referenceUrl
+   * when the device declares no productUrl/datasheetUrl.
+   */
+  documentId?: string;
 }
 
 /**
@@ -319,16 +451,14 @@ function buildTemplate(
 
   const template: EsDeviceTemplate = {
     label,
-    deviceType: deriveDeviceType(d.category),
+    deviceType: mapDeviceType(device, warnings),
     category: deriveCategory(d.category),
     manufacturer,
     modelNumber,
     model: modelNumber,
+    referenceUrl: deviceReferenceUrl(d, extras.documentId),
     ports
   };
-
-  const referenceUrl = d.productUrl ?? d.datasheetUrl;
-  if (referenceUrl) template.referenceUrl = referenceUrl;
 
   if (typeof powerDrawW === "number") template.powerDrawW = powerDrawW;
 
@@ -449,11 +579,12 @@ function buildCableTemplate(
 
   const template: EsDeviceTemplate = {
     label,
-    deviceType: "cable",
+    deviceType: "cable-accessory",
     category: "cable",
     manufacturer,
     modelNumber,
     model: modelNumber || undefined,
+    referenceUrl: cableReferenceUrl(cable, extras.documentId),
     ports,
     isCableAccessory: true
   };
@@ -482,7 +613,11 @@ function buildCableTemplate(
  * cable-accessory template per distinct cable. The kit part number is added to
  * every template's searchTerms for traceability.
  */
-function buildBundleTemplates(bundle: Bundle, warnings: string[]): EsDeviceTemplate[] {
+function buildBundleTemplates(
+  bundle: Bundle,
+  warnings: string[],
+  documentId: string | undefined
+): EsDeviceTemplate[] {
   const flat = flattenBundle(bundle);
   const kitModel = bundle.bundle?.model;
   const kitManufacturer = bundle.bundle?.manufacturer;
@@ -505,12 +640,12 @@ function buildBundleTemplates(bundle: Bundle, warnings: string[]): EsDeviceTempl
       // Emit one disambiguated template per physical instance, mirroring how
       // device-level port `count` is expanded into distinct units.
       for (let unit = 1; unit <= qty; unit++) {
-        const t = buildTemplate(view, warnings, { extraSearchTerms: kitTerms });
+        const t = buildTemplate(view, warnings, { extraSearchTerms: kitTerms, documentId });
         t.label = `${t.label} (${unit} of ${qty})`;
         templates.push(t);
       }
     } else {
-      templates.push(buildTemplate(view, warnings, { extraSearchTerms: kitTerms }));
+      templates.push(buildTemplate(view, warnings, { extraSearchTerms: kitTerms, documentId }));
     }
   }
 
@@ -522,7 +657,8 @@ function buildBundleTemplates(bundle: Bundle, warnings: string[]): EsDeviceTempl
     templates.push(
       buildCableTemplate(entry.cable as CableBody, warnings, {
         extraSearchTerms: kitTerms,
-        quantity: qty
+        quantity: qty,
+        documentId
       })
     );
   }
@@ -546,7 +682,13 @@ function buildBundleTemplates(bundle: Bundle, warnings: string[]): EsDeviceTempl
 
 /**
  * The EasySchematic adapter. Validates input with the SDK, then emits a single
- * JSON file containing `{ templates: [...] }`.
+ * JSON file containing the device templates.
+ *
+ * Output envelope is controlled by `opts.format`:
+ *   - "array" (default): a bare JSON array of templates, the shape accepted by
+ *     EasySchematic's in-app device-creation JSON importer.
+ *   - "bulk": the legacy `{ templates: [...] }` wrapper used by the vendor-DB
+ *     seed import.
  *
  * Accepts either a device document or a bundle (kit) document. A bundle is
  * flattened via the SDK and expanded into one template per leaf device plus a
@@ -555,10 +697,14 @@ function buildBundleTemplates(bundle: Bundle, warnings: string[]): EsDeviceTempl
  */
 export const EasySchematicAdapter: Adapter = {
   id: "easyschematic",
-  label: "EasySchematic (bulk device-template import)",
+  label: "EasySchematic (device-template import)",
   fileExtension: "json",
 
-  export(device: OdioDevice): AdapterResult {
+  export(device: OdioDevice, opts?: Record<string, unknown>): AdapterResult {
+    const format: EsFormat = (opts as EsExportOptions | undefined)?.format === "bulk"
+      ? "bulk"
+      : "array";
+
     // Route by document kind. validateDocument inspects top-level `kind`
     // ("bundle"/"cable") and validates against the matching schema; device
     // documents have no `kind`.
@@ -571,13 +717,17 @@ export const EasySchematicAdapter: Adapter = {
       );
     }
 
+    // The owning document's id, used for the fallback registry referenceUrl.
+    const documentId = (device as { id?: unknown }).id;
+    const docId = typeof documentId === "string" ? documentId : undefined;
+
     const warnings: string[] = [];
     let templates: EsDeviceTemplate[];
     let fileBase: string;
 
     if (routed.kind === "bundle") {
       const bundle = device as unknown as Bundle;
-      templates = buildBundleTemplates(bundle, warnings);
+      templates = buildBundleTemplates(bundle, warnings, docId);
       fileBase = slug(
         `${bundle.bundle?.manufacturer ?? ""}-${bundle.bundle?.model ?? "bundle"}`
       );
@@ -585,7 +735,7 @@ export const EasySchematicAdapter: Adapter = {
       // A standalone cable document is wrapped as a single cable-accessory
       // template for consistency with how bundle cables are emitted.
       const cable = (device as unknown as { cable: CableBody }).cable;
-      const template = buildCableTemplate(cable, warnings);
+      const template = buildCableTemplate(cable, warnings, { documentId: docId });
       if (!template.manufacturer || !template.modelNumber) {
         throw new Error(
           `EasySchematic adapter: cable must have a non-empty manufacturer and model number.`
@@ -603,7 +753,7 @@ export const EasySchematicAdapter: Adapter = {
           )}`
         );
       }
-      const template = buildTemplate(device, warnings);
+      const template = buildTemplate(device, warnings, { documentId: docId });
       // Guard the importer's hard requirements explicitly.
       if (!template.manufacturer || !template.modelNumber || template.modelNumber === "custom") {
         throw new Error(
@@ -614,7 +764,8 @@ export const EasySchematicAdapter: Adapter = {
       fileBase = slug(`${template.manufacturer}-${template.modelNumber}`);
     }
 
-    const doc = { templates };
+    // Envelope: bare array (in-app importer) or { templates } (bulk seed).
+    const doc: unknown = format === "bulk" ? { templates } : templates;
     const content = JSON.stringify(doc, null, 2) + "\n";
 
     return {

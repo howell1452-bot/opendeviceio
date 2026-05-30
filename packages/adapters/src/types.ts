@@ -243,6 +243,20 @@ export interface EsBulkImport {
   templates: EsDeviceTemplate[];
 }
 
+/**
+ * Output envelope for the EasySchematic adapter:
+ *   - "array": a bare JSON array of templates, accepted by EasySchematic's
+ *     in-app device-creation JSON importer (the default).
+ *   - "bulk": the `{ templates: [...] }` wrapper used by the vendor-DB seed.
+ */
+export type EsFormat = "array" | "bulk";
+
+/** Options accepted by the EasySchematic adapter's `export`. */
+export interface EsExportOptions {
+  /** Output envelope; defaults to "array". */
+  format?: EsFormat;
+}
+
 /** A single output artifact produced by an adapter. */
 export interface AdapterFile {
   /** Suggested relative file path (caller decides where to write). */

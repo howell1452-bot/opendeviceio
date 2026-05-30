@@ -46,11 +46,51 @@ function loadDevice(name: string): OdioDevice {
   return parse(raw);
 }
 
-function runEs(name: string): { doc: EsBulkImport; template: EsDeviceTemplate; warnings: string[] } {
+// Mirror the importer's valid deviceType set so tests assert membership
+// independently of the adapter's internal table.
+const DEVICE_TYPES = new Set<string>([
+  "camera","ptz-camera","camera-ccu","graphics","computer","media-player","mouse","keyboard",
+  "video-bar","touch-screen","screen","switcher","router","converter","scaler","adapter",
+  "frame-sync","multiviewer","capture-card","chromakey","da","video-wall-controller","monitor",
+  "tv","projector","recorder","audio-mixer","audio-embedder","audio-interface","audio-dsp",
+  "equalizer","stage-box","audio-splitter","wireless-mic-receiver","speaker","amplifier",
+  "headphone-amplifier","monitor-controller","personal-monitor","ndi-encoder","ndi-decoder",
+  "network-switch","streaming-encoder","av-over-ip","kvm-extender","usb-extender",
+  "hdbaset-extender","wireless-video","intercom","led-processor","led-cabinet","media-server",
+  "lighting-console","moving-light","led-fixture","dmx-splitter","dmx-node","control-processor",
+  "tally-system","ptz-controller","sync-generator","timecode-generator","midi-device",
+  "control-expansion","cable-accessory","wired-mic","iem-transmitter","change-over",
+  "expansion-card","fiber-transmitter","company-switch","frame","power-distribution",
+  "patch-panel","wall-plate","presentation-system","wireless-presentation","cloud-service",
+  "codec","expansion-chassis","power-mixer","hdmi-splitter","network-router","nas",
+  "external-storage","storage-media","lighting-processor","network-wifi","access-point",
+  "intercom-transceiver","controller","button-panel","dock","studio-monitor","video-scope",
+  "audio-meter","assistive-listening","battery","commentary-box","phone-hybrid",
+  "interpreter-desk","table-box","antenna","antenna-distribution","conference-system","di-box",
+  "display","charging-station","audio-bar","mtr-pc","touch-controller","occupancy-sensor"
+]);
+
+const HTTP_URL = /^https?:\/\//;
+
+/** Run the adapter in the default (array) format and return the parsed array. */
+function runEsArray(
+  name: string
+): { templates: EsDeviceTemplate[]; template: EsDeviceTemplate; warnings: string[] } {
   const device = loadDevice(name);
   const result = EasySchematicAdapter.export(device);
-  const doc = JSON.parse(result.files[0].content) as EsBulkImport;
-  return { doc, template: doc.templates[0], warnings: result.warnings };
+  const parsed = JSON.parse(result.files[0].content) as unknown;
+  if (!Array.isArray(parsed)) {
+    throw new Error("default EasySchematic output is not a bare array");
+  }
+  const templates = parsed as EsDeviceTemplate[];
+  return { templates, template: templates[0], warnings: result.warnings };
+}
+
+// Back-compat helper used by the field-mapping tests: returns the first
+// template (format is irrelevant to per-template field assertions).
+function runEs(name: string): { template: EsDeviceTemplate; warnings: string[] } {
+  const { template, warnings } = runEsArray(name);
+  return { template, warnings };
 }
 
 const validExamples = readdirSync(examplesDir).filter((f) => f.endsWith(".odio.json"));
@@ -61,11 +101,23 @@ describe("EasySchematic adapter — invariants across every valid example", () =
   });
 
   for (const name of validExamples) {
-    it(`${name} produces a valid templates document`, () => {
-      const { doc, template } = runEs(name);
+    it(`${name} produces a valid bare-array templates document`, () => {
+      const { templates, template } = runEsArray(name);
 
-      expect(Array.isArray(doc.templates)).toBe(true);
-      expect(doc.templates.length).toBeGreaterThan(0);
+      // Default output is a bare ARRAY, not a { templates } wrapper.
+      expect(Array.isArray(templates)).toBe(true);
+      expect(templates.length).toBeGreaterThan(0);
+      expect((templates as unknown as { templates?: unknown }).templates).toBeUndefined();
+
+      // Every emitted template must satisfy the in-app importer's hard rules.
+      for (const t of templates) {
+        expect(t.label.length).toBeGreaterThan(0);
+        expect(DEVICE_TYPES.has(t.deviceType ?? "")).toBe(true);
+        expect(t.manufacturer.length).toBeGreaterThan(0);
+        expect(t.modelNumber.length).toBeGreaterThan(0);
+        expect(t.modelNumber).not.toBe("custom");
+        expect(t.referenceUrl ?? "").toMatch(HTTP_URL);
+      }
 
       expect(template.manufacturer.length).toBeGreaterThan(0);
       expect(template.modelNumber.length).toBeGreaterThan(0);
@@ -80,6 +132,40 @@ describe("EasySchematic adapter — invariants across every valid example", () =
       }
     });
   }
+});
+
+describe("EasySchematic adapter — envelope / format option", () => {
+  it("defaults to a bare ARRAY of templates (in-app importer format)", () => {
+    const device = loadDevice("lightware-ucx-4x2-hc60d.odio.json");
+    const parsed = JSON.parse(EasySchematicAdapter.export(device).files[0].content) as unknown;
+    expect(Array.isArray(parsed)).toBe(true);
+  });
+
+  it("format:'bulk' yields the { templates: [...] } wrapper", () => {
+    const device = loadDevice("lightware-ucx-4x2-hc60d.odio.json");
+    const result = EasySchematicAdapter.export(device, { format: "bulk" });
+    const parsed = JSON.parse(result.files[0].content) as EsBulkImport;
+    expect(Array.isArray(parsed)).toBe(false);
+    expect(Array.isArray(parsed.templates)).toBe(true);
+    expect(parsed.templates.length).toBeGreaterThan(0);
+  });
+
+  it("lightware example maps to deviceType 'switcher'", () => {
+    const { template } = runEsArray("lightware-ucx-4x2-hc60d.odio.json");
+    expect(template.deviceType).toBe("switcher");
+  });
+
+  it("netgear example maps to deviceType 'network-switch'", () => {
+    const { template } = runEsArray("netgear-m4250-poe.odio.json");
+    expect(template.deviceType).toBe("network-switch");
+  });
+
+  it("device referenceUrl falls back to the registry id when no productUrl", () => {
+    const { template } = runEsArray("lightware-ucx-4x2-hc60d.odio.json");
+    expect(template.referenceUrl).toBe(
+      "https://opendeviceio.org/registry/lightware/ucx-4x2-hc60d"
+    );
+  });
 });
 
 describe("EasySchematic adapter — specific mappings", () => {
@@ -195,18 +281,53 @@ describe("EasySchematic adapter — invalid input", () => {
 describe("EasySchematic adapter — bundle (kit) expansion", () => {
   const bundleRel = "bundles/crestron-uc-cx100-t-wm.odio.json";
 
-  function runBundle(): { doc: EsBulkImport; warnings: string[] } {
+  function runBundle(): { templates: EsDeviceTemplate[]; warnings: string[] } {
     const raw = readFileSync(join(examplesDir, bundleRel), "utf8");
     // Pass the raw object through the adapter, which routes by `kind`.
     const obj = JSON.parse(raw) as OdioDevice;
     const result = EasySchematicAdapter.export(obj);
-    const doc = JSON.parse(result.files[0].content) as EsBulkImport;
-    return { doc, warnings: result.warnings };
+    const parsed = JSON.parse(result.files[0].content) as unknown;
+    if (!Array.isArray(parsed)) {
+      throw new Error("default bundle output is not a bare array");
+    }
+    return { templates: parsed as EsDeviceTemplate[], warnings: result.warnings };
   }
 
+  it("default output is a bare ARRAY of templates", () => {
+    const raw = readFileSync(join(examplesDir, bundleRel), "utf8");
+    const obj = JSON.parse(raw) as OdioDevice;
+    const parsed = JSON.parse(EasySchematicAdapter.export(obj).files[0].content) as unknown;
+    expect(Array.isArray(parsed)).toBe(true);
+  });
+
+  it("format:'bulk' still yields { templates: [...] } for the bundle", () => {
+    const raw = readFileSync(join(examplesDir, bundleRel), "utf8");
+    const obj = JSON.parse(raw) as OdioDevice;
+    const parsed = JSON.parse(
+      EasySchematicAdapter.export(obj, { format: "bulk" }).files[0].content
+    ) as EsBulkImport;
+    expect(Array.isArray(parsed.templates)).toBe(true);
+    expect(parsed.templates.length).toBeGreaterThan(0);
+  });
+
+  it("the UC-ENGINE leaf maps to deviceType 'mtr-pc'", () => {
+    const { templates } = runBundle();
+    const ucEngine = templates.find((t) => t.modelNumber === "UC-ENGINE");
+    expect(ucEngine?.deviceType).toBe("mtr-pc");
+  });
+
+  it("every template (devices + cables) has a valid deviceType and http referenceUrl", () => {
+    const { templates } = runBundle();
+    expect(templates.length).toBeGreaterThan(0);
+    for (const t of templates) {
+      expect(DEVICE_TYPES.has(t.deviceType ?? "")).toBe(true);
+      expect(t.referenceUrl ?? "").toMatch(HTTP_URL);
+    }
+  });
+
   it("emits one template per leaf device (all 5 models present)", () => {
-    const { doc } = runBundle();
-    const models = new Set(doc.templates.filter((t) => !t.isCableAccessory).map((t) => t.modelNumber));
+    const { templates } = runBundle();
+    const models = new Set(templates.filter((t) => !t.isCableAccessory).map((t) => t.modelNumber));
     for (const m of [
       "TSW-1070-B-S-T-V",
       "UC-ENGINE",
@@ -219,8 +340,8 @@ describe("EasySchematic adapter — bundle (kit) expansion", () => {
   });
 
   it("every device template has non-empty manufacturer + modelNumber and valid enums", () => {
-    const { doc } = runBundle();
-    const devices = doc.templates.filter((t) => !t.isCableAccessory);
+    const { templates } = runBundle();
+    const devices = templates.filter((t) => !t.isCableAccessory);
     expect(devices.length).toBeGreaterThanOrEqual(5);
     for (const t of devices) {
       expect(t.manufacturer.length).toBeGreaterThan(0);
@@ -233,11 +354,13 @@ describe("EasySchematic adapter — bundle (kit) expansion", () => {
     }
   });
 
-  it("emits cable-accessory templates with valid enum ports", () => {
-    const { doc } = runBundle();
-    const cables = doc.templates.filter((t) => t.isCableAccessory === true);
+  it("emits cable-accessory templates with valid enum ports, deviceType + referenceUrl", () => {
+    const { templates } = runBundle();
+    const cables = templates.filter((t) => t.isCableAccessory === true);
     expect(cables.length).toBeGreaterThanOrEqual(4);
     for (const c of cables) {
+      expect(c.deviceType).toBe("cable-accessory");
+      expect(c.referenceUrl ?? "").toMatch(HTTP_URL);
       expect(c.ports.length).toBeGreaterThanOrEqual(2);
       for (const p of c.ports) {
         expect(SIGNAL_TYPES.has(p.signalType)).toBe(true);
@@ -248,8 +371,8 @@ describe("EasySchematic adapter — bundle (kit) expansion", () => {
   });
 
   it("DP->HDMI cable yields displayport + hdmi ends", () => {
-    const { doc } = runBundle();
-    const dpHd = doc.templates.find((t) => t.modelNumber === "CBL-4K-DP-HD-6");
+    const { templates } = runBundle();
+    const dpHd = templates.find((t) => t.modelNumber === "CBL-4K-DP-HD-6");
     expect(dpHd?.isCableAccessory).toBe(true);
     const connectors = new Set(dpHd?.ports.map((p) => p.connectorType));
     expect(connectors.has("displayport")).toBe(true);
@@ -257,14 +380,14 @@ describe("EasySchematic adapter — bundle (kit) expansion", () => {
   });
 
   it("cable quantity recorded on the template (UC Engine LAN cable qty 2)", () => {
-    const { doc } = runBundle();
-    const lan = doc.templates.find((t) => t.modelNumber === "CBL-CAT5E-7");
+    const { templates } = runBundle();
+    const lan = templates.find((t) => t.modelNumber === "CBL-CAT5E-7");
     expect(lan?.quantity).toBe(2);
   });
 
   it("kit part number UC-CX100-T-WM is discoverable on every template via searchTerms", () => {
-    const { doc } = runBundle();
-    for (const t of doc.templates) {
+    const { templates } = runBundle();
+    for (const t of templates) {
       expect((t.searchTerms ?? []).includes("UC-CX100-T-WM")).toBe(true);
     }
   });
