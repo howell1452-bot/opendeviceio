@@ -382,12 +382,93 @@ multiple device templates; Genie can detect and emit kits.
 
 ---
 
-## 11. Public website & distribution (roadmap — not yet built)
+## 11. Public website, registry & distribution (active track)
 
-Planned: a project website hosting (1) a **whitepaper** and **manufacturer authoring
-guide** for producing `.odio.json` files; (2) a **free, downloadable database** of
-community/manufacturer `.odio.json` device & kit files; and (3) a possible **paid hosted
-Genie** import service (spec-sheet → draft `.odio.json`). The free spec/SDK/CLI remain
-open (Apache-2.0 / CC-BY-4.0); monetization, if any, is the hosted convenience service,
-not the standard. To design later: hosting/stack, the device registry (which also
-satisfies §8.1 and bundle `ref` resolution), submission/review flow, and billing.
+A project website that does four things:
+
+1. **Spec home + canonical schema hosting.** The schema `$id`s already point at
+   `https://opendeviceio.org/schema/v0.1/…` — the site MUST serve the canonical schema
+   files at those versioned URLs (so `$ref`/`$schema` resolve for anyone). This is a hard
+   requirement, not a nicety.
+2. **Whitepaper + manufacturer authoring guide.** Why ODIO, the model, and a
+   step-by-step "how to produce a conformant `.odio.json`" guide (by hand, via the SDK,
+   or via Genie), plus the conformance rules.
+3. **Free device/kit database (the registry).** A searchable, browsable, **freely
+   downloadable** library of `.odio.json` device, bundle, and cable files, with a
+   read API. This is also the **registry** that resolves bundle `ref:` components and
+   settles the id-authority question (§8.1), and the **labeled-data flywheel** for §12.
+4. **Hosted Genie (paid, later).** A convenience import service (spec sheet → draft
+   `.odio.json`). The spec/SDK/CLI stay open (Apache-2.0 / CC-BY-4.0); only the hosted
+   convenience is monetized — never the standard.
+
+### Architecture (proposed)
+- **Registry data**: Postgres (Supabase) — a table of submissions keyed by `id`
+  (`manufacturer/model[@rev]`), storing the document JSON + extracted metadata
+  (manufacturer, category, connectors, kind) for search, plus `validation.status`
+  (draft / reviewed / manufacturer-verified) and a moderation state. Files also
+  downloadable as raw `.odio.json`. Auth + storage via Supabase.
+- **Read API**: `GET /api/devices?...` (search/filter), `GET /registry/{id}` → the
+  `.odio.json` (this is what bundle `ref:{id}` resolves against), schema files served at
+  the versioned paths.
+- **Submission/review flow**: submit (validated against the schema on ingest) →
+  moderation queue → published; manufacturers can claim/verify their own entries
+  (`manufacturer-verified`). Mirrors the pattern EasySchematic uses for its community
+  device DB.
+- **Frontend**: a JS/React stack (the ecosystem ODIO consumers live in) — docs/whitepaper
+  + the database browser + submission UI; serves the schema files.
+- **Hosted Genie**: deferred to a later phase; Genie is Python, so it runs as a separate
+  service the site calls (not an edge function). Billing TBD.
+
+Open decisions to settle before building: exact frontend framework + hosting, whether v1
+includes the submission/moderation flow or starts read-only with a seeded corpus, and how
+schema hosting is wired to this repo (the schema files here are the source of truth and
+must be published verbatim).
+
+---
+
+## 12. Extraction-cost & model strategy (to revisit)
+
+Goal: ingest **large manufacturer catalogs** (see §13) without unsustainable per-spec cost.
+Pre-training a model from scratch is a non-starter; the plan, in stages:
+
+1. **Bootstrap now with Anthropic Haiku/Sonnet.** Extraction is structured parsing, not
+   deep reasoning, so a cheaper tier + the existing prompt-caching (schema + few-shots) +
+   the **Batch API (−50%)** make bulk ingest affordable. Reserve Opus for hard/ambiguous
+   docs. Measure real $/spec on a sample before scaling.
+2. **Accumulate a labeled dataset.** Every reviewed / `manufacturer-verified` file —
+   especially from the §11 public database — is a gold (datasheet → ODIO) pair. The
+   database is the training corpus (flywheel).
+3. **At scale, a self-hosted open model with the Anthropic API as fallback.** A 7–14B
+   open model (Qwen/Llama/Mistral) with **schema-constrained / grammar decoding**
+   (Outlines / vLLM guided decoding / llama.cpp GBNF) — the real unlock for
+   guaranteed-valid output — optionally LoRA-fine-tuned on the accumulated pairs.
+   **Route low-confidence or failed extractions to the Anthropic API (Sonnet/Opus) as the
+   fallback.** Constrained decoding regenerates its grammar from the current schema, so it
+   never emits stale vocabulary as the schema evolves.
+
+Drops cleanly into Genie's pluggable `Extractor` interface as a `LocalExtractor` beside
+`ClaudeExtractor` — no rework; the fallback is just a confidence-gated chain of extractors.
+
+---
+
+## 13. Corpus build targets (phase after the website)
+
+Once the website/registry exists, grow the corpus by ingesting **full catalogs** (via the
+§12 pipeline, with human review) for these manufacturers first:
+
+- Crestron
+- Biamp
+- Extron
+- Q-SYS (QSC)
+- Shure
+- LG Commercial (Business / commercial displays & signage)
+- Visionary Solutions
+- Lightware
+- JBL (Professional / Harman)
+- AVer
+- Listen Technologies
+
+These span video switching/control, DSP/audio, networked AV, microphones, displays,
+AV-over-IP, and assistive listening — broad coverage to stress the vocabulary and seed the
+free database. Manufacturer-verified entries are the priority (highest-trust + best
+training data).
