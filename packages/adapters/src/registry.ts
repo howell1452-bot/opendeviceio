@@ -1,0 +1,21 @@
+// Adapter registry: id -> Adapter.
+
+import type { Adapter } from "./types.js";
+import { EasySchematicAdapter } from "./easyschematic.js";
+import { DxfAdapter, VisioAdapter, AvcadAdapter } from "./stubs.js";
+
+/** All registered adapters keyed by their stable id. */
+export const adapters: Readonly<Record<string, Adapter>> = {
+  easyschematic: EasySchematicAdapter,
+  dxf: DxfAdapter,
+  visio: VisioAdapter,
+  avcad: AvcadAdapter
+};
+
+/** The set of valid adapter ids. */
+export const adapterIds = Object.keys(adapters);
+
+/** Look up an adapter by id, or undefined if not registered. */
+export function getAdapter(id: string): Adapter | undefined {
+  return adapters[id];
+}
