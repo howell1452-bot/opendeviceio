@@ -7,6 +7,8 @@ import { KindBadge, StatusBadge, Chip } from "@/components/Badge";
 import { DeviceView } from "@/components/DeviceView";
 import { BundleView } from "@/components/BundleView";
 import { IoTableView } from "@/components/IoTableView";
+import { getCurrentUser } from "@/lib/session";
+import { listMyMemberships } from "@/lib/membership";
 
 // Fetch the row at request time; build must not depend on the DB.
 export const dynamic = "force-dynamic";
@@ -40,6 +42,13 @@ export default async function RegistryDetailPage({
   const id = joinId(seg);
   const row = await getRegistryRow(id);
   if (!row) notFound();
+
+  // Show an Edit link only to signed-in manufacturers approved for this brand.
+  const { user, client } = await getCurrentUser();
+  const memberships = user && client ? await listMyMemberships(client) : [];
+  const canEdit = Boolean(
+    row.manufacturer && memberships.some((m) => m.manufacturer === row.manufacturer)
+  );
 
   const doc = row.document as Record<string, unknown>;
   const provenance = doc.provenance as
@@ -92,6 +101,14 @@ export default async function RegistryDetailPage({
             <DownloadLink id={row.id} format="odio" label="ODIO (.odio)" primary />
             <DownloadLink id={row.id} format="dxf" label="DXF (CAD)" />
             <DownloadLink id={row.id} format="svg" label="I/O table (SVG)" />
+            {canEdit ? (
+              <Link
+                href={`/author?id=${encodeURIComponent(row.id)}`}
+                className="inline-flex items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-800 shadow-sm transition hover:border-emerald-400"
+              >
+                Edit / update →
+              </Link>
+            ) : null}
           </div>
         </div>
       </header>
