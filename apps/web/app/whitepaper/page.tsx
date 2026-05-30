@@ -53,9 +53,12 @@ export default function WhitepaperPage() {
           <p className="mt-4 text-lg text-slate-600">
             OpenDeviceIO (ODIO) is an open, machine-readable format for describing
             the input/output, power, physical, and compliance characteristics of a
-            hardware device. One file, published by a manufacturer alongside a
-            product&apos;s support documents, lets design software import accurate
-            device data instead of re-keying it from PDFs.
+            hardware device. One file — a{" "}
+            <code>.odio</code> document (JSON) — published by a manufacturer
+            alongside a product&apos;s support documents lets design software import
+            accurate device data instead of re-keying it from PDFs, and renders a
+            standardized I/O table you can drop onto a spec sheet, embed on a product
+            page, or view in the browser.
           </p>
 
           <h2 id="motivation">1. Motivation</h2>
@@ -106,6 +109,15 @@ export default function WhitepaperPage() {
             <Link href="/schema/v0.1/device.schema.json">JSON Schema</Link> is the
             single source of truth: the TypeScript SDK types are generated from it,
             and the normative prose is written to match it.
+          </p>
+          <p>
+            Documents use the <code>.odio</code> file extension (the legacy{" "}
+            <code>.odio.json</code> is still accepted) and the media type{" "}
+            <code>application/vnd.odio+json</code> — the content is plain JSON, so
+            every JSON tool still applies. The shape also allows optional{" "}
+            <code>network</code> (a device&apos;s OSI layer / managed class for
+            switches and routers) and, for modular chassis, frame <code>slots</code>{" "}
+            and a card&apos;s <code>card</code> block (see Bundles, below).
           </p>
 
           <h2 id="three-layer">3. The three-layer port model</h2>
@@ -174,6 +186,15 @@ export default function WhitepaperPage() {
             into leaf devices, cables, and accessories with effective quantities,
             and <code>bundleBillOfMaterials()</code> produces a flat BOM — exactly
             what the registry detail page renders for a kit.
+          </p>
+          <p>
+            The same machinery models <strong>modular chassis</strong>: a frame is a
+            device that declares its card <code>slots</code>, each card is a device
+            with a <code>card</code> block stating which slot it fits, and a populated
+            chassis is a bundle whose card components carry a <code>slot</code>{" "}
+            assignment. <code>validateChassis()</code> checks that cards fit their
+            slots (type, occupancy, power budget); the I/O table aggregates the
+            frame&apos;s ports plus every populated card&apos;s, labeled by slot.
           </p>
 
           <h2 id="provenance">5. Provenance &amp; trust</h2>
@@ -247,31 +268,54 @@ export default function WhitepaperPage() {
             the schema is authoritative.
           </p>
 
-          <h2 id="roadmap">8. Roadmap</h2>
+          <h2 id="roadmap">8. Status &amp; roadmap</h2>
+          <p>Shipped:</p>
           <ul>
             <li>
-              <strong>Canonical schema &amp; SDK (done).</strong> The device,
-              bundle, and cable schemas; the <code>@opendeviceio/sdk</code>
-              (generated types, an Ajv validator, and accessors); and adapters that
-              expand ODIO into design-tool formats.
+              <strong>Schema, SDK &amp; adapters.</strong> The device, bundle, and
+              cable schemas (plus modular-chassis <code>slots</code>/<code>card</code>{" "}
+              and a device <code>network</code> OSI-layer class);{" "}
+              <code>@opendeviceio/sdk</code> and <code>@opendeviceio/adapters</code>{" "}
+              published on npm (generated types, an Ajv validator, bundle/chassis
+              flattening + validation, and renderers).
             </li>
             <li>
-              <strong>This website &amp; registry (now).</strong> Canonical schema
-              hosting at the versioned URLs, the whitepaper and authoring guide, and
-              a free, searchable, downloadable registry of device, bundle, and cable
-              files — which also resolves bundle references and settles the
-              id-authority question.
+              <strong>Registry &amp; API.</strong> A free, searchable, downloadable
+              library of thousands of device, bundle, and cable files, with a public
+              REST API that also returns render-ready projections (the I/O table as
+              JSON or SVG, and a host-agnostic draw program).
             </li>
             <li>
-              <strong>Corpus growth.</strong> Ingesting full manufacturer catalogs
-              via the Genie pipeline with human review, prioritizing
-              manufacturer-verified entries (highest trust and best training data).
+              <strong>The standardized I/O table.</strong> A deterministic projection
+              of any file into a consistent table — rendered on registry pages, in the
+              in-browser <Link href="/viewer">viewer</Link>, exportable as SVG/HTML for
+              spec sheets.
             </li>
             <li>
-              <strong>Hosted Genie (later, paid).</strong> A convenience import
-              service (spec sheet → draft <code>.odio.json</code>). The spec, SDK,
-              and CLI stay open; only the hosted convenience is monetized — never
-              the standard.
+              <strong>Tools &amp; integrations.</strong> An in-browser{" "}
+              <Link href="/author">authoring form</Link> (with gated publish for
+              approved manufacturers), and AutoCAD / Visio import add-ins that draw a
+              device&apos;s block straight into a drawing from the API.
+            </li>
+          </ul>
+          <p>Next:</p>
+          <ul>
+            <li>
+              <strong>Manufacturer-published catalogs.</strong> Brands publish and
+              verify their own devices (and each new product) via the authoring form,
+              upload, or API — the Genie importer bootstraps a few large catalogs to
+              seed adoption, not as an ongoing ingestion engine.
+            </li>
+            <li>
+              <strong>AI-assisted design.</strong> The validated corpus + the
+              generate→validate→repair loop (the SDK can check a proposed connection)
+              make ODIO the ground truth for design assistants — starting with an MCP
+              server over the registry.
+            </li>
+            <li>
+              <strong>More layout integrations.</strong> An InDesign plugin to place
+              the I/O table onto spec sheets, and a hosted convenience importer. The
+              spec, SDK, and CLI stay open — only hosted convenience is ever monetized.
             </li>
           </ul>
 
