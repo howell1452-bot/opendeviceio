@@ -32,14 +32,7 @@ import {
   type FlattenedDevice
 } from "@opendeviceio/sdk";
 
-import {
-  DxfWriter,
-  point3d,
-  Units,
-  TextHorizontalAlignment,
-  TextVerticalAlignment,
-  type DxfBlock
-} from "@tarikjabiri/dxf";
+import { DxfWriter, point3d, Units, type DxfBlock } from "@tarikjabiri/dxf";
 
 import type { Adapter, AdapterResult } from "./types.js";
 import { buildBlockModel, type BlockModel, type BlockPort } from "./block.js";
@@ -78,9 +71,18 @@ function blockName(value: string): string {
   return s.length > 0 ? s : "DEVICE";
 }
 
-/** Sanitise text for a DXF TEXT value: strip control chars, collapse, cap length. */
+/**
+ * Sanitise text for a DXF TEXT value: collapse whitespace, map the few non-ASCII
+ * separators we emit to ASCII (AutoCAD's default SHX fonts don't render them
+ * reliably), drop any remaining non-ASCII, and cap length.
+ */
 function dxfText(value: string): string {
-  const clean = value.replace(/\s+/g, " ").trim();
+  const clean = value
+    .replace(/[·•]/g, "-")
+    .replace(/[—–]/g, "-")
+    .replace(/[^\x20-\x7E]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
   return clean.length > 64 ? `${clean.slice(0, 61)}...` : clean;
 }
 
@@ -98,6 +100,25 @@ type DeviceView = {
 /** Estimated rendered width of a text string at a given text height. */
 function textWidth(s: string, h: number): number {
   return s.length * h * CHAR_W;
+}
+
+type Justify = "left" | "center" | "right";
+
+/**
+ * Place a DXF TEXT with the default left/baseline justification, computing the
+ * insertion point ourselves. We deliberately do NOT use the writer's
+ * horizontal/vertical alignment options: those set group codes 72/73 but the
+ * library omits the required second alignment point (11/21), so AutoCAD ignores
+ * 10/20 and stacks every justified label at the origin. With default
+ * justification, 10/20 is authoritative. `yMid` is the row's vertical centre; we
+ * drop the baseline by ~0.36·h to visually centre the cap height.
+ */
+function placeText(block: DxfBlock, x: number, yMid: number, h: number, raw: string, layer: string, justify: Justify): void {
+  const s = dxfText(raw);
+  let tx = x;
+  if (justify === "center") tx = x - textWidth(s, h) / 2;
+  else if (justify === "right") tx = x - textWidth(s, h);
+  block.addText(point3d(tx, yMid - h * 0.36, 0), h, s, { layerName: layer });
 }
 
 /** Widest rendered extent of a column's two-line labels (0 for an empty column). */
@@ -142,17 +163,9 @@ function drawBlockBody(block: DxfBlock, view: DeviceView): { width: number; heig
 
   // Title (centred) and, if present, the power subtitle beneath it.
   const titleY = model.subtitle ? H - 4.8 : H - HEADER_BAND / 2;
-  block.addText(point3d(W / 2, titleY, 0), TITLE_TEXT_H, dxfText(model.title), {
-    layerName: LAYER_TEXT,
-    horizontalAlignment: TextHorizontalAlignment.Center,
-    verticalAlignment: TextVerticalAlignment.Middle
-  });
+  placeText(block, W / 2, titleY, TITLE_TEXT_H, model.title, LAYER_TEXT, "center");
   if (model.subtitle) {
-    block.addText(point3d(W / 2, H - 9.6, 0), SUBTITLE_TEXT_H, dxfText(model.subtitle), {
-      layerName: LAYER_TEXT,
-      horizontalAlignment: TextHorizontalAlignment.Center,
-      verticalAlignment: TextVerticalAlignment.Middle
-    });
+    placeText(block, W / 2, H - 9.6, SUBTITLE_TEXT_H, model.subtitle, LAYER_TEXT, "center");
   }
 
   const topRowY = H - HEADER_BAND - ROW_PITCH / 2;
@@ -170,17 +183,9 @@ function drawBlockBody(block: DxfBlock, view: DeviceView): { width: number; heig
 
       // Two-line label INSIDE the box: name over connector type.
       const labelX = side === "left" ? EDGE_PAD : W - EDGE_PAD;
-      const align = side === "left" ? TextHorizontalAlignment.Left : TextHorizontalAlignment.Right;
-      block.addText(point3d(labelX, y + LINE_OFFSET, 0), NAME_TEXT_H, dxfText(p.name), {
-        layerName: LAYER_TEXT,
-        horizontalAlignment: align,
-        verticalAlignment: TextVerticalAlignment.Middle
-      });
-      block.addText(point3d(labelX, y - LINE_OFFSET, 0), TYPE_TEXT_H, dxfText(p.type), {
-        layerName: LAYER_PORTS,
-        horizontalAlignment: align,
-        verticalAlignment: TextVerticalAlignment.Middle
-      });
+      const justify: Justify = side === "left" ? "left" : "right";
+      placeText(block, labelX, y + LINE_OFFSET, NAME_TEXT_H, p.name, LAYER_TEXT, justify);
+      placeText(block, labelX, y - LINE_OFFSET, TYPE_TEXT_H, p.type, LAYER_PORTS, justify);
     }
   };
   placeColumn(model.left, "left");
@@ -244,13 +249,12 @@ function buildDxf(blocks: BlockPlacement[], cables: { label: string }[]): string
     dxf.addInsert(b.name, point3d(b.insertX, 0, 0), { layerName: LAYER_DEVICE });
   }
 
-  // Cables: list as TEXT annotations beneath the row, in model space.
+  // Cables: list as TEXT annotations beneath the row, in model space. Default
+  // left/baseline justification (no 72/73) so 10/20 positions the text.
   let cy = -16;
   for (const c of cables) {
-    dxf.addText(point3d(0, cy, 0), TYPE_TEXT_H, dxfText(c.label), {
-      layerName: LAYER_TEXT,
-      horizontalAlignment: TextHorizontalAlignment.Left,
-      verticalAlignment: TextVerticalAlignment.Top
+    dxf.addText(point3d(0, cy - TYPE_TEXT_H, 0), TYPE_TEXT_H, dxfText(c.label), {
+      layerName: LAYER_TEXT
     });
     cy -= ROW_PITCH * 0.8;
   }
