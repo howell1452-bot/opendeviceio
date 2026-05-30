@@ -921,7 +921,60 @@ A DisplayPort-to-HDMI factory cable carrying a video signal:
 
 ---
 
-## 17. Versioning policy
+## 17. The `.odio` file (extension and media type)
+
+An ODIO document is a JSON text (§2). Its on-disk form:
+
+- The RECOMMENDED file extension is **`.odio`**. The extension **`.odio.json`** MAY be
+  used and consumers SHOULD accept both. The byte content is identical either way —
+  `.odio` is JSON, so any JSON tool can read it.
+- The media type is **`application/vnd.odio+json`**. Servers SHOULD send this
+  `Content-Type` when serving documents; the `+json` suffix means generic JSON tooling
+  still applies.
+- Tools MUST NOT require a particular extension to parse a document: routing is by the
+  top-level `kind` discriminator (§14) and schema validation, never by filename.
+
+The SDK exposes these as constants (`ODIO_MEDIA_TYPE`, `ODIO_EXTENSION`,
+`ODIO_LEGACY_EXTENSION`) and helpers (`isOdioPath`, `odioFilename`).
+
+## 18. The standardized I/O table
+
+ODIO defines a single, deterministic **projection** of a document to a tabular view of
+its I/O, so every producer's I/O table is structurally identical (and so a manufacturer
+can author once and render the same table onto a spec sheet, a web page, or a report).
+The table is **presentation-only**: it is fully derived from the document and has no
+semantic effect; two conforming renderers MUST produce equivalent tables for the same
+document.
+
+**Rows.** One row per *physical connector instance*: each `port` is count-expanded into
+`port.count` rows (default 1). Device-level `power.inputs` (§9) each contribute one
+additional row.
+
+**Grouping and order.** Rows are grouped, top to bottom, as **Input → Output →
+Bidirectional → Power**, by `port.direction` (power rows last). Within a group, document
+order is preserved.
+
+**Columns** (left to right), each derived as follows:
+
+| Column | Derivation |
+| --- | --- |
+| **Label** | `port.shortLabel` if present, else `port.label`, else `port.id`; a unit number is appended when `port.count > 1`. Power rows use the input `type` (upper-cased). |
+| **Direction** | `In` / `Out` / `Bi` from `port.direction`; `Power` for power rows. |
+| **Connector** | `port.connector` rendered as a human name (e.g. `hdmi-type-a` → "HDMI"); `port.connectorOther` when `connector` is `other`. |
+| **Link** | A summary of `port.link` (§8) in order: `standard` (else `type`), then `speed`/`bandwidthGbps`, then PoE (`poe.standard` as PoE/PoE+/PoE++ with role/class), then USB-PD (`powerDeliveryWatts`), then fiber mode. Power rows summarize voltage/frequency/standard. |
+| **Signals** | The distinct concurrent flows on the connector (§6.3), each shown by its `transport` (else `domain`). |
+
+**Bundles** (§15) project to one table section per leaf device (headed by the device
+title) plus a **Components** list (each device/cable/accessory with its effective
+quantity). Standalone cables (§16) project to a single component row.
+
+Presentation hints — `port.shortLabel`, `port.location.face`, `physical.rackUnits` — MAY
+refine a rendering but MUST NOT be required: the table MUST render correctly without them.
+
+A reference renderer is provided in `@opendeviceio/adapters` (`table-svg` for a vector
+spec-sheet table, `table-html` for a self-contained viewable page).
+
+## 19. Versioning policy
 
 - **`odioVersion`** is a semantic version (`MAJOR.MINOR.PATCH`, with optional
   pre-release). For this specification it is `0.1.0`.
@@ -948,7 +1001,7 @@ examples live in `examples/bundles/` so the device conformance corpus (§1.3) is
 
 ---
 
-## 18. Worked references
+## 20. Worked references
 
 The repository's `examples/` directory contains complete, conformant documents that
 exercise the model end to end, including:
