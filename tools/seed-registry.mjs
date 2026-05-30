@@ -165,21 +165,29 @@ async function apply() {
     port_count: r.port_count, connectors: r.connectors, transports: r.transports,
     document: r.document,
   }));
-  const res = await fetch(`${url}/rest/v1/registry?on_conflict=id`, {
-    method: "POST",
-    headers: {
-      apikey: key,
-      Authorization: `Bearer ${key}`,
-      "Content-Type": "application/json",
-      Prefer: "resolution=merge-duplicates,return=minimal",
-    },
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) {
-    console.error(`Upsert failed: ${res.status} ${await res.text()}`);
-    process.exit(1);
+  // Chunk the upsert so a large catalog stays well under any request-body limit.
+  const CHUNK = Number(process.env.SEED_CHUNK || 250);
+  let done = 0;
+  for (let i = 0; i < payload.length; i += CHUNK) {
+    const batch = payload.slice(i, i + CHUNK);
+    const res = await fetch(`${url}/rest/v1/registry?on_conflict=id`, {
+      method: "POST",
+      headers: {
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+        Prefer: "resolution=merge-duplicates,return=minimal",
+      },
+      body: JSON.stringify(batch),
+    });
+    if (!res.ok) {
+      console.error(`Upsert failed at rows ${i}-${i + batch.length} (after ${done} ok): ${res.status} ${await res.text()}`);
+      process.exit(1);
+    }
+    done += batch.length;
+    console.error(`  upserted ${done}/${payload.length}…`);
   }
-  console.error(`Upserted ${payload.length} registry rows.`);
+  console.error(`Upserted ${done} registry rows.`);
 }
 
 if (process.argv.includes("--apply")) {
