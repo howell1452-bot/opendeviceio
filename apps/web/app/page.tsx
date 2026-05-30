@@ -171,6 +171,36 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* For tool builders */}
+      <section className="border-b border-slate-200 bg-brand-600">
+        <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-12 sm:px-6 md:flex-row md:items-center md:justify-between">
+          <div className="max-w-2xl">
+            <h2 className="text-2xl font-bold text-white">
+              Build an ODIO importer for your tool
+            </h2>
+            <p className="mt-3 text-brand-50">
+              EasySchematic, XTEN-AV, AVCAD, D-Tools, Visio — consume ODIO with
+              the SDK or the free, read-only public API, and map devices into
+              your own port model with the proven primary-signal recipe.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <Link
+              href="/implement"
+              className="rounded-lg bg-white px-5 py-2.5 font-medium text-brand-700 shadow-sm transition hover:bg-brand-50"
+            >
+              Implement ODIO
+            </Link>
+            <Link
+              href="/api-docs"
+              className="rounded-lg border border-white/40 px-5 py-2.5 font-medium text-white transition hover:bg-white/10"
+            >
+              API reference →
+            </Link>
+          </div>
+        </div>
+      </section>
+
       {/* Quick links */}
       <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
         <h2 className="text-2xl font-bold text-slate-900">Explore</h2>

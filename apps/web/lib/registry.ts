@@ -29,13 +29,24 @@ export interface RegistryQuery {
   search?: string;
   kind?: string;
   category?: string;
+  manufacturer?: string;
   connector?: string;
+  transport?: string;
+  /** Max rows to return. Defaults to no limit when omitted. */
+  limit?: number;
+  /** Row offset for pagination. Defaults to 0. */
+  offset?: number;
 }
 
 export type RegistryListRow = Omit<RegistryRow, "document">;
 
 export interface RegistryListResult {
   rows: RegistryListRow[];
+  /**
+   * Total rows matching the query, ignoring limit/offset. Null when the count
+   * is unknown (e.g. DB unreachable).
+   */
+  total: number | null;
   /** True when the DB is unreachable / not configured (distinct from "0 rows"). */
   unavailable: boolean;
 }
@@ -44,19 +55,24 @@ export interface RegistryListResult {
  * List registry rows, applying optional search + filters. Always runs at request
  * time (callers mark their route dynamic). Returns an empty list (never throws)
  * when the DB is empty or unreachable so the site renders gracefully.
+ *
+ * When `limit`/`offset` are supplied a window is returned and `total` carries the
+ * exact unpaginated match count (via Supabase `count: "exact"`).
  */
 export async function listRegistry(
   query: RegistryQuery = {}
 ): Promise<RegistryListResult> {
   const supabase = getSupabase();
-  if (!supabase) return { rows: [], unavailable: true };
+  if (!supabase) return { rows: [], total: null, unavailable: true };
 
   try {
-    let q = supabase.from("registry").select(LIST_COLUMNS);
+    let q = supabase.from("registry").select(LIST_COLUMNS, { count: "exact" });
 
     if (query.kind) q = q.eq("kind", query.kind);
     if (query.category) q = q.eq("category", query.category);
+    if (query.manufacturer) q = q.eq("manufacturer", query.manufacturer);
     if (query.connector) q = q.contains("connectors", [query.connector]);
+    if (query.transport) q = q.contains("transports", [query.transport]);
 
     if (query.search && query.search.trim()) {
       const term = query.search.trim();
@@ -69,17 +85,29 @@ export async function listRegistry(
       ascending: true
     });
 
-    const { data, error } = await q;
+    if (typeof query.limit === "number") {
+      const offset = query.offset && query.offset > 0 ? query.offset : 0;
+      q = q.range(offset, offset + query.limit - 1);
+    } else if (query.offset && query.offset > 0) {
+      // Offset without an explicit limit: page forward to the end of the table.
+      q = q.range(query.offset, query.offset + 999999);
+    }
+
+    const { data, error, count } = await q;
     if (error) {
       // eslint-disable-next-line no-console
       console.error("[odio] registry list error:", error.message);
-      return { rows: [], unavailable: true };
+      return { rows: [], total: null, unavailable: true };
     }
-    return { rows: (data ?? []) as unknown as RegistryListRow[], unavailable: false };
+    return {
+      rows: (data ?? []) as unknown as RegistryListRow[],
+      total: typeof count === "number" ? count : null,
+      unavailable: false
+    };
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error("[odio] registry list threw:", err);
-    return { rows: [], unavailable: true };
+    return { rows: [], total: null, unavailable: true };
   }
 }
 

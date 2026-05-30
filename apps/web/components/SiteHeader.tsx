@@ -3,6 +3,7 @@ import Link from "next/link";
 const NAV = [
   { href: "/whitepaper", label: "Whitepaper" },
   { href: "/guide", label: "Authoring guide" },
+  { href: "/implement", label: "Implement" },
   { href: "/registry", label: "Registry" },
   { href: "/schema/v0.1/device.schema.json", label: "Schema" }
 ];

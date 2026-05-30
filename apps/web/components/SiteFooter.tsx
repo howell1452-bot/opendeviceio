@@ -20,6 +20,8 @@ export function SiteFooter() {
               <ul className="mt-2 space-y-1.5 text-slate-600">
                 <li><Link className="hover:text-brand-700" href="/whitepaper">Whitepaper</Link></li>
                 <li><Link className="hover:text-brand-700" href="/guide">Authoring guide</Link></li>
+                <li><Link className="hover:text-brand-700" href="/implement">Implement ODIO</Link></li>
+                <li><Link className="hover:text-brand-700" href="/api-docs">API reference</Link></li>
                 <li><Link className="hover:text-brand-700" href="/registry">Registry</Link></li>
               </ul>
             </div>
