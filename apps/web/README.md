@@ -5,8 +5,19 @@ authoring guide, **canonical schema hosting**, and a **read-only** browser for t
 device / bundle / cable registry (backed by Supabase).
 
 Built with Next.js (App Router, TypeScript) and Tailwind CSS. It reuses the
-monorepo's `@opendeviceio/sdk` (via a `file:` dependency) for ODIO types and the
-`flattenBundle` / `bundleBillOfMaterials` accessors.
+monorepo's `@opendeviceio/sdk` (resolved through npm workspaces, dependency
+`"@opendeviceio/sdk": "*"`) for ODIO types and the `flattenBundle` /
+`bundleBillOfMaterials` accessors.
+
+## Deployment (Vercel / npm workspaces)
+
+The repo is a single npm workspace (root `package.json` `workspaces`). Vercel
+auto-detects the workspace root and runs one `npm install` there. The SDK's
+`prepare` script (`npm run build`) builds `packages/ts-sdk/dist` during that
+install, so by the time `next build` runs the workspace-linked
+`@opendeviceio/sdk` is already built — no custom `buildCommand` is needed.
+`vercel.json` is therefore minimal (`{ "framework": "nextjs" }`). The app's
+`prebuild` still runs `sync-schema` to copy the canonical schema files.
 
 > v1 scope is **read-only**: no submission flow, no auth, no hosted Genie.
 

@@ -5,8 +5,15 @@
   "description": "OpenDeviceIO (ODIO) — an open, machine-readable format for describing hardware device I/O. Root dev tooling and conformance runner.",
   "license": "Apache-2.0",
   "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
   "scripts": {
-    "validate:examples": "node tools/validate-examples.mjs"
+    "validate:examples": "node tools/validate-examples.mjs",
+    "build:sdk": "npm run build -w @opendeviceio/sdk",
+    "build:web": "npm run build -w @opendeviceio/web",
+    "test:js": "npm run test -w @opendeviceio/sdk && npm run test -w @opendeviceio/adapters"
   },
   "devDependencies": {
     "ajv": "^8.17.1",

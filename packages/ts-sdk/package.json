@@ -22,6 +22,7 @@
   "scripts": {
     "gen-types": "node scripts/gen-types.mjs",
     "build": "npm run gen-types && tsc -p tsconfig.esm.json && tsc -p tsconfig.cjs.json && node scripts/finalize-cjs.mjs",
+    "prepare": "npm run build",
     "test": "vitest run",
     "validate": "node scripts/validate-cli.mjs"
   },

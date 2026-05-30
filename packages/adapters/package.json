@@ -26,7 +26,7 @@
     "export": "node dist/cli.js"
   },
   "dependencies": {
-    "@opendeviceio/sdk": "file:../ts-sdk"
+    "@opendeviceio/sdk": "*"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

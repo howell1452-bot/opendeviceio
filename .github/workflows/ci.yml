@@ -32,12 +32,9 @@ jobs:
       - name: Validate example corpus against the schema
         run: npm run validate:examples
 
-  ts-sdk:
-    name: TypeScript SDK
+  js:
+    name: JS workspaces (SDK, adapters, web)
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: packages/ts-sdk
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -47,14 +44,25 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install dependencies
+      # Single install at the workspace root. This links the workspaces and runs
+      # the SDK's `prepare` script, building packages/ts-sdk/dist so dependents
+      # (adapters, web) resolve a built @opendeviceio/sdk.
+      - name: Install workspace dependencies
         run: npm ci || npm install
 
-      - name: Build
-        run: npm run build
+      # Build the SDK explicitly before adapters/web so their steps always see
+      # a fresh dist even if install-time prepare is skipped (e.g. cache reuse).
+      - name: Build SDK
+        run: npm run build -w @opendeviceio/sdk
 
-      - name: Test
-        run: npm test
+      - name: Test SDK
+        run: npm run test -w @opendeviceio/sdk
+
+      - name: Test adapters
+        run: npm run test -w @opendeviceio/adapters
+
+      - name: Build web
+        run: npm run build -w @opendeviceio/web
 
   genie:
     name: Genie importer (Python)
