@@ -6,6 +6,7 @@ const NAV = [
   { href: "/guide", label: "Authoring guide" },
   { href: "/implement", label: "Implement" },
   { href: "/registry", label: "Registry" },
+  { href: "/author", label: "Author" },
   { href: "/viewer", label: "Viewer" },
   { href: "/contribute", label: "Contribute" },
   { href: "/schema/v0.1/device.schema.json", label: "Schema" }
