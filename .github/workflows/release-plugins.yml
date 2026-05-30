@@ -63,11 +63,30 @@ jobs:
           certificate-profile-name: ${{ secrets.TRUSTED_SIGNING_PROFILE }}
           files-folder: OdioImport.bundle/Contents
           files-folder-filter: dll
-      - name: Zip
+      - name: Zip bundle
         shell: pwsh
         run: Compress-Archive -Path OdioImport.bundle -DestinationPath "OdioImport-autocad.zip" -Force
+      - name: Build MSI (WiX)
+        shell: pwsh
+        working-directory: integrations/autocad
+        run: |
+          dotnet tool install --global wix
+          wix extension add -g WixToolset.UI.wixext
+          wix build installer/OdioImport.wxs -d BinDir=bin/Release/net48 -d MetaDir=. -ext WixToolset.UI.wixext -o "$env:GITHUB_WORKSPACE/OdioImport-autocad.msi"
+      - name: Sign MSI (Azure Trusted Signing)
+        if: ${{ secrets.AZURE_CLIENT_ID != '' }}
+        uses: azure/trusted-signing-action@v0
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ secrets.TRUSTED_SIGNING_ENDPOINT }}
+          trusted-signing-account-name: ${{ secrets.TRUSTED_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ secrets.TRUSTED_SIGNING_PROFILE }}
+          files-folder: ${{ github.workspace }}
+          files-folder-filter: msi
       - uses: actions/upload-artifact@v4
-        with: { name: autocad, path: OdioImport-autocad.zip }
+        with: { name: autocad, path: "OdioImport-autocad.*" }
 
   visio:
     runs-on: windows-latest
