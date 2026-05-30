@@ -173,6 +173,12 @@ def _build_parser() -> argparse.ArgumentParser:
         "submitting a new one — re-fetches its results (free for ~29 days) and runs the "
         "rest of the pipeline. Use after a downstream failure to avoid re-paying.",
     )
+    p_ingest.add_argument(
+        "--skip-discontinued",
+        action="store_true",
+        help="Skip datasheets whose text contains 'discontinued' (status banners / EOL "
+        "notices) before extraction; skipped slugs are logged and listed in the manifest.",
+    )
     p_ingest.set_defaults(func=_cmd_ingest)
 
     return parser
@@ -277,6 +283,7 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
         fewshot=not args.no_fewshot,
         validated_by=args.by,
         resume_batch_id=args.resume_batch_id,
+        skip_discontinued=args.skip_discontinued,
     )
 
     counts = manifest["counts"]
@@ -284,6 +291,8 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
     print(f"  valid:          {counts['valid']}/{counts['total']}")
     print(f"  escalated:      {counts['escalated']}")
     print(f"  low-confidence: {counts['lowConfidence']}")
+    if counts.get("skippedDiscontinued"):
+        print(f"  skipped (disc.): {counts['skippedDiscontinued']}")
     est = manifest.get("cost", {}).get("estimatedCostUsd")
     if est is not None:
         print(f"  est. cost:      ~${est:.4f} (estimate; see Anthropic Console)")

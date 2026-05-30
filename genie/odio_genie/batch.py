@@ -442,6 +442,7 @@ def ingest_directory(
     validated_by: str | None = None,
     extractor_factory: Callable[..., BatchExtractorProtocol] | None = None,
     resume_batch_id: str | None = None,
+    skip_discontinued: bool = False,
 ) -> dict[str, Any]:
     """Bulk-ingest every datasheet under ``input_dir`` into drafts + a manifest.
 
@@ -495,6 +496,27 @@ def ingest_directory(
         used.add(slug)
         slugs[slug] = extracted
         order.append(slug)
+
+    # Optionally drop datasheets that mark the product discontinued (status
+    # banners / EOL notices), before any extraction is paid for.
+    skipped_discontinued: list[str] = []
+    if skip_discontinued:
+        pat = re.compile(r"\bdiscontinued\b", re.IGNORECASE)
+        kept: list[str] = []
+        for slug in order:
+            text = slugs[slug].combined or ""
+            m = pat.search(text)
+            if m:
+                ctx = text[max(0, m.start() - 40) : m.end() + 40].replace("\n", " ").strip()
+                skipped_discontinued.append(slug)
+                print(f"  skip (discontinued): {slug}  …{ctx}…", flush=True)
+            else:
+                kept.append(slug)
+        for slug in skipped_discontinued:
+            slugs.pop(slug, None)
+        order = kept
+        if skipped_discontinued:
+            print(f"Skipped {len(skipped_discontinued)} discontinued sheet(s).", flush=True)
 
     # --- pass 1: bulk extraction (Haiku) ---
     primary = factory(schema=tool_schema, kind=kind, model=model)
@@ -660,7 +682,9 @@ def ingest_directory(
                 for d in manifest_docs
                 if d["overallConfidence"] <= confidence_threshold
             ),
+            "skippedDiscontinued": len(skipped_discontinued),
         },
+        "skippedDiscontinued": skipped_discontinued,
         "documents": manifest_docs,
     }
 
