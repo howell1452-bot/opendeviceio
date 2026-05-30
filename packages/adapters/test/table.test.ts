@@ -4,7 +4,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { parse, type OdioDevice } from "@opendeviceio/sdk";
-import { buildIoTable, renderTableSvg } from "../src/index.js";
+import { buildIoTable, renderTableSvg, renderTableHtml } from "../src/index.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const examplesDir = resolve(here, "../../../examples");
@@ -60,5 +60,15 @@ describe("I/O-table projection + SVG renderer", () => {
     expect(table.components && table.components.length).toBeGreaterThanOrEqual(5);
     const svg = renderTableSvg(table);
     expect(svg).toContain("COMPONENTS");
+  });
+
+  it("renders a self-contained HTML pack embedding the SVG + source .odio", () => {
+    const device = loadDevice("lightware-ucx-4x2-hc60d.odio.json");
+    const html = renderTableHtml(device);
+    expect(html.startsWith("<!doctype html>")).toBe(true);
+    expect(html).toContain('<div class="card" id="table"><svg '); // SVG inlined (no XML decl)
+    expect(html).toContain('type="application/odio+json"'); // embedded source
+    expect(html).toContain("Lightware UCX-4x2-HC60D");
+    expect(html).toContain("window.print()"); // print-to-PDF affordance
   });
 });

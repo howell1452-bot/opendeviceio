@@ -51,8 +51,12 @@ const EDGE_PAD = 3; // gap from a box edge to its label text
 const COL_GAP = 10; // min clear gap between the left and right label columns
 const LINE_OFFSET = 1.9; // half the gap between a row's two label lines
 const MIN_BODY_WIDTH = 64;
-const MAX_BODY_WIDTH = 160;
-const CHAR_W = 0.62; // approximate glyph width as a fraction of text height
+const MAX_BODY_WIDTH = 220;
+// Conservative glyph-width fraction. AutoCAD's STANDARD text style can resolve to
+// fonts noticeably wider than a naive 0.6; we size boxes AND truncate labels with
+// the same generous factor so text fits by construction regardless of the host
+// font (real width <= this => no overflow).
+const CHAR_W = 0.82;
 const BLOCK_GAP = 40; // horizontal gap between blocks in a bundle row
 
 const LAYER_DEVICE = "DEVICE";
@@ -113,12 +117,29 @@ type Justify = "left" | "center" | "right";
  * justification, 10/20 is authoritative. `yMid` is the row's vertical centre; we
  * drop the baseline by ~0.36·h to visually centre the cap height.
  */
-function placeText(block: DxfBlock, x: number, yMid: number, h: number, raw: string, layer: string, justify: Justify): void {
-  const s = dxfText(raw);
+function placeText(
+  block: DxfBlock,
+  x: number,
+  yMid: number,
+  h: number,
+  raw: string,
+  layer: string,
+  justify: Justify,
+  maxWidth?: number
+): void {
+  let s = dxfText(raw);
+  if (maxWidth !== undefined) s = truncateToWidth(s, h, maxWidth);
   let tx = x;
   if (justify === "center") tx = x - textWidth(s, h) / 2;
   else if (justify === "right") tx = x - textWidth(s, h);
   block.addText(point3d(tx, yMid - h * 0.36, 0), h, s, { layerName: layer });
+}
+
+/** Truncate `s` (already dxf-sanitised) so its rendered width fits `maxWidth`. */
+function truncateToWidth(s: string, h: number, maxWidth: number): string {
+  const maxChars = Math.max(1, Math.floor(maxWidth / (h * CHAR_W)));
+  if (s.length <= maxChars) return s;
+  return maxChars <= 2 ? s.slice(0, maxChars) : `${s.slice(0, maxChars - 2)}..`;
 }
 
 /** Widest rendered extent of a column's two-line labels (0 for an empty column). */
@@ -135,9 +156,11 @@ function blockDims(model: BlockModel): { width: number; height: number } {
   const rows = Math.max(model.left.length, model.right.length, 1);
   const height = HEADER_BAND + rows * ROW_PITCH + BOTTOM_PAD;
 
+  // Width must fit both label columns side-by-side (with a clear gap) AND the
+  // title/subtitle, all measured with the conservative CHAR_W.
   const contentW = EDGE_PAD * 2 + columnWidth(model.left) + columnWidth(model.right) + COL_GAP;
-  const titleW = textWidth(model.title, TITLE_TEXT_H) + 8;
-  const subtitleW = model.subtitle ? textWidth(model.subtitle, SUBTITLE_TEXT_H) + 8 : 0;
+  const titleW = textWidth(model.title, TITLE_TEXT_H) + EDGE_PAD * 2;
+  const subtitleW = model.subtitle ? textWidth(model.subtitle, SUBTITLE_TEXT_H) + EDGE_PAD * 2 : 0;
   const width = Math.min(
     MAX_BODY_WIDTH,
     Math.max(MIN_BODY_WIDTH, contentW, titleW, subtitleW)
@@ -161,16 +184,29 @@ function drawBlockBody(block: DxfBlock, view: DeviceView): { width: number; heig
   const bandY = H - HEADER_BAND;
   block.addLine(point3d(0, bandY, 0), point3d(W, bandY, 0), { layerName: LAYER_DEVICE });
 
-  // Title (centred) and, if present, the power subtitle beneath it.
+  // Title (centred) and, if present, the power subtitle beneath it — clamped to
+  // the interior so they never overrun the box edges.
+  const headerBudget = W - EDGE_PAD * 2;
   const titleY = model.subtitle ? H - 4.8 : H - HEADER_BAND / 2;
-  placeText(block, W / 2, titleY, TITLE_TEXT_H, model.title, LAYER_TEXT, "center");
+  placeText(block, W / 2, titleY, TITLE_TEXT_H, model.title, LAYER_TEXT, "center", headerBudget);
   if (model.subtitle) {
-    placeText(block, W / 2, H - 9.6, SUBTITLE_TEXT_H, model.subtitle, LAYER_TEXT, "center");
+    placeText(block, W / 2, H - 9.6, SUBTITLE_TEXT_H, model.subtitle, LAYER_TEXT, "center", headerBudget);
   }
+
+  // Per-side label budgets: split the interior (minus the centre gap) in
+  // proportion to each column's natural width, so labels truncate to their own
+  // share and can neither overrun an edge nor collide across the centre.
+  const leftColW = columnWidth(model.left);
+  const rightColW = columnWidth(model.right);
+  const interior = Math.max(0, W - EDGE_PAD * 2 - COL_GAP);
+  const totalColW = leftColW + rightColW || 1;
+  const leftBudget = model.left.length ? Math.max(8, (interior * leftColW) / totalColW) : 0;
+  const rightBudget = model.right.length ? Math.max(8, (interior * rightColW) / totalColW) : 0;
 
   const topRowY = H - HEADER_BAND - ROW_PITCH / 2;
 
   const placeColumn = (col: BlockPort[], side: "left" | "right") => {
+    const budget = side === "left" ? leftBudget : rightBudget;
     for (let i = 0; i < col.length; i++) {
       const p = col[i];
       const y = topRowY - i * ROW_PITCH;
@@ -181,11 +217,12 @@ function drawBlockBody(block: DxfBlock, view: DeviceView): { width: number; heig
       block.addLine(point3d(edgeX, y, 0), point3d(tipX, y, 0), { layerName: LAYER_PORTS });
       block.addCircle(point3d(tipX, y, 0), TERMINAL_R, { layerName: LAYER_PORTS });
 
-      // Two-line label INSIDE the box: name over connector type.
+      // Two-line label INSIDE the box: name over connector type, truncated to the
+      // column budget.
       const labelX = side === "left" ? EDGE_PAD : W - EDGE_PAD;
       const justify: Justify = side === "left" ? "left" : "right";
-      placeText(block, labelX, y + LINE_OFFSET, NAME_TEXT_H, p.name, LAYER_TEXT, justify);
-      placeText(block, labelX, y - LINE_OFFSET, TYPE_TEXT_H, p.type, LAYER_PORTS, justify);
+      placeText(block, labelX, y + LINE_OFFSET, NAME_TEXT_H, p.name, LAYER_TEXT, justify, budget);
+      placeText(block, labelX, y - LINE_OFFSET, TYPE_TEXT_H, p.type, LAYER_PORTS, justify, budget);
     }
   };
   placeColumn(model.left, "left");

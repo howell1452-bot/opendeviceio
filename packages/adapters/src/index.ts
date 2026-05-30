@@ -11,6 +11,7 @@ export { EasySchematicAdapter } from "./easyschematic.js";
 export { DxfAdapter } from "./dxf.js";
 export { AvcadAdapter } from "./stubs.js";
 export { TableSvgAdapter, renderTableSvg } from "./table-svg.js";
+export { TableHtmlAdapter, renderTableHtml } from "./table-html.js";
 export {
   buildIoTable,
   IO_GROUP_ORDER,

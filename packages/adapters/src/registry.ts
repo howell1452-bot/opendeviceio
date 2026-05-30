@@ -5,6 +5,7 @@ import { EasySchematicAdapter } from "./easyschematic.js";
 import { DxfAdapter } from "./dxf.js";
 import { AvcadAdapter } from "./stubs.js";
 import { TableSvgAdapter } from "./table-svg.js";
+import { TableHtmlAdapter } from "./table-html.js";
 
 // NOTE: the Visio .vssx file adapter was retired — hand-authored stencils proved
 // unreliable to render (Error 313). Visio support moves to a native add-in that
@@ -15,7 +16,8 @@ export const adapters: Readonly<Record<string, Adapter>> = {
   easyschematic: EasySchematicAdapter,
   dxf: DxfAdapter,
   avcad: AvcadAdapter,
-  "table-svg": TableSvgAdapter
+  "table-svg": TableSvgAdapter,
+  "table-html": TableHtmlAdapter
 };
 
 /** The set of valid adapter ids. */
