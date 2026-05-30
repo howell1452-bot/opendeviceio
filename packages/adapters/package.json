@@ -4,11 +4,26 @@
   "description": "Adapters that convert validated OpenDeviceIO (.odio.json) documents into design-tool import formats. EasySchematic, AutoCAD-DXF, and Microsoft Visio are fully implemented; AVCAD is a registered stub.",
   "license": "Apache-2.0",
   "type": "module",
-  "publishConfig": { "access": "public" },
+  "publishConfig": {
+    "access": "public"
+  },
   "homepage": "https://opendeviceio.org",
-  "repository": { "type": "git", "url": "git+https://github.com/howell1452-bot/opendeviceio.git", "directory": "packages/adapters" },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/howell1452-bot/opendeviceio.git",
+    "directory": "packages/adapters"
+  },
   "bugs": "https://github.com/howell1452-bot/opendeviceio/issues",
-  "keywords": ["opendeviceio", "odio", "av", "easyschematic", "dxf", "visio", "cad", "adapter"],
+  "keywords": [
+    "opendeviceio",
+    "odio",
+    "av",
+    "easyschematic",
+    "dxf",
+    "visio",
+    "cad",
+    "adapter"
+  ],
   "files": [
     "dist",
     "README.md"
@@ -33,6 +48,7 @@
   },
   "dependencies": {
     "@opendeviceio/sdk": "^0.1.0",
+    "@tarikjabiri/dxf": "^2.8.9",
     "fflate": "^0.8.2"
   },
   "devDependencies": {

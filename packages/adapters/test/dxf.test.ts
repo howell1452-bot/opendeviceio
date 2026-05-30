@@ -21,17 +21,23 @@ function runDxf(device: OdioDevice): string {
   return result.files[0].content ?? "";
 }
 
-/** Count occurrences of a literal line value following a group-code line. */
+/** Count entity records of a given type ("  0\r\nTYPE" → exact-line match). */
 function countEntities(dxf: string, type: string): number {
-  // ENTITIES/BLOCKS entities are "  0\r\nTYPE". Count exact-line matches.
   const lines = dxf.split(/\r?\n/);
   let n = 0;
   for (const l of lines) if (l === type) n++;
   return n;
 }
 
+// @tarikjabiri/dxf always emits two standard blocks (*Model_Space and
+// *Paper_Space) in addition to any device blocks we define, so the number of
+// device blocks is the total BLOCK record count minus 2.
+function deviceBlockCount(dxf: string): number {
+  return countEntities(dxf, "BLOCK") - 2;
+}
+
 describe("DXF adapter — structure", () => {
-  it("emits the required DXF section markers and EOF", () => {
+  it("emits the required DXF section markers, the 2013 version, and EOF", () => {
     const dxf = runDxf(loadDevice("lightware-ucx-4x2-hc60d.odio.json"));
     expect(dxf).toContain("SECTION");
     expect(dxf).toContain("HEADER");
@@ -39,10 +45,13 @@ describe("DXF adapter — structure", () => {
     expect(dxf).toContain("BLOCKS");
     expect(dxf).toContain("ENTITIES");
     expect(dxf).toContain("ENDSEC");
+    // AutoCAD 2013 DXF format (AC1027) — opened natively by AutoCAD 2018.
+    expect(dxf).toContain("$ACADVER");
+    expect(dxf).toContain("AC1027");
     // EOF must be the terminating record.
     expect(dxf.trimEnd().endsWith("EOF")).toBe(true);
-    // A real BLOCK definition + an INSERT of it.
-    expect(countEntities(dxf, "BLOCK")).toBeGreaterThanOrEqual(1);
+    // A real device BLOCK definition + an INSERT of it.
+    expect(deviceBlockCount(dxf)).toBeGreaterThanOrEqual(1);
     expect(countEntities(dxf, "INSERT")).toBeGreaterThanOrEqual(1);
   });
 
@@ -67,11 +76,12 @@ describe("DXF adapter — structure", () => {
     expect(countEntities(dxf, "LINE")).toBeGreaterThan(10);
   });
 
-  it("bundle yields one BLOCK + INSERT per leaf device instance", () => {
+  it("bundle yields one device BLOCK + INSERT per leaf device instance", () => {
     const dxf = runDxf(loadRaw("bundles/crestron-uc-cx100-t-wm.odio.json"));
-    // 5 device models; one leaf has quantity 2 -> at least 5 blocks.
-    expect(countEntities(dxf, "BLOCK")).toBeGreaterThanOrEqual(5);
-    expect(countEntities(dxf, "INSERT")).toBe(countEntities(dxf, "BLOCK"));
+    // 5 device models; one leaf has quantity 2 -> at least 5 device blocks.
+    expect(deviceBlockCount(dxf)).toBeGreaterThanOrEqual(5);
+    // One INSERT per device block we defined.
+    expect(countEntities(dxf, "INSERT")).toBe(deviceBlockCount(dxf));
     // Cables listed as CABLE: text annotations.
     expect(dxf).toContain("CABLE:");
     expect(dxf.trimEnd().endsWith("EOF")).toBe(true);
