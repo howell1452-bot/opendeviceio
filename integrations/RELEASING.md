@@ -4,6 +4,11 @@ The lightweight "build it yourself" form isn't viable for most users, so the goa
 **signed installers people download and double-click**. This documents the pipeline and
 the one-time setup. The CI is in `.github/workflows/release-plugins.yml`.
 
+> **Doing this for the first time?** Follow the step-by-step, copy-pasteable
+> [`SIGNING-SETUP.md`](./SIGNING-SETUP.md): an unsigned proof-of-build first, then
+> Azure Trusted Signing, then the signed tag, then Adobe Exchange for InDesign.
+> This file is the overview/reference; that file is the checklist.
+
 ## What's automated vs. what only you can provide
 
 Automated (GitHub Actions, Windows + Linux runners):
