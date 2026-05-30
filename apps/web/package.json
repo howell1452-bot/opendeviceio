@@ -6,8 +6,9 @@
   "license": "Apache-2.0",
   "scripts": {
     "sync-schema": "node scripts/sync-schema.mjs",
+    "build-workspace-deps": "npm --prefix ../../packages/ts-sdk run build && npm --prefix ../../packages/adapters run build",
     "predev": "npm run sync-schema",
-    "prebuild": "npm run sync-schema",
+    "prebuild": "npm run sync-schema && npm run build-workspace-deps",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
