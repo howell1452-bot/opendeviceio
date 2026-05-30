@@ -1,0 +1,29 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    body { font-family: -apple-system, system-ui, sans-serif; font-size: 12px; color: #1f2937; padding: 10px; }
+    label { display: block; font-size: 11px; color: #6b7280; margin-top: 8px; }
+    sp-textfield, input { width: 100%; box-sizing: border-box; }
+    input { padding: 5px 7px; border: 1px solid #cbd5e1; border-radius: 4px; font: inherit; margin-top: 2px; }
+    button { margin-top: 12px; width: 100%; padding: 7px; border: 0; border-radius: 5px; background: #b45309; color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+    button:disabled { opacity: .5; }
+    .status { margin-top: 10px; font-size: 11px; color: #6b7280; white-space: pre-wrap; }
+    .hint { margin-top: 6px; font-size: 10px; color: #9ca3af; }
+  </style>
+</head>
+<body>
+  <label for="id">Device id</label>
+  <input id="id" type="text" placeholder="crestron/dm-nvx-360" />
+
+  <label for="base">API base</label>
+  <input id="base" type="text" value="https://opendeviceio.org" />
+
+  <button id="place">Place I/O table</button>
+  <div class="status" id="status"></div>
+  <div class="hint">Places the device's standardized I/O table (SVG) onto the active document.</div>
+
+  <script src="index.js"></script>
+</body>
+</html>

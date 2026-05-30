@@ -61,11 +61,13 @@ const INTEGRATIONS: Tool[] = [
   },
   {
     name: "Adobe InDesign plugin",
-    tag: "Planned",
+    tag: "Developer preview",
     description:
-      "Place the standardized I/O table into a spec-sheet layout straight from an .odio file — author once, render onto your datasheet.",
-    href: "/implement",
-    cta: "Implementer guide"
+      "A UXP panel that places the standardized I/O table onto your spec-sheet layout straight from a device id — author once, render onto your datasheet.",
+    href: `${REPO}/tree/main/integrations/indesign`,
+    cta: "Get it on GitHub",
+    external: true,
+    note: "UXP plugin — load via the Adobe UXP Developer Tool; requires InDesign 2023+."
   }
 ];
 
