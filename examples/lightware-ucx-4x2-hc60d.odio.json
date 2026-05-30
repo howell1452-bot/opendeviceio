@@ -1,0 +1,225 @@
+{
+  "$schema": "https://opendeviceio.org/schema/v0.1/device.schema.json",
+  "odioVersion": "0.1.0",
+  "id": "lightware/ucx-4x2-hc60d",
+  "device": {
+    "manufacturer": "Lightware",
+    "model": "UCX-4x2-HC60D",
+    "productLine": "Taurus UCX",
+    "category": "av/switcher/matrix",
+    "sku": "91310113"
+  },
+  "ports": [
+    {
+      "id": "hdmi-in", "label": "HDMI IN", "direction": "input",
+      "connector": "hdmi-type-a", "count": 2,
+      "link": { "type": "hdmi", "standard": "hdmi-2.0", "bandwidthGbps": 18 },
+      "location": { "group": "inputs" },
+      "notes": "Screw-locking. Accepts HDMI 2.0 / 1.x / DVI. HDCP 1.x and 2.2; max pixel clock 597 MHz.",
+      "signals": [
+        { "domain": "video", "transport": "hdmi", "maxResolution": "5120x2160", "maxRefreshHz": 60,
+          "chromaSubsampling": "4:2:0", "hdcp": "2.2",
+          "notes": "4096x2160@60 4:4:4 (18 Gbps); 5K 5120x2160@30 4:4:4 or @60 4:2:0." },
+        { "domain": "audio", "transport": "lpcm", "maxChannelsPerCircuit": 8,
+          "notes": "All HDMI 2.0 audio formats pass through; de-embeds to the analog audio layer (LPCM up to 2ch, 192 kHz, 24-bit)." }
+      ]
+    },
+    {
+      "id": "usb-c-in", "label": "USB-C IN", "direction": "bidirectional",
+      "connector": "usb-c", "count": 2,
+      "link": { "type": "usb", "standard": "usb-3.1-gen1", "speed": "5g", "bandwidthGbps": 5,
+                "usbRole": "host", "powerDeliveryWatts": 100 },
+      "location": { "group": "inputs" },
+      "notes": "BYOD host input: DP Alt Mode video (DSC), USB 3.1 Gen1 data, and up to 100W charging (120W total) over one cable. Optional Ethernet access.",
+      "signals": [
+        { "domain": "video", "transport": "displayport", "direction": "input", "maxResolution": "4096x2160",
+          "maxRefreshHz": 60, "chromaSubsampling": "4:4:4", "hdcp": "2.2",
+          "notes": "DP Alt Mode; DSC enables 4K60 4:4:4 over two DP lanes." },
+        { "domain": "data", "transport": "usb-data", "direction": "bidirectional", "rateGbps": 5 },
+        { "domain": "power", "transport": "usb-pd", "direction": "output", "role": "source", "maxWatts": 100,
+          "notes": "Up to 100W per port, 120W total across ports." }
+      ]
+    },
+    {
+      "id": "hdmi-out", "label": "HDMI OUT", "direction": "output",
+      "connector": "hdmi-type-a", "count": 2,
+      "link": { "type": "hdmi", "standard": "hdmi-2.0", "bandwidthGbps": 18 },
+      "location": { "group": "outputs" },
+      "signals": [
+        { "domain": "video", "transport": "hdmi", "direction": "output", "maxResolution": "4096x2160",
+          "maxRefreshHz": 60, "chromaSubsampling": "4:4:4", "hdcp": "2.2" },
+        { "domain": "audio", "transport": "lpcm", "direction": "output", "maxChannelsPerCircuit": 8 },
+        { "domain": "control", "transport": "cec", "direction": "bidirectional" }
+      ]
+    },
+    {
+      "id": "audio-out", "label": "AUDIO OUT (L/R)", "direction": "output",
+      "connector": "phoenix", "poleCount": 5,
+      "link": { "type": "analog-audio" },
+      "location": { "group": "audio" },
+      "notes": "De-embedded analog stereo from the audio layer (LPCM up to 2 ch, 192 kHz, 24-bit).",
+      "signals": [
+        { "domain": "audio", "transport": "analog", "direction": "output", "maxChannelsPerCircuit": 2,
+          "balanced": true, "sampleRateHz": 192000, "bitDepth": 24 }
+      ]
+    },
+    {
+      "id": "dante", "label": "Dante", "direction": "bidirectional",
+      "connector": "rj45",
+      "link": { "type": "ethernet", "standard": "1000base-t", "speed": "1g" },
+      "location": { "group": "audio" },
+      "notes": "Dedicated DANTE/AES67 network audio interface.",
+      "signals": [
+        { "domain": "audio", "transport": "dante", "direction": "bidirectional" },
+        { "domain": "audio", "transport": "aes67", "direction": "bidirectional" }
+      ]
+    },
+    {
+      "id": "eth-secure-control", "label": "ETHERNET — Secure Control", "direction": "bidirectional",
+      "connector": "rj45",
+      "link": { "type": "ethernet", "standard": "1000base-t", "speed": "1g" },
+      "location": { "group": "network" },
+      "notes": "Secure device control/configuration over SSH/SSL/HTTPS; isolated room-control VLAN supported.",
+      "signals": [
+        { "domain": "network", "transport": "control-network", "vlanCapable": true, "managed": true },
+        { "domain": "control", "transport": "ip-control" }
+      ]
+    },
+    {
+      "id": "eth-utility-av", "label": "ETHERNET — Utility AV", "direction": "bidirectional",
+      "connector": "rj45",
+      "link": { "type": "ethernet", "standard": "1000base-t", "speed": "1g" },
+      "location": { "group": "network" },
+      "notes": "Utility AV / user-data Ethernet layer.",
+      "signals": [
+        { "domain": "network", "transport": "av-network", "vlanCapable": true }
+      ]
+    },
+    {
+      "id": "eth-configurable", "label": "ETHERNET — Configurable", "direction": "bidirectional",
+      "connector": "rj45",
+      "link": { "type": "ethernet", "standard": "100base-t", "speed": "100m" },
+      "location": { "group": "network" },
+      "signals": [
+        { "domain": "network", "transport": "management" }
+      ]
+    },
+    {
+      "id": "rs232", "label": "RS-232", "direction": "bidirectional",
+      "connector": "phoenix", "poleCount": 3, "count": 2,
+      "location": { "group": "control" },
+      "notes": "Parity none/odd/even; stop bits 1 or 2.",
+      "signals": [
+        { "domain": "control", "transport": "rs-232", "channels": 1, "baudRange": "9600-115200" }
+      ]
+    },
+    {
+      "id": "occupancy-sensor", "label": "OCS SENSOR", "direction": "input",
+      "connector": "phoenix", "poleCount": 3,
+      "location": { "group": "control" },
+      "notes": "Room occupancy sensor input (contact-closure / sensor interface).",
+      "signals": [
+        { "domain": "control", "transport": "contact-closure", "direction": "input", "channels": 1 }
+      ]
+    },
+    {
+      "id": "gpio", "label": "GPIO", "direction": "bidirectional",
+      "connector": "phoenix", "poleCount": 8,
+      "location": { "group": "control" },
+      "notes": "8-pole Phoenix GPIO for automated room control. Exact GPIO/ground pole allocation not stated in the brief; modeled as 8 independent circuits.",
+      "signals": [
+        { "domain": "control", "transport": "gpio", "channels": 8 }
+      ]
+    },
+    {
+      "id": "usb-c-peripheral", "label": "USB-C (peripherals)", "direction": "bidirectional",
+      "connector": "usb-c", "count": 2,
+      "link": { "type": "usb", "standard": "usb-3.1-gen1", "speed": "5g", "usbRole": "host" },
+      "location": { "group": "peripherals" },
+      "notes": "Cameras, speakerphones, touch monitors, USB-HID devices.",
+      "signals": [
+        { "domain": "data", "transport": "usb-data", "rateGbps": 5 },
+        { "domain": "control", "transport": "usb-hid" }
+      ]
+    },
+    {
+      "id": "usb-a-peripheral", "label": "USB-A (peripherals)", "direction": "bidirectional",
+      "connector": "usb-a", "count": 2,
+      "link": { "type": "usb", "standard": "usb-3.1-gen1", "speed": "5g", "usbRole": "host" },
+      "location": { "group": "peripherals" },
+      "signals": [
+        { "domain": "data", "transport": "usb-data", "rateGbps": 5 },
+        { "domain": "control", "transport": "usb-hid" }
+      ]
+    },
+    {
+      "id": "usb-b-host", "label": "DEVICE PORT — Host USB-B", "direction": "bidirectional",
+      "connector": "usb-b",
+      "link": { "type": "usb", "standard": "usb-3.1-gen1", "speed": "5g", "usbRole": "device" },
+      "location": { "group": "host" },
+      "notes": "Separate USB 3.1 host layer (device-side) for a wired host computer; used with an HDMI input for non-USB-C laptops.",
+      "signals": [
+        { "domain": "data", "transport": "usb-data", "rateGbps": 5 },
+        { "domain": "control", "transport": "usb-hid" }
+      ]
+    },
+    {
+      "id": "service", "label": "SERVICE", "direction": "bidirectional",
+      "connector": "usb-b-mini",
+      "link": { "type": "usb" },
+      "location": { "group": "management" },
+      "notes": "Mini USB Type B, reserved for service.",
+      "signals": [
+        { "domain": "control", "transport": "usb-cdc" }
+      ]
+    },
+    {
+      "id": "dc-in", "label": "DC IN (24V)", "direction": "input",
+      "connector": "phoenix-power", "poleCount": 2,
+      "location": { "group": "power" },
+      "notes": "24V / 6.6A from an external 160W power supply.",
+      "signals": [
+        { "domain": "power", "transport": "dc", "direction": "input", "role": "sink", "nominalVoltage": 24 }
+      ]
+    }
+  ],
+  "power": {
+    "inputs": [
+      { "type": "dc", "nominalVoltage": 24, "connector": "phoenix-power" }
+    ],
+    "consumptionWatts": { "max": 150 },
+    "heatBtuPerHour": 471
+  },
+  "physical": {
+    "dimensionsMm": { "width": 271, "height": 26, "depth": 140.3 },
+    "weightGrams": 968
+  },
+  "standards": [
+    { "category": "emc", "name": "EN 55032:2015" },
+    { "category": "emc", "name": "IEC 61000-3-3:2013+AMD1:2017" },
+    { "category": "emc", "name": "FCC CFR Title 47, Part 15, Subpart B" }
+  ],
+  "parameters": {
+    "operatingTemperature": { "value": "0-50", "unit": "C" },
+    "operatingHumidity": { "value": "0-90", "unit": "% RH non-condensing" },
+    "storageTemperature": { "value": "-20-70", "unit": "C" },
+    "warranty": { "value": 3, "unit": "years" },
+    "maxDataRate": { "value": 18, "unit": "Gbps" },
+    "maxPixelClock": { "value": 597, "unit": "MHz" },
+    "cooling": "Passive, fanless (noiseless)",
+    "maxHosts": 2
+  },
+  "provenance": {
+    "generator": "genie/0.1.0",
+    "method": "llm-extraction",
+    "sourceDocuments": [
+      {
+        "title": "UCX-4x2-HC60D_Product_Brief_Online.pdf",
+        "sha256": "e2f414018a526bd522b63c850594ca8bcb780e24d4c759ec0a04bf9286759d58",
+        "retrieved": "2026-05-29"
+      }
+    ],
+    "validation": { "status": "reviewed", "by": "howell1452@gmail.com", "date": "2026-05-29" }
+  },
+  "x-note": "Extracted by Genie from the Lightware product brief, then human-reviewed: corrected the DC input connector (Phoenix power, 24V) and added the analog AUDIO OUT and dedicated Dante ports that text-only extraction missed."
+}
