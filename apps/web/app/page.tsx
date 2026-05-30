@@ -71,7 +71,7 @@ export default function HomePage() {
               hardware device&apos;s connectors, signals, power, physical
               characteristics, and compliance. Manufacturers publish an{" "}
               <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-sm">
-                .odio.json
+                .odio
               </code>{" "}
               alongside their support documents; AV/IT design software imports it
               to render back panels, schematic blocks, route signals, and total power and heat load.
@@ -210,7 +210,7 @@ export default function HomePage() {
             licensing, and the roadmap.
           </CardLink>
           <CardLink href="/guide" title="Authoring guide">
-            Produce a conformant <code>.odio.json</code> by hand, with the SDK, or
+            Produce a conformant <code>.odio</code> by hand, with the SDK, or
             via the Genie importer — and how to validate it.
           </CardLink>
           <CardLink href="/registry" title="Device registry">

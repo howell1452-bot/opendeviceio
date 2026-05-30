@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Publish a verified file",
   description:
-    "Upload a .odio.json file for your approved brand. It validates against the ODIO schema and publishes as manufacturer-verified."
+    "Upload a .odio file for your approved brand. It validates against the ODIO schema and publishes as manufacturer-verified."
 };
 
 export default async function PublishPage() {
@@ -25,7 +25,7 @@ export default async function PublishPage() {
         Manufacturer publishing
       </p>
       <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-slate-900">
-        Publish a verified <code className="font-mono">.odio.json</code>
+        Publish a verified <code className="font-mono">.odio</code>
       </h1>
       <p className="mt-3 text-slate-600">
         Upload a document for one of your approved brands. It is validated

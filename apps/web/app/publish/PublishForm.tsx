@@ -149,7 +149,7 @@ export function PublishForm({ brands }: { brands: string[] }) {
       >
         <input
           type="file"
-          accept=".json,application/json"
+          accept=".odio,.odio.json,.json,application/json,application/vnd.odio+json"
           className="hidden"
           onChange={(e) => {
             const file = e.target.files?.[0];
@@ -157,7 +157,7 @@ export function PublishForm({ brands }: { brands: string[] }) {
           }}
         />
         <span className="font-medium text-slate-700">
-          {busy ? "Publishing…" : "Drop a .odio.json file here, or click to choose"}
+          {busy ? "Publishing…" : "Drop a .odio file here, or click to choose"}
         </span>
         {fileName ? (
           <span className="mt-1 text-sm text-slate-500">{fileName}</span>

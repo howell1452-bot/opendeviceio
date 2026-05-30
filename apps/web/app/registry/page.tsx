@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Registry",
   description:
-    "Browse the OpenDeviceIO registry: a free, searchable, downloadable library of device, bundle, and cable .odio.json files."
+    "Browse the OpenDeviceIO registry: a free, searchable, downloadable library of device, bundle, and cable .odio files."
 };
 
 function first(v: string | string[] | undefined): string {
@@ -44,7 +44,7 @@ export default async function RegistryPage({
           Device registry
         </h1>
         <p className="mt-3 text-slate-600">
-          A free, read-only library of <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-sm">.odio.json</code>{" "}
+          A free, read-only library of <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-sm">.odio</code>{" "}
           device, bundle, and cable files. Every entry is downloadable and shows its
           validation status. Search and filter below.
         </p>

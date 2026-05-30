@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Sign in",
   description:
-    "Sign in to OpenDeviceIO with a magic link to request manufacturer access and publish verified .odio.json files for your brand."
+    "Sign in to OpenDeviceIO with a magic link to request manufacturer access and publish verified .odio files for your brand."
 };
 
 export default function SignInPage() {

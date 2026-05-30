@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Contribute as a manufacturer",
   description:
-    "Manufacturer reps: request access to publish manufacturer-verified .odio.json files for your brand on OpenDeviceIO."
+    "Manufacturer reps: request access to publish manufacturer-verified .odio files for your brand on OpenDeviceIO."
 };
 
 export default async function ContributePage() {
@@ -34,7 +34,7 @@ export default async function ContributePage() {
       <p className="mt-3 text-slate-600">
         OpenDeviceIO lets the brands that make AV hardware publish authoritative{" "}
         <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-sm">
-          .odio.json
+          .odio
         </code>{" "}
         device, bundle, and cable files for their own products. Approved reps
         upload files for their brand and they go live as{" "}

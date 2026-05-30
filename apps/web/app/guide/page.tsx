@@ -5,7 +5,7 @@ import { CodeBlock } from "@/components/CodeBlock";
 export const metadata: Metadata = {
   title: "Manufacturer authoring guide",
   description:
-    "How to produce a conformant .odio.json: by hand, with @opendeviceio/sdk, or via the Genie importer — the connector/link/signals model, the id slug rule, the x- extension rule, and how to validate."
+    "How to produce a conformant .odio: by hand, with @opendeviceio/sdk, or via the Genie importer — the connector/link/signals model, the id slug rule, the x- extension rule, and how to validate."
 };
 
 const TOC = [
@@ -47,7 +47,7 @@ export default function GuidePage() {
             Authoring guide
           </p>
           <h1 className="mt-2 text-4xl font-extrabold tracking-tight text-slate-900">
-            Producing a conformant <code>.odio.json</code>
+            Producing a conformant <code>.odio</code>
           </h1>
           <p className="mt-4 text-lg text-slate-600">
             This guide shows three ways to author an ODIO device file — by hand,
@@ -58,7 +58,7 @@ export default function GuidePage() {
 
           <h2 id="what">What you are producing</h2>
           <p>
-            One <code>.odio.json</code> file per orderable model. It is a single
+            One <code>.odio</code> file per orderable model. It is a single
             JSON object with a required <code>odioVersion</code>, <code>id</code>,{" "}
             <code>device</code> identity, and <code>ports</code> array, plus optional{" "}
             <code>power</code>, <code>physical</code>, <code>standards</code>,{" "}
@@ -235,7 +235,7 @@ console.log(poeBudget(device), "W of PoE source budget");`}</CodeBlock>
           <h2 id="genie">Authoring with Genie</h2>
           <p>
             Genie is the reference importer: it reads a product PDF and emits a{" "}
-            <code>draft</code> <code>.odio.json</code> plus a review report flagging
+            <code>draft</code> <code>.odio</code> plus a review report flagging
             low-confidence fields. The intended workflow is{" "}
             <strong>generate → human-review → publish</strong>, promoting the
             document&apos;s <code>provenance.validation.status</code> from{" "}
@@ -243,7 +243,7 @@ console.log(poeBudget(device), "W of PoE source budget");`}</CodeBlock>
             <code>manufacturer-verified</code>) as it is checked.
           </p>
           <CodeBlock language="shell">{`# Generate a draft from a datasheet, with a review report:
-genie parse datasheet.pdf -o widget-100.odio.json --review-report review.md
+genie parse datasheet.pdf -o widget-100.odio --review-report review.md
 
 # The Claude API key is supplied at runtime via an env var; Genie never ships one.`}</CodeBlock>
 

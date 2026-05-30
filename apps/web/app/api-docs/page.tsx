@@ -5,7 +5,7 @@ import { CodeBlock } from "@/components/CodeBlock";
 export const metadata: Metadata = {
   title: "API reference",
   description:
-    "Reference for the free, read-only OpenDeviceIO REST API: list / search devices and fetch full .odio.json documents by id. CORS-enabled, no key required."
+    "Reference for the free, read-only OpenDeviceIO REST API: list / search devices and fetch full .odio documents by id. CORS-enabled, no key required."
 };
 
 const TOC = [
@@ -59,7 +59,7 @@ const res = await fetch(\`https://opendeviceio.org/api/v1/devices/\${id}\`);
 if (res.status === 404) {
   // unknown id
 } else {
-  const document = await res.json(); // the full .odio.json document
+  const document = await res.json(); // the full .odio document
 }`;
 
 const BYID_RESPONSE = `{
@@ -240,7 +240,7 @@ export default function ApiDocsPage() {
             Fetch the full ODIO document for one entry. The id is a catch-all
             path segment, so it carries the slash inside an id verbatim — e.g.{" "}
             <code>/api/v1/devices/lightware/ucx-4x2-hc60d</code>. Returns the raw{" "}
-            <code>.odio.json</code> document (device, bundle, or cable). A{" "}
+            <code>.odio</code> document (device, bundle, or cable). A{" "}
             missing id returns <code>404</code> with{" "}
             <code>{`{ "error": "not found" }`}</code>.
           </p>

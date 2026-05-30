@@ -146,7 +146,7 @@ export function TokenManager({
         <pre className="mt-2 overflow-x-auto rounded bg-slate-900 p-3 font-mono text-xs text-slate-100">{`curl -X POST https://opendeviceio.org/api/v1/devices \\
   -H "Authorization: Bearer odio_..." \\
   -H "Content-Type: application/json" \\
-  --data-binary @my-device.odio.json`}</pre>
+  --data-binary @my-device.odio`}</pre>
         <p className="mt-2 text-xs text-slate-500">
           The document&apos;s manufacturer must be one of your approved brands.
           Returns <code>{`{ id, status }`}</code>.

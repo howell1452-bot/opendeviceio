@@ -152,7 +152,7 @@ export default function ImplementPage() {
             like — to consume OpenDeviceIO so your users import accurate device
             data instead of re-keying PDF spec sheets. You can pull data from the{" "}
             <Link href="/api-docs">free, read-only public API</Link> or read{" "}
-            <code>.odio.json</code> files directly with the SDK.
+            <code>.odio</code> files directly with the SDK.
           </p>
 
           <div className="my-6 rounded-xl border border-emerald-200 bg-emerald-50 p-5">
@@ -162,7 +162,7 @@ export default function ImplementPage() {
             <p className="mb-0 mt-2 text-emerald-900">
               Brands can publish authoritative, <strong>manufacturer-verified</strong>{" "}
               files for their own products. Approved reps upload{" "}
-              <code>.odio.json</code> files through the web UI or an authenticated{" "}
+              <code>.odio</code> files through the web UI or an authenticated{" "}
               <code>POST /api/v1/devices</code> token.{" "}
               <Link href="/contribute" className="font-semibold underline">
                 Request access on the Contribute page →
@@ -211,7 +211,7 @@ export default function ImplementPage() {
           <p>There are two ways to get ODIO data into your tool:</p>
           <h3>1. The TypeScript SDK</h3>
           <p>
-            Install the SDK and read <code>.odio.json</code> files (whether you
+            Install the SDK and read <code>.odio</code> files (whether you
             fetched them, bundled them, or accepted them as an import):
           </p>
           <CodeBlock language="shell">npm install @opendeviceio/sdk</CodeBlock>
