@@ -4,6 +4,11 @@
   "description": "TypeScript SDK for OpenDeviceIO (.odio.json): generated types, Ajv 2020 validator, and convenience accessors built against the canonical v0.1 device schema.",
   "license": "Apache-2.0",
   "type": "module",
+  "publishConfig": { "access": "public" },
+  "homepage": "https://opendeviceio.org",
+  "repository": { "type": "git", "url": "git+https://github.com/howell1452-bot/opendeviceio.git", "directory": "packages/ts-sdk" },
+  "bugs": "https://github.com/howell1452-bot/opendeviceio/issues",
+  "keywords": ["opendeviceio", "odio", "av", "audiovisual", "device", "io", "connectors", "json-schema"],
   "files": [
     "dist",
     "README.md"
