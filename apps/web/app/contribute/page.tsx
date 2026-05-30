@@ -45,6 +45,43 @@ export default async function ContributePage() {
         .
       </p>
 
+      <section className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-5">
+        <h2 className="text-base font-semibold text-slate-900">
+          Why publish your products to OpenDeviceIO
+        </h2>
+        <p className="mt-2 text-sm text-slate-600">
+          One accurate file makes your gear effortless to design with and adopt —
+          and ends the guesswork about what&apos;s really on the back panel.
+        </p>
+        <ul className="mt-3 space-y-2 text-sm text-slate-600">
+          <li>
+            <strong className="text-slate-900">Designed in faster.</strong>{" "}
+            Integrators, engineers, and consultants import your devices straight
+            into their CAD and schematic tools — accurate connectors, signals,
+            power, and kits, with no re-keying from spec sheets.
+          </li>
+          <li>
+            <strong className="text-slate-900">Adopted more.</strong> When your
+            product drops cleanly into a design, it&apos;s far likelier to be
+            specified and to land in the bill of materials.
+          </li>
+          <li>
+            <strong className="text-slate-900">Ground truth, from you.</strong>{" "}
+            A manufacturer-verified file is the authoritative source — it
+            disambiguates the conflicting, out-of-date, and hand-keyed data
+            scattered across every design tool&apos;s product library.
+          </li>
+          <li>
+            <strong className="text-slate-900">
+              Fewer errors &amp; support tickets.
+            </strong>{" "}
+            Correct I/O up front means fewer wiring mistakes and fewer
+            &ldquo;which port does what?&rdquo; questions for the engineers and
+            end users who build around your gear.
+          </li>
+        </ul>
+      </section>
+
       {!configured ? (
         <Notice tone="amber">
           Contribution is not configured on this deployment yet.
