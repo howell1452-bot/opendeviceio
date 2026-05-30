@@ -94,5 +94,7 @@ export {
   type UnresolvedRefEntry,
   type FlattenOptions,
   type ResolvedDocument,
-  type BomLine
+  type BomLine,
+  validateChassis,
+  type ChassisIssue
 } from "./bundle.js";

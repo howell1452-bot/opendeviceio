@@ -247,7 +247,13 @@ export function buildIoTable(document: OdioDevice): IoTable {
     const components: IoTableComponent[] = [];
     for (const entry of flat.devices) {
       const v = entry.device as FlattenedDevice;
-      const heading = blockTitle(v.device ?? {});
+      const title = blockTitle(v.device ?? {});
+      // Prefix modular-chassis cards with their slot; mark a frame as such.
+      const heading = entry.slot
+        ? `Slot ${entry.slot} · ${title}`
+        : (v as { slots?: unknown[] }).slots?.length
+          ? `${title} (frame)`
+          : title;
       const sec = sectionFor({ device: v.device, ports: v.ports as PortView[], power: v.power });
       sec.heading = heading;
       sections.push(sec);

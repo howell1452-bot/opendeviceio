@@ -12,7 +12,9 @@ import type {
   Physical,
   Standard,
   Parameters,
-  Cable
+  Cable,
+  Slot,
+  Card
 } from "./bundle-types.js";
 
 /**
@@ -26,6 +28,10 @@ export interface FlattenedDevice {
   physical?: Physical;
   standards?: Standard[];
   parameters?: Parameters;
+  /** Modular-chassis frame slot topology, when this leaf is a frame. */
+  slots?: Slot[];
+  /** Card-fit block, when this leaf is a plug-in card. */
+  card?: Card;
 }
 
 /** A device leaf produced by {@link flattenBundle}. */
@@ -38,6 +44,8 @@ export interface FlatDeviceEntry {
   designators: string[];
   /** Designator/model chain from the root bundle down to this leaf. */
   path: string[];
+  /** Frame slot id this card occupies (from the component's slot assignment). */
+  slot?: string;
 }
 
 /** A cable leaf produced by {@link flattenBundle}. */
@@ -160,11 +168,14 @@ export function flattenBundle(
             ...(dc.power !== undefined ? { power: dc.power } : {}),
             ...(dc.physical !== undefined ? { physical: dc.physical } : {}),
             ...(dc.standards !== undefined ? { standards: dc.standards } : {}),
-            ...(dc.parameters !== undefined ? { parameters: dc.parameters } : {})
+            ...(dc.parameters !== undefined ? { parameters: dc.parameters } : {}),
+            ...(dc.slots !== undefined ? { slots: dc.slots } : {}),
+            ...(dc.card !== undefined ? { card: dc.card } : {})
           },
           quantity: effective,
           designators: nextDesignators,
-          path: [...path, deviceLabel(dc)]
+          path: [...path, deviceLabel(dc)],
+          ...(typeof dc.slot === "string" ? { slot: dc.slot } : {})
         });
         return;
       }
@@ -226,6 +237,7 @@ export function flattenBundle(
     const designator = (component as { designator?: string }).designator;
     const r = resolved as Record<string, unknown>;
     if (type === "device") {
+      const dc = component as DeviceComponent;
       out.devices.push({
         device: {
           device: r.device as Device,
@@ -233,11 +245,15 @@ export function flattenBundle(
           ...(r.power !== undefined ? { power: r.power as Power } : {}),
           ...(r.physical !== undefined ? { physical: r.physical as Physical } : {}),
           ...(r.standards !== undefined ? { standards: r.standards as Standard[] } : {}),
-          ...(r.parameters !== undefined ? { parameters: r.parameters as Parameters } : {})
+          ...(r.parameters !== undefined ? { parameters: r.parameters as Parameters } : {}),
+          // Frame slots / card-fit may come from the resolved doc or the component.
+          ...((r.slots ?? dc.slots) !== undefined ? { slots: (r.slots ?? dc.slots) as Slot[] } : {}),
+          ...((r.card ?? dc.card) !== undefined ? { card: (r.card ?? dc.card) as Card } : {})
         },
         quantity: factor,
         designators,
-        path: [...path, designator ?? (r.device as Device)?.model ?? "device"]
+        path: [...path, designator ?? (r.device as Device)?.model ?? "device"],
+        ...(typeof dc.slot === "string" ? { slot: dc.slot } : {})
       });
     } else if (type === "cable") {
       out.cables.push({
@@ -313,4 +329,78 @@ export function bundleBillOfMaterials(bundle: Bundle): BomLine[] {
     });
   }
   return lines;
+}
+
+/** A modular-chassis slot-assignment problem found by {@link validateChassis}. */
+export interface ChassisIssue {
+  /** Designator/model path to the components scope where the issue was found. */
+  path: string[];
+  message: string;
+}
+
+/**
+ * Validate modular-chassis slot assignments in a bundle (semantics beyond JSON
+ * Schema). Within each components scope (the frame and its cards are siblings),
+ * checks that every card's `slot` names a real frame slot, that no slot is
+ * double-occupied, that an inline card's `card.slotType` is in the slot's
+ * `accepts`, and that a card's `powerDrawW` fits the slot's `powerBudgetW`.
+ * Returns an empty array when there is nothing to flag (incl. non-chassis bundles).
+ */
+export function validateChassis(bundle: Bundle): ChassisIssue[] {
+  const issues: ChassisIssue[] = [];
+
+  function check(components: Component[], path: string[]): void {
+    // Collect frame slots declared by device components in this scope.
+    const slots = new Map<string, Slot>();
+    for (const c of components) {
+      if (c.type !== "device") continue;
+      const dc = c as DeviceComponent;
+      for (const s of dc.slots ?? []) {
+        if (!s?.id) continue;
+        if (slots.has(s.id)) {
+          issues.push({ path, message: `Duplicate slot id '${s.id}' across frames in this scope.` });
+        }
+        slots.set(s.id, s);
+      }
+    }
+
+    // Validate card components assigned to slots.
+    const occupied = new Map<string, string>();
+    for (const c of components) {
+      if (c.type === "bundle") {
+        const bc = c as BundleComponent;
+        if (Array.isArray(bc.components)) {
+          check(bc.components as Component[], [...path, bc.designator ?? bc.bundle?.model ?? "bundle"]);
+        }
+        continue;
+      }
+      if (c.type !== "device") continue;
+      const dc = c as DeviceComponent;
+      if (typeof dc.slot !== "string") continue;
+      const label = dc.designator ?? dc.device?.model ?? dc.id ?? "card";
+      const slot = slots.get(dc.slot);
+      if (!slot) {
+        issues.push({ path, message: `Card '${label}' is assigned to slot '${dc.slot}', which no frame in this bundle defines.` });
+        continue;
+      }
+      const prior = occupied.get(dc.slot);
+      if (prior) {
+        issues.push({ path, message: `Slot '${dc.slot}' is assigned to more than one card ('${prior}' and '${label}').` });
+      } else {
+        occupied.set(dc.slot, label);
+      }
+      const cardType = dc.card?.slotType;
+      const accepts = slot.accepts ?? [];
+      if (cardType && accepts.length > 0 && !accepts.includes(cardType)) {
+        issues.push({ path, message: `Card '${label}' (slotType '${cardType}') does not fit slot '${dc.slot}' (accepts: ${accepts.join(", ")}).` });
+      }
+      const draw = dc.card?.powerDrawW;
+      if (typeof draw === "number" && typeof slot.powerBudgetW === "number" && draw > slot.powerBudgetW) {
+        issues.push({ path, message: `Card '${label}' draws ${draw} W but slot '${dc.slot}' budgets ${slot.powerBudgetW} W.` });
+      }
+    }
+  }
+
+  check((bundle.components ?? []) as Component[], [bundle.bundle?.model ?? "bundle"]);
+  return issues;
 }

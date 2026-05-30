@@ -833,6 +833,30 @@ accessory:
 }
 ```
 
+### 15.10 Modular chassis — frames, cards, and slots
+
+A **modular chassis** (a frame that accepts interchangeable cards) is modeled with two
+additive device members plus a bundle slot assignment:
+
+- A **card** is an ordinary `device` with its own `ports`, plus a `card` object:
+  `slotType` (REQUIRED — the slot family it fits), `slotSpan` (physical slots occupied,
+  default 1), optional `role` (`input`/`output`/`universal`) and `powerDrawW`.
+- A **frame** is an ordinary `device` with its own fixed `ports` plus a `slots` array.
+  Each slot is `{ id (REQUIRED), label?, accepts? (card `slotType` values; empty/omitted =
+  universal), role?, face?, position?, powerBudgetW? }`. An empty frame is a valid device.
+- A **populated chassis** is a `bundle` (§15): the frame and its cards are component
+  devices, and each card component carries `slot` — the `id` of a frame slot (a
+  `device.slots[].id` on the frame component in the same components scope) it occupies.
+
+The aggregate I/O of a populated chassis is the frame's ports plus every populated card's
+ports; the standardized I/O table (§18) renders one section per device, labeled by slot.
+Beyond JSON Schema, a conforming tool SHOULD check (the SDK's `validateChassis` does): every
+`slot` names a real frame slot in scope; no slot is occupied twice; an inline card's
+`card.slotType` is in the slot's `accepts`; and `card.powerDrawW` ≤ the slot's `powerBudgetW`.
+Internal routing/crosspoint behavior is out of scope (describe it in `parameters` if needed).
+
+`examples/bundles/example-modular-frame-configured.odio.json` is a worked example.
+
 ---
 
 ## 16. `cable` — typed cables and connections

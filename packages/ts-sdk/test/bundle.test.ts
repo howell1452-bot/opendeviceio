@@ -12,6 +12,7 @@ import {
   flattenBundle,
   bundleDeviceCount,
   bundleBillOfMaterials,
+  validateChassis,
   type Bundle,
   type ResolvedDocument
 } from "../src/index.js";
@@ -270,5 +271,45 @@ describe("bundleDeviceCount and bundleBillOfMaterials", () => {
       model: "Mounting hardware",
       quantity: 1
     });
+  });
+});
+
+describe("modular chassis (slots / cards)", () => {
+  const frameFile = path.join(bundlesDir, "example-modular-frame-configured.odio.json");
+  const frame = load(frameFile) as Bundle;
+
+  it("is a valid bundle and flattens frame + cards with slot assignments", () => {
+    expect(validateDocument(frame).valid).toBe(true);
+    const flat = flattenBundle(frame);
+    expect(flat.devices).toHaveLength(3);
+    const byModel = Object.fromEntries(flat.devices.map((d) => [d.device.device.model, d]));
+    // Frame carries slot topology; cards carry their slot assignment + card block.
+    expect(byModel["FRAME-4"].device.slots?.length).toBe(4);
+    expect(byModel["FRAME-4"].slot).toBeUndefined();
+    expect(byModel["CARD-HDMI-IN-4"].slot).toBe("in-1");
+    expect(byModel["CARD-HDMI-IN-4"].device.card?.slotType).toBe("frame4-input");
+    expect(byModel["CARD-HDBT-OUT-4"].slot).toBe("out-1");
+  });
+
+  it("validateChassis passes a well-formed configuration", () => {
+    expect(validateChassis(frame)).toEqual([]);
+  });
+
+  it("validateChassis flags missing slot, wrong slotType, and double-occupancy", () => {
+    const bad = JSON.parse(JSON.stringify(frame)) as Bundle;
+    const comps = bad.components as Array<Record<string, unknown>>;
+    // card 1 -> nonexistent slot; card 2 -> wrong type into out-1; then a dupe.
+    comps[1].slot = "nope";
+    (comps[2].card as Record<string, unknown>).slotType = "frame4-input";
+    comps[2].slot = "out-1";
+    comps.push({ ...(comps[2] as object), designator: "Second out card", slot: "out-1" });
+    const msgs = validateChassis(bad).map((i) => i.message).join(" | ");
+    expect(msgs).toMatch(/no frame in this bundle defines/);
+    expect(msgs).toMatch(/does not fit slot 'out-1'/);
+    expect(msgs).toMatch(/more than one card/);
+  });
+
+  it("validateChassis returns nothing for a non-chassis bundle", () => {
+    expect(validateChassis(crestron)).toEqual([]);
   });
 });
