@@ -358,7 +358,14 @@ _SYSTEM_PROMPT = (
     "`signals[]` keyed by `domain`. Use the controlled vocabularies; when a value is "
     "not listed use the relevant `*Other` free-text field with the parent set to "
     "'other'. Never invent specifications: if the datasheet does not state a value, "
-    "omit the field. For every field you are uncertain about, record its JSON path and "
+    "omit the field. "
+    "If the device is a NETWORK switch/router, set `network` (osiLayers, e.g. [2] for an "
+    "L2 switch or [2,3] for L2+/multilayer; managed/unmanaged; routing). "
+    "If the device is a MODULAR CHASSIS/FRAME that accepts plug-in cards, set `slots[]` "
+    "(one per card slot: id, accepts[] of card slotType, role, powerBudgetW) and keep the "
+    "frame's own fixed ports. If the device IS a plug-in card/module, set the `card` block "
+    "(slotType it fits, slotSpan, role) and describe the card's own ports normally. "
+    "For every field you are uncertain about, record its JSON path and "
     "a 0..1 confidence in the tool call's `_confidence` map so a human can review it."
 )
 
