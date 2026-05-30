@@ -74,7 +74,7 @@ export default function HomePage() {
                 .odio.json
               </code>{" "}
               alongside their support documents; AV/IT design software imports it
-              to render back panels, route signals, and total power and heat load.
+              to render back panels, schematic blocks, route signals, and total power and heat load.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link

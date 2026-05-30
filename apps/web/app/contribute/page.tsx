@@ -40,7 +40,7 @@ export default async function ContributePage() {
         upload files for their brand and they go live as{" "}
         <strong>manufacturer-verified</strong> in the public{" "}
         <Link className="text-brand-700 underline" href="/registry">
-          registry
+          registry and in your device resource downloads.
         </Link>
         .
       </p>
