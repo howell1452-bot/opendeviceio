@@ -125,13 +125,18 @@ describe("Visio adapter — VSSX stencil of masters", () => {
     const master = strFromU8(entries["visio/masters/master1.xml"]);
     expect(master).toContain("<MasterContents");
     // Device title + a couple of representative port labels in the shape text.
+    // Each port row is a two-line label child: the port name over the connector
+    // type (e.g. "HDMI IN 1" / "HDMI"), matching an AVCAD block.
     expect(master).toContain("Lightware UCX-4x2-HC60D");
-    expect(master).toContain("HDMI IN 1 (hdmi)");
-    expect(master).toContain("Dante (dante)");
-    // Master shape is a single named, renderable Shape (not a Group) — see the
-    // Error 313 fix: a master's root shape must be named and draw its own geometry.
+    expect(master).toContain("HDMI IN 1");
+    expect(master).toContain("Dante");
+    // The master is a NAMED root Group whose visible elements (body, header band,
+    // title, per-port labels) are child Shapes — the structure the ground-truth
+    // reference uses and that renders on drop (the Error 313 fix). The root is a
+    // Group; the children are Type='Shape'.
+    expect(master).toContain("Type='Group'");
     expect(master).toContain("Type='Shape'");
-    expect(master).not.toContain("Type='Group'");
+    expect(master).toContain("<Shapes>");
     expect(master).toContain("N='Geometry'");
     expect(master).toContain("N='Connection'");
     // One Connection Row per physical connector, matching expandConnectors.
@@ -146,26 +151,29 @@ describe("Visio adapter — VSSX stencil of masters", () => {
     expect(master).toContain("N='Prompt' V='HDMI IN 1'");
   });
 
-  it("master1.xml's root shape has the cells Visio needs to place it (Error 313 fix)", () => {
+  it("master1.xml's root Group is named and children draw rectangles (Error 313 fix)", () => {
     const entries = runVisio(loadDevice("lightware-ucx-4x2-hc60d.odio.json"));
     const master = strFromU8(entries["visio/masters/master1.xml"]);
-    // The root shape MUST be named — an unnamed root shape is "empty" on drop.
+    // The root shape MUST be a NAMED Group — an unnamed/empty root reads as "empty".
     expect(master).toMatch(/<Shape ID='1'[^>]*NameU='Lightware UCX-4x2-HC60D'/);
     expect(master).toMatch(/<Shape ID='1'[^>]*IsCustomNameU='1'/);
+    expect(master).toMatch(/<Shape ID='1'[^>]*Type='Group'/);
     // Full placement cell set so Visio can position/size the shape.
     for (const cell of ["PinX", "PinY", "Width", "Height", "LocPinX", "LocPinY"]) {
       expect(master).toContain(`<Cell N='${cell}' V=`);
     }
     expect(master).toContain("<Cell N='Angle' V='0'/>");
     expect(master).toContain("<Cell N='ResizeMode' V='0'/>");
-    // A real drawn rectangle: a Geometry section with a MoveTo + LineTo rows that
-    // actually close the path, plus the fill/line/show flags.
+    // Child shapes draw real rectangles: a Geometry section with RelMoveTo +
+    // RelLineTo rows that close the path, plus the fill/line/show flags. The body
+    // outline + header band are visible (NoShow='0'); the body is unfilled
+    // (NoFill='1') and the header band is filled (NoFill='0').
     expect(master).toContain("<Section N='Geometry' IX='0'>");
     expect(master).toContain("<Cell N='NoFill' V='0'/>");
     expect(master).toContain("<Cell N='NoLine' V='0'/>");
     expect(master).toContain("<Cell N='NoShow' V='0'/>");
-    expect(master).toContain("<Row T='MoveTo' IX='1'>");
-    const lineRows = (master.match(/<Row T='LineTo' IX='\d+'>/g) ?? []).length;
+    expect(master).toContain("<Row T='RelMoveTo' IX='1'>");
+    const lineRows = (master.match(/<Row T='RelLineTo' IX='\d+'>/g) ?? []).length;
     expect(lineRows).toBeGreaterThanOrEqual(4);
     // Character + Paragraph sections backing the text run.
     expect(master).toContain("<Section N='Character'>");

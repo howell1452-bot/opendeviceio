@@ -1,29 +1,26 @@
 // AutoCAD DXF adapter (target "dxf", .dxf).
 //
-// Renders each ODIO device as a schematic CAD BLOCK: a labeled rectangle with
-// one labeled I/O terminal per physical connector. Terminals come from the
-// shared per-connector expander (src/ports.ts) so DXF, Visio, and EasySchematic
-// agree on exactly which ports a device exposes.
+// Renders each ODIO device as an AVCAD-style schematic CAD BLOCK: a titled
+// rectangle with a header band (manufacturer + model + a power summary) and two
+// columns of I/O rows — inputs on the left edge, outputs/bidirectional on the
+// right. Each row is a two-line label (port name over connector type, e.g.
+// "HDMI IN 1" / "HDMI") sitting just inside the box, with a stub line + terminal
+// marker hanging off the matching edge. Content comes from the shared block model
+// (src/block.ts) so DXF and Visio render the same blocks.
 //
-// The DXF is produced by @tarikjabiri/dxf — a maintained DXF writer that emits a
-// structurally complete file (HEADER with proper handles, TABLES, BLOCKS,
-// ENTITIES, OBJECTS, EOF). The previous hand-rolled group-code output failed to
-// open in AutoCAD ("Processing error"); using a real writer fixes that.
+// The DXF is produced by @tarikjabiri/dxf — a maintained writer that emits a
+// structurally complete file (HEADER with handles, TABLES, BLOCKS, ENTITIES,
+// OBJECTS, EOF). We override $ACADVER to AC1027 (AutoCAD 2013); AutoCAD 2018
+// (AC1032) opens it natively.
 //
-// Version: the library writes AutoCAD R2007 (AC1021) handles/sections by
-// default; we override $ACADVER to AC1027 (AutoCAD 2013) so the file declares
-// the 2013 interchange format. AutoCAD 2018 (AC1032) opens AC1027 DXF natively
-// and Save-As / Insert to a 2018 DWG works without conversion.
-//
-// Layout (matching the Visio + EasySchematic adapters' intent):
-//   - one BLOCK per device: outline rectangle sized to the connector count,
-//     the device title near the top, and per connector a stub LINE + a terminal
-//     CIRCLE at the edge + a TEXT label "<port label> (<signalType-or-conn>)".
-//   - inputs on the left edge, outputs/bidirectional on the right, distributed
-//     evenly by height.
+// Layout (drawing units treated as millimetres):
+//   - one BLOCK per device: an outline rectangle auto-sized to the row count and
+//     the longest label; a header band (title + power subtitle) separated by a
+//     rule; per connector a two-line label inside the box, a stub LINE and a
+//     terminal CIRCLE outside the edge.
 //   - each block is INSERTed into model space; bundles INSERT one block per leaf
-//     device laid out in a row. Cables are listed as TEXT annotations beneath
-//     the row (a full wiring diagram is out of scope for a block library).
+//     device laid out in a row. Cables are listed as TEXT annotations beneath the
+//     row (a full wiring diagram is out of scope for a block library).
 
 import {
   validateDocument,
@@ -45,22 +42,29 @@ import {
 } from "@tarikjabiri/dxf";
 
 import type { Adapter, AdapterResult } from "./types.js";
-import { expandConnectors, type ExpandedConnector } from "./ports.js";
+import { buildBlockModel, type BlockModel, type BlockPort } from "./block.js";
 
 // --- Layout constants (drawing units; treat as millimetres) ----------------
-const TITLE_TEXT_H = 3.5;
-const PORT_TEXT_H = 2.5;
-const ROW_PITCH = 10; // vertical spacing between terminals
-const TITLE_BAND = 12; // height reserved at the top for the title
-const BOTTOM_PAD = 8;
-const STUB_LEN = 6; // length of the terminal stub line outside the box
-const TERMINAL_R = 1.2; // radius of the terminal circle
-const BODY_WIDTH = 70; // rectangle width
-const LABEL_GAP = 2; // gap between terminal circle and its text label
+const TITLE_TEXT_H = 4.0; // device title in the header band
+const SUBTITLE_TEXT_H = 2.3; // power summary under the title
+const NAME_TEXT_H = 2.6; // port name (first label line)
+const TYPE_TEXT_H = 2.0; // connector type (second label line)
+const ROW_PITCH = 9; // vertical spacing between port rows
+const HEADER_BAND = 13; // height reserved at the top for title + subtitle
+const BOTTOM_PAD = 5; // padding below the last row
+const STUB_LEN = 7; // length of the terminal stub outside the box
+const TERMINAL_R = 1.0; // radius of the terminal circle
+const EDGE_PAD = 3; // gap from a box edge to its label text
+const COL_GAP = 10; // min clear gap between the left and right label columns
+const LINE_OFFSET = 1.9; // half the gap between a row's two label lines
+const MIN_BODY_WIDTH = 64;
+const MAX_BODY_WIDTH = 160;
+const CHAR_W = 0.62; // approximate glyph width as a fraction of text height
 const BLOCK_GAP = 40; // horizontal gap between blocks in a bundle row
 
 const LAYER_DEVICE = "DEVICE";
 const LAYER_PORTS = "PORTS";
+const LAYER_TEXT = "TEXT";
 
 // AutoCAD 2013 DXF format header value. AutoCAD 2018 (AC1032) reads it natively.
 const ACAD_VERSION = "AC1027";
@@ -76,102 +80,113 @@ function blockName(value: string): string {
 
 /** Sanitise text for a DXF TEXT value: strip control chars, collapse, cap length. */
 function dxfText(value: string): string {
-  // DXF TEXT does not support newlines; collapse whitespace and trim.
   const clean = value.replace(/\s+/g, " ").trim();
   return clean.length > 64 ? `${clean.slice(0, 61)}...` : clean;
 }
 
-/** The device identity fields the DXF adapter reads. */
+/** The device identity + ports + power the DXF adapter reads. */
 interface DeviceIdentity {
   manufacturer?: string;
   model?: string;
 }
+type DeviceView = {
+  device: DeviceIdentity;
+  ports: OdioDevice["ports"];
+  power?: OdioDevice["power"];
+};
 
-/** A device view: identity + ports, satisfied by both documents and leaves. */
-type DeviceView = { device: DeviceIdentity; ports: OdioDevice["ports"] };
-
-function deviceTitle(d: DeviceIdentity): string {
-  const title = `${d.manufacturer ?? ""} ${d.model ?? ""}`.trim();
-  return title.length > 0 ? title : "Device";
+/** Estimated rendered width of a text string at a given text height. */
+function textWidth(s: string, h: number): number {
+  return s.length * h * CHAR_W;
 }
 
-/** Split terminals into left (inputs) and right (outputs + bidirectional). */
-function partition(terms: ExpandedConnector[]): { left: ExpandedConnector[]; right: ExpandedConnector[] } {
-  const left: ExpandedConnector[] = [];
-  const right: ExpandedConnector[] = [];
-  for (const t of terms) {
-    if (t.direction === "input") left.push(t);
-    else right.push(t); // output + bidirectional on the right
+/** Widest rendered extent of a column's two-line labels (0 for an empty column). */
+function columnWidth(col: BlockPort[]): number {
+  let w = 0;
+  for (const p of col) {
+    w = Math.max(w, textWidth(p.name, NAME_TEXT_H), textWidth(p.type, TYPE_TEXT_H));
   }
-  return { left, right };
+  return w;
 }
 
-/** The signal-type-or-connector descriptor shown in a port label's parentheses. */
-function portTypeLabel(t: ExpandedConnector): string {
-  if (t.primaryTransport) return t.primaryTransport;
-  if (t.primaryDomain) return t.primaryDomain;
-  return t.connector;
-}
+/** Block bounding size derived from the model's rows + label/title widths. */
+function blockDims(model: BlockModel): { width: number; height: number } {
+  const rows = Math.max(model.left.length, model.right.length, 1);
+  const height = HEADER_BAND + rows * ROW_PITCH + BOTTOM_PAD;
 
-/** Compute the block body height so every terminal row fits. */
-function bodyHeight(left: ExpandedConnector[], right: ExpandedConnector[]): number {
-  const rows = Math.max(left.length, right.length, 1);
-  return TITLE_BAND + rows * ROW_PITCH + BOTTOM_PAD;
+  const contentW = EDGE_PAD * 2 + columnWidth(model.left) + columnWidth(model.right) + COL_GAP;
+  const titleW = textWidth(model.title, TITLE_TEXT_H) + 8;
+  const subtitleW = model.subtitle ? textWidth(model.subtitle, SUBTITLE_TEXT_H) + 8 : 0;
+  const width = Math.min(
+    MAX_BODY_WIDTH,
+    Math.max(MIN_BODY_WIDTH, contentW, titleW, subtitleW)
+  );
+  return { width, height };
 }
 
 /**
- * Draw the body of one device into `block` at the block's local origin (0,0).
- * Returns the block's bounding width/height so callers can lay blocks out in a
- * row and compute drawing extents.
+ * Draw one device block into `block` at the block's local origin (0,0). Returns
+ * the bounding width/height so callers can lay blocks out in a row and compute
+ * extents. Recomputes dims from the same model so drawing and layout agree.
  */
 function drawBlockBody(block: DxfBlock, view: DeviceView): { width: number; height: number } {
-  const terms = expandConnectors(view);
-  const { left, right } = partition(terms);
-  const h = bodyHeight(left, right);
+  const model = buildBlockModel(view);
+  const { width: W, height: H } = blockDims(model);
 
   // Outline rectangle (top-left .. bottom-right) on the DEVICE layer.
-  block.addRectangle({ x: 0, y: h }, { x: BODY_WIDTH, y: 0 }, { layerName: LAYER_DEVICE });
+  block.addRectangle({ x: 0, y: H }, { x: W, y: 0 }, { layerName: LAYER_DEVICE });
 
-  // Title text, centred near the top.
-  block.addText(point3d(BODY_WIDTH / 2, h - TITLE_BAND + 3, 0), TITLE_TEXT_H, dxfText(deviceTitle(view.device)), {
-    layerName: LAYER_DEVICE,
+  // Header band: a rule separating the title area from the rows.
+  const bandY = H - HEADER_BAND;
+  block.addLine(point3d(0, bandY, 0), point3d(W, bandY, 0), { layerName: LAYER_DEVICE });
+
+  // Title (centred) and, if present, the power subtitle beneath it.
+  const titleY = model.subtitle ? H - 4.8 : H - HEADER_BAND / 2;
+  block.addText(point3d(W / 2, titleY, 0), TITLE_TEXT_H, dxfText(model.title), {
+    layerName: LAYER_TEXT,
     horizontalAlignment: TextHorizontalAlignment.Center,
-    verticalAlignment: TextVerticalAlignment.Bottom
+    verticalAlignment: TextVerticalAlignment.Middle
   });
+  if (model.subtitle) {
+    block.addText(point3d(W / 2, H - 9.6, 0), SUBTITLE_TEXT_H, dxfText(model.subtitle), {
+      layerName: LAYER_TEXT,
+      horizontalAlignment: TextHorizontalAlignment.Center,
+      verticalAlignment: TextVerticalAlignment.Middle
+    });
+  }
 
-  // Terminals: rows distributed top-down inside the body (below the title band).
-  const topY = h - TITLE_BAND - ROW_PITCH / 2;
-  const placeColumn = (col: ExpandedConnector[], side: "left" | "right") => {
+  const topRowY = H - HEADER_BAND - ROW_PITCH / 2;
+
+  const placeColumn = (col: BlockPort[], side: "left" | "right") => {
     for (let i = 0; i < col.length; i++) {
-      const t = col[i];
-      const y = topY - i * ROW_PITCH;
-      const edgeX = side === "left" ? 0 : BODY_WIDTH;
-      const tipX = side === "left" ? -STUB_LEN : BODY_WIDTH + STUB_LEN;
-      // Terminal stub + circle on the PORTS layer.
+      const p = col[i];
+      const y = topRowY - i * ROW_PITCH;
+      const edgeX = side === "left" ? 0 : W;
+      const tipX = side === "left" ? -STUB_LEN : W + STUB_LEN;
+
+      // Stub line + terminal circle hanging off the matching edge.
       block.addLine(point3d(edgeX, y, 0), point3d(tipX, y, 0), { layerName: LAYER_PORTS });
       block.addCircle(point3d(tipX, y, 0), TERMINAL_R, { layerName: LAYER_PORTS });
-      // Label: "<port label> (<signalType-or-connector>)", vertically centred on
-      // the row, hanging off the terminal away from the body.
-      const label = dxfText(`${t.label} (${portTypeLabel(t)})`);
-      if (side === "left") {
-        block.addText(point3d(tipX - TERMINAL_R - LABEL_GAP, y, 0), PORT_TEXT_H, label, {
-          layerName: LAYER_PORTS,
-          horizontalAlignment: TextHorizontalAlignment.Right,
-          verticalAlignment: TextVerticalAlignment.Middle
-        });
-      } else {
-        block.addText(point3d(tipX + TERMINAL_R + LABEL_GAP, y, 0), PORT_TEXT_H, label, {
-          layerName: LAYER_PORTS,
-          horizontalAlignment: TextHorizontalAlignment.Left,
-          verticalAlignment: TextVerticalAlignment.Middle
-        });
-      }
+
+      // Two-line label INSIDE the box: name over connector type.
+      const labelX = side === "left" ? EDGE_PAD : W - EDGE_PAD;
+      const align = side === "left" ? TextHorizontalAlignment.Left : TextHorizontalAlignment.Right;
+      block.addText(point3d(labelX, y + LINE_OFFSET, 0), NAME_TEXT_H, dxfText(p.name), {
+        layerName: LAYER_TEXT,
+        horizontalAlignment: align,
+        verticalAlignment: TextVerticalAlignment.Middle
+      });
+      block.addText(point3d(labelX, y - LINE_OFFSET, 0), TYPE_TEXT_H, dxfText(p.type), {
+        layerName: LAYER_PORTS,
+        horizontalAlignment: align,
+        verticalAlignment: TextVerticalAlignment.Middle
+      });
     }
   };
-  placeColumn(left, "left");
-  placeColumn(right, "right");
+  placeColumn(model.left, "left");
+  placeColumn(model.right, "right");
 
-  return { width: BODY_WIDTH, height: h };
+  return { width: W, height: H };
 }
 
 interface BlockPlacement {
@@ -204,28 +219,19 @@ function cableLabel(cable: CableBody, qty: number): string {
 }
 
 /**
- * Compute the body height of a device view without drawing it, so layout +
- * extents can be planned before blocks are created.
- */
-function probeHeight(view: DeviceView): number {
-  const { left, right } = partition(expandConnectors(view));
-  return bodyHeight(left, right);
-}
-
-/**
- * Build the whole DXF document from a planned list of block placements and a
- * list of cable annotation labels.
+ * Build the whole DXF document from a planned list of block placements and a list
+ * of cable annotation labels.
  */
 function buildDxf(blocks: BlockPlacement[], cables: { label: string }[]): string {
   const dxf = new DxfWriter();
-  // Millimetre units; declare the AutoCAD 2013 format so AutoCAD 2018 opens it
-  // natively. setUnits also writes $INSUNITS so INSERTs scale correctly.
   dxf.setUnits(Units.Millimeters);
   dxf.setVariable("$ACADVER", { 1: ACAD_VERSION });
 
-  // Layers: DEVICE (white/7 — outline + title), PORTS (blue/5 — terminals).
+  // Layers: DEVICE (white/7 — outline + rule), PORTS (blue/5 — stubs + type), TEXT
+  // (cyan/4 — title + port names).
   dxf.addLayer(LAYER_DEVICE, 7, "Continuous");
   dxf.addLayer(LAYER_PORTS, 5, "Continuous");
+  dxf.addLayer(LAYER_TEXT, 4, "Continuous");
 
   // One BLOCK definition per device.
   for (const b of blocks) {
@@ -241,8 +247,8 @@ function buildDxf(blocks: BlockPlacement[], cables: { label: string }[]): string
   // Cables: list as TEXT annotations beneath the row, in model space.
   let cy = -16;
   for (const c of cables) {
-    dxf.addText(point3d(0, cy, 0), PORT_TEXT_H, dxfText(c.label), {
-      layerName: LAYER_DEVICE,
+    dxf.addText(point3d(0, cy, 0), TYPE_TEXT_H, dxfText(c.label), {
+      layerName: LAYER_TEXT,
       horizontalAlignment: TextHorizontalAlignment.Left,
       verticalAlignment: TextVerticalAlignment.Top
     });
@@ -250,18 +256,19 @@ function buildDxf(blocks: BlockPlacement[], cables: { label: string }[]): string
   }
 
   // Drawing extents so AutoCAD opens zoomed to the content.
-  const extMaxX = blocks.reduce((m, b) => Math.max(m, b.insertX + b.width), BODY_WIDTH);
-  const extMaxY = blocks.reduce((m, b) => Math.max(m, b.height), TITLE_BAND);
+  const extMaxX = blocks.reduce((m, b) => Math.max(m, b.insertX + b.width), MIN_BODY_WIDTH);
+  const extMaxY = blocks.reduce((m, b) => Math.max(m, b.height), HEADER_BAND);
   const extMinY = Math.min(-20, cy);
-  dxf.setVariable("$EXTMIN", { 10: -STUB_LEN - 60, 20: extMinY, 30: 0 });
-  dxf.setVariable("$EXTMAX", { 10: extMaxX + 60, 20: extMaxY + 10, 30: 0 });
+  dxf.setVariable("$EXTMIN", { 10: -STUB_LEN - 80, 20: extMinY, 30: 0 });
+  dxf.setVariable("$EXTMAX", { 10: extMaxX + 80, 20: extMaxY + 10, 30: 0 });
 
   return dxf.stringify();
 }
 
 /**
- * The AutoCAD DXF adapter. Validates the input via the SDK, then renders one
- * BLOCK per device (laid out in a row for bundles) with labeled I/O terminals.
+ * The AutoCAD DXF adapter. Validates the input via the SDK, then renders one BLOCK
+ * per device (laid out in a row for bundles) with an AVCAD-style header band and
+ * labeled I/O terminals.
  */
 export const DxfAdapter: Adapter = {
   id: "dxf",
@@ -285,15 +292,14 @@ export const DxfAdapter: Adapter = {
 
     const addDevice = (view: DeviceView, nameSeed: string) => {
       const name = blockName(nameSeed);
-      // Disambiguate duplicate block names within one drawing.
       let unique = name;
       let n = 1;
       while (blocks.some((b) => b.name === unique)) {
         unique = `${name}_${++n}`;
       }
-      const height = probeHeight(view);
+      const { width, height } = blockDims(buildBlockModel(view));
       const insertX = blocks.reduce((m, b) => Math.max(m, b.insertX + b.width + BLOCK_GAP), 0);
-      blocks.push({ name: unique, view, insertX, width: BODY_WIDTH, height });
+      blocks.push({ name: unique, view, insertX, width, height });
     };
 
     if (routed.kind === "bundle") {
@@ -310,7 +316,7 @@ export const DxfAdapter: Adapter = {
         const qty = entry.quantity >= 1 ? entry.quantity : 1;
         for (let unit = 1; unit <= qty; unit++) {
           const seed = `${view.device.manufacturer}-${view.device.model}${qty > 1 ? `-${unit}` : ""}`;
-          addDevice({ device: view.device, ports: view.ports }, seed);
+          addDevice({ device: view.device, ports: view.ports, power: view.power }, seed);
         }
       }
       for (const entry of flat.cables) {
@@ -324,8 +330,8 @@ export const DxfAdapter: Adapter = {
       }
       fileBase = fileSlug(`${bundle.bundle?.manufacturer ?? ""}-${bundle.bundle?.model ?? "bundle"}`);
     } else if (routed.kind === "cable") {
-      // A standalone cable has no device block; render it as a labeled empty box
-      // so the file is still a valid, openable drawing.
+      // A standalone cable has no device block; render it as a labeled box so the
+      // file is still a valid, openable drawing.
       const cable = (device as unknown as { cable: CableBody }).cable;
       cables.push({ label: cableLabel(cable, 1) });
       addDevice(

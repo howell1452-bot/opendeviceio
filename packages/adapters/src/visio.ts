@@ -74,7 +74,7 @@ import {
 } from "@opendeviceio/sdk";
 
 import type { Adapter, AdapterResult } from "./types.js";
-import { expandConnectors, type ExpandedConnector } from "./ports.js";
+import { buildBlockModel, blockTitle, type BlockModel, type BlockPort } from "./block.js";
 import { DOCUMENT_XML, PAGES_XML, WINDOWS_XML } from "./visio-template.js";
 
 /** XML-escape a text value for use in element text or attribute. */
@@ -94,16 +94,14 @@ interface DeviceIdentity {
   manufacturer?: string;
   model?: string;
 }
-type DeviceView = { device: DeviceIdentity; ports: OdioDevice["ports"] };
+type DeviceView = {
+  device: DeviceIdentity;
+  ports: OdioDevice["ports"];
+  power?: OdioDevice["power"];
+};
 
-function deviceTitle(d: DeviceIdentity): string {
-  const t = `${d.manufacturer ?? ""} ${d.model ?? ""}`.trim();
-  return t.length > 0 ? t : "Device";
-}
-
-function portTypeLabel(t: ExpandedConnector): string {
-  return t.primaryTransport ?? t.primaryDomain ?? t.connector;
-}
+/** "<manufacturer> <model>" trimmed (shared with the block model). */
+const deviceTitle = blockTitle;
 
 // --- Deterministic GUIDs ----------------------------------------------------
 //
@@ -253,115 +251,140 @@ const MASTER_ICON =
   "////4f///+P////h////4f///+HH///jx///4Yf//+HH///jx///4Yf//+HH///hh///4cf//+HH\n" +
   "///jh///4Af//+dn///wB///8A///////w==";
 
-// --- Master geometry (inches; Visio's default page units) -------------------
-const SHAPE_W = 2.25; // master rectangle width (matches the reference ~2.25in)
-const PORT_ROW = 0.28; // vertical pitch between port rows
-const TITLE_BAND = 0.5; // height reserved for the title band
-const PAD = 0.25;
+// --- AVCAD-style master geometry (inches; Visio's default page units) -------
+//
+// A master is a NAMED root <Shape Type='Group'> with CHILD <Shape Type='Shape'>
+// elements — exactly the structure the ground-truth Extron masters use and the
+// structure that renders on drop. (A flat single shape, or an UNNAMED group, is
+// what Visio rejects as "Error 313 — the master is empty".) Each visual element
+// is its own child: the body outline, the header band, the title + power
+// subtitle, and one text child per port row. Connection points live on the group.
+// Child geometry uses RelMoveTo/RelLineTo (fractions of the child's Width/Height),
+// matching the reference children.
 
-function shapeHeight(termCount: number): number {
-  return TITLE_BAND + Math.max(termCount, 1) * PORT_ROW + PAD;
+const TITLE_BAND_IN = 0.5; // header band height
+const ROW_PITCH_IN = 0.34; // vertical pitch between port rows
+const BOTTOM_PAD_IN = 0.18; // padding below the last row
+const EDGE_PAD_IN = 0.08; // gap from a box edge to its label
+const COL_GAP_IN = 0.22; // min clear gap between the two label columns
+const TITLE_SIZE = 0.13; // device-title text size
+const SUBTITLE_SIZE = 0.085; // power-subtitle text size
+const LABEL_SIZE = 0.088; // port-label text size
+const CHAR_W_IN = 0.56; // glyph width as a fraction of text size
+const HEADER_FILL = "#F2A93B"; // AVCAD-style amber header band
+const MIN_W_IN = 2.4;
+const MAX_W_IN = 6.0;
+
+/** Estimated rendered width (inches) of a string at a given Visio text size. */
+function approxWidthIn(s: string, size: number): number {
+  return s.length * size * CHAR_W_IN;
 }
 
-/**
- * Emit a fully-formed top-level <Shape Type='Shape'> for one master. This is the
- * single building block both device and cable masters use, and it mirrors a real
- * master's root shape so Visio always has renderable geometry on drop:
- *   * NameU/Name (IsCustomNameU/IsCustomName) — a master's root shape MUST be named,
- *     otherwise Visio reports "Error 313 — the master is empty";
- *   * the full placement cell set (PinX/PinY/Width/Height/LocPinX/LocPinY/Angle/
- *     FlipX/FlipY/ResizeMode);
- *   * a drawn rectangle <Section N='Geometry'> (closed MoveTo/LineTo path) carrying
- *     the same NoFill/NoLine/NoShow/NoSnap/NoQuickDrag cells the real shapes use;
- *   * a <Section N='Character'> + <Section N='Paragraph'> and a <Text> block with
- *     the <cp/><pp/> run markers (so the text actually renders);
- *   * the <Section N='Connection'> (one Row per physical connector) when provided.
- * The shape references the document's Normal style (Line/Fill/Text style 3), which
- * is defined in document.xml with a visible black hairline + solid fill.
- */
-function shapeXml(opts: {
-  id: number;
-  name: string;
-  width: number;
-  height: number;
-  text: string;
-  connectors?: ExpandedConnector[];
-}): string {
-  const { id, name, width: w, height: h, text } = opts;
-  const uid = deterministicGuid(`shape:${id}:${name}`);
-  const nm = xml(name);
-  const parts: string[] = [];
-  parts.push(
-    `<Shape ID='${id}' NameU='${nm}' IsCustomNameU='1' Name='${nm}' IsCustomName='1' ` +
-      `Type='Shape' LineStyle='3' FillStyle='3' TextStyle='3' UniqueID='${uid}'>`
-  );
-  parts.push(`<Cell N='PinX' V='${(w / 2).toFixed(6)}'/>`);
-  parts.push(`<Cell N='PinY' V='${(h / 2).toFixed(6)}'/>`);
-  parts.push(`<Cell N='Width' V='${w.toFixed(6)}'/>`);
-  parts.push(`<Cell N='Height' V='${h.toFixed(6)}'/>`);
-  parts.push(`<Cell N='LocPinX' V='${(w / 2).toFixed(6)}'/>`);
-  parts.push(`<Cell N='LocPinY' V='${(h / 2).toFixed(6)}'/>`);
-  parts.push("<Cell N='Angle' V='0'/>");
-  parts.push("<Cell N='FlipX' V='0'/>");
-  parts.push("<Cell N='FlipY' V='0'/>");
-  parts.push("<Cell N='ResizeMode' V='0'/>");
-
-  // Connection points: one Row per physical connector (T='Connection', IX from 0,
-  // matching the reference). Inputs on the left edge (X=0), outputs/bidirectional
-  // on the right edge (X=Width). DirX/DirY=0 as in the reference masters.
-  const terms = opts.connectors ?? [];
-  if (terms.length > 0) {
-    parts.push("<Section N='Connection'>");
-    for (let i = 0; i < terms.length; i++) {
-      const t = terms[i];
-      const y = h - TITLE_BAND - (i + 0.5) * PORT_ROW;
-      const onLeft = t.direction === "input";
-      const x = onLeft ? 0 : w;
-      parts.push(
-        `<Row T='Connection' IX='${i}'>` +
-          `<Cell N='X' V='${x.toFixed(6)}'/>` +
-          `<Cell N='Y' V='${y.toFixed(6)}'/>` +
-          `<Cell N='DirX' V='0'/>` +
-          `<Cell N='DirY' V='0'/>` +
-          `<Cell N='Type' V='0'/>` +
-          `<Cell N='AutoGen' V='0'/>` +
-          `<Cell N='Prompt' V='${xml(t.label)}'/>` +
-          "</Row>"
-      );
-    }
-    parts.push("</Section>");
+/** Widest two-line label extent of a column (0 for an empty column). */
+function columnWidthIn(col: BlockPort[]): number {
+  let w = 0;
+  for (const p of col) {
+    w = Math.max(w, approxWidthIn(p.name, LABEL_SIZE), approxWidthIn(p.type, LABEL_SIZE));
   }
-
-  // Character + Paragraph sections so the <Text> run (referenced by <cp/>/<pp/>)
-  // has a defined font/colour/alignment — matching how real text shapes render.
-  parts.push(
-    "<Section N='Character'><Row IX='0'>" +
-      "<Cell N='Font' V='Arial'/><Cell N='Color' V='#000000'/><Cell N='Size' V='0.1111111111111111'/>" +
-      "</Row></Section>"
-  );
-  parts.push(
-    "<Section N='Paragraph'><Row IX='0'><Cell N='HorzAlign' V='1'/></Row></Section>"
-  );
-
-  // Rectangle geometry (closed path), matching the reference's Geometry cell set.
-  parts.push(
-    "<Section N='Geometry' IX='0'>" +
-      "<Cell N='NoFill' V='0'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/>" +
-      "<Cell N='NoSnap' V='0'/><Cell N='NoQuickDrag' V='0'/>" +
-      "<Row T='MoveTo' IX='1'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>" +
-      `<Row T='LineTo' IX='2'><Cell N='X' V='${w.toFixed(6)}'/><Cell N='Y' V='0'/></Row>` +
-      `<Row T='LineTo' IX='3'><Cell N='X' V='${w.toFixed(6)}'/><Cell N='Y' V='${h.toFixed(6)}'/></Row>` +
-      `<Row T='LineTo' IX='4'><Cell N='X' V='0'/><Cell N='Y' V='${h.toFixed(6)}'/></Row>` +
-      "<Row T='LineTo' IX='5'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>" +
-      "</Section>"
-  );
-  // Shape text: the <cp/>/<pp/> markers reference the Character/Paragraph rows.
-  parts.push(`<Text><cp IX='0'/><pp IX='0'/>${xml(text)}</Text>`);
-  parts.push("</Shape>");
-  return parts.join("");
+  return w;
 }
 
-/** Wrap one or more top-level shapes in a <MasterContents> document. */
+/** Master width/height (inches) derived from the model's rows + labels. */
+function blockDimsIn(model: BlockModel): { width: number; height: number } {
+  const rows = Math.max(model.left.length, model.right.length, 1);
+  const height = TITLE_BAND_IN + rows * ROW_PITCH_IN + BOTTOM_PAD_IN;
+  const contentW = EDGE_PAD_IN * 2 + columnWidthIn(model.left) + columnWidthIn(model.right) + COL_GAP_IN;
+  const titleW = approxWidthIn(model.title, TITLE_SIZE) + 0.12;
+  const subW = model.subtitle ? approxWidthIn(model.subtitle, SUBTITLE_SIZE) + 0.12 : 0;
+  const width = Math.min(MAX_W_IN, Math.max(MIN_W_IN, contentW, titleW, subW));
+  return { width, height };
+}
+
+/** Common placement cells for a child shape centred at (cx,cy), size w×h. */
+function placementCells(cx: number, cy: number, w: number, h: number): string {
+  return (
+    `<Cell N='PinX' V='${cx.toFixed(6)}'/><Cell N='PinY' V='${cy.toFixed(6)}'/>` +
+    `<Cell N='Width' V='${w.toFixed(6)}'/><Cell N='Height' V='${h.toFixed(6)}'/>` +
+    `<Cell N='LocPinX' V='${(w / 2).toFixed(6)}'/><Cell N='LocPinY' V='${(h / 2).toFixed(6)}'/>` +
+    `<Cell N='Angle' V='0'/><Cell N='FlipX' V='0'/><Cell N='FlipY' V='0'/><Cell N='ResizeMode' V='0'/>`
+  );
+}
+
+/** A unit rectangle Geometry (RelMoveTo/RelLineTo), with show/fill/line flags. */
+function relRectGeometry(noFill: 0 | 1, noLine: 0 | 1, noShow: 0 | 1): string {
+  return (
+    "<Section N='Geometry' IX='0'>" +
+    `<Cell N='NoFill' V='${noFill}'/><Cell N='NoLine' V='${noLine}'/><Cell N='NoShow' V='${noShow}'/>` +
+    "<Cell N='NoSnap' V='0'/><Cell N='NoQuickDrag' V='0'/>" +
+    "<Row T='RelMoveTo' IX='1'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>" +
+    "<Row T='RelLineTo' IX='2'><Cell N='X' V='1'/><Cell N='Y' V='0'/></Row>" +
+    "<Row T='RelLineTo' IX='3'><Cell N='X' V='1'/><Cell N='Y' V='1'/></Row>" +
+    "<Row T='RelLineTo' IX='4'><Cell N='X' V='0'/><Cell N='Y' V='1'/></Row>" +
+    "<Row T='RelLineTo' IX='5'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>" +
+    "</Section>"
+  );
+}
+
+/** A drawn rectangle child (visible outline; optional solid fill colour). */
+function rectChild(id: number, seed: string, cx: number, cy: number, w: number, h: number, fill?: string): string {
+  const uid = deterministicGuid(`child:${seed}:${id}`);
+  return (
+    `<Shape ID='${id}' Type='Shape' LineStyle='3' FillStyle='3' TextStyle='3' UniqueID='${uid}'>` +
+    placementCells(cx, cy, w, h) +
+    "<Cell N='LineWeight' V='0.0104'/><Cell N='LineColor' V='#000000'/>" +
+    (fill
+      ? `<Cell N='FillForegnd' V='${fill}'/><Cell N='FillPattern' V='1'/>`
+      : "<Cell N='FillPattern' V='0'/>") +
+    relRectGeometry(fill ? 0 : 1, 0, 0) +
+    "</Shape>"
+  );
+}
+
+/** A text-only child (no visible outline/fill; an invisible bounding rectangle). */
+function textChild(
+  id: number,
+  seed: string,
+  cx: number,
+  cy: number,
+  w: number,
+  h: number,
+  text: string,
+  size: number,
+  align: 0 | 1 | 2,
+  bold: boolean
+): string {
+  const uid = deterministicGuid(`text:${seed}:${id}`);
+  return (
+    `<Shape ID='${id}' Type='Shape' LineStyle='0' FillStyle='0' TextStyle='0' UniqueID='${uid}'>` +
+    placementCells(cx, cy, w, h) +
+    "<Cell N='FillPattern' V='0'/><Cell N='LinePattern' V='0'/>" +
+    "<Section N='Character'><Row IX='0'>" +
+    `<Cell N='Font' V='Arial'/><Cell N='Color' V='#000000'/><Cell N='Style' V='${bold ? 1 : 0}'/><Cell N='Size' V='${size}'/>` +
+    "</Row></Section>" +
+    `<Section N='Paragraph'><Row IX='0'><Cell N='HorzAlign' V='${align}'/></Row></Section>` +
+    relRectGeometry(1, 1, 1) +
+    `<Text><cp IX='0'/><pp IX='0'/>${xml(text)}</Text>` +
+    "</Shape>"
+  );
+}
+
+/** A named root Group (no own geometry) carrying connection points + children. */
+function groupShape(name: string, w: number, h: number, connectionRows: string, childrenXml: string): string {
+  const uid = deterministicGuid(`group:${name}`);
+  const nm = xml(name);
+  const conn = connectionRows.length > 0 ? `<Section N='Connection'>${connectionRows}</Section>` : "";
+  return (
+    `<Shape ID='1' NameU='${nm}' IsCustomNameU='1' Name='${nm}' IsCustomName='1' ` +
+    `Type='Group' LineStyle='3' FillStyle='3' TextStyle='3' UniqueID='${uid}'>` +
+    placementCells(w / 2, h / 2, w, h) +
+    "<Cell N='QuickStyleVariation' V='0'/><Cell N='SelectMode' V='0'/>" +
+    conn +
+    `<Shapes>${childrenXml}</Shapes>` +
+    "</Shape>"
+  );
+}
+
+/** Wrap the root group shape in a <MasterContents> document. */
 function masterContentsDoc(shapesXml: string): string {
   return (
     XML_DECL.trimEnd() +
@@ -375,38 +398,73 @@ function masterContentsDoc(shapesXml: string): string {
 }
 
 /**
- * Build the <MasterContents> XML for one device master: a single labelled
- * rectangle carrying one connection point per physical connector and a text
- * block (device title + one line per port).
+ * Build the <MasterContents> XML for one device master: a named Group containing
+ * a body outline, an amber header band, the device title + power subtitle, and a
+ * two-line text child (name over connector type) per port row, with one
+ * connection point per physical connector on the group.
  */
 function masterContentsXml(view: DeviceView): { xml: string; width: number; height: number } {
-  const terms = expandConnectors(view);
-  const h = shapeHeight(terms.length);
-  const w = SHAPE_W;
-  const title = deviceTitle(view.device);
-  const lines = [title];
-  for (const t of terms) lines.push(`${t.label} (${portTypeLabel(t)})`);
-  const shape = shapeXml({
-    id: 1,
-    name: title,
-    width: w,
-    height: h,
-    text: lines.join("\n"),
-    connectors: terms
-  });
-  return { xml: masterContentsDoc(shape), width: w, height: h };
+  const model = buildBlockModel(view);
+  const { width: W, height: H } = blockDimsIn(model);
+  const seed = model.title;
+
+  let id = 2; // child IDs start at 2 (the group is ID 1)
+  const children: string[] = [];
+  const conns: string[] = [];
+
+  // Body outline (transparent) then the filled header band on top of it.
+  children.push(rectChild(id++, seed, W / 2, H / 2, W, H));
+  children.push(rectChild(id++, seed, W / 2, H - TITLE_BAND_IN / 2, W, TITLE_BAND_IN, HEADER_FILL));
+
+  // Title (and power subtitle) centred in the header band.
+  const titleY = model.subtitle ? H - 0.17 : H - TITLE_BAND_IN / 2;
+  children.push(textChild(id++, seed, W / 2, titleY, W - 0.1, 0.2, model.title, TITLE_SIZE, 1, true));
+  if (model.subtitle) {
+    children.push(textChild(id++, seed, W / 2, H - 0.37, W - 0.1, 0.16, model.subtitle, SUBTITLE_SIZE, 1, false));
+  }
+
+  // Port rows: two-line label children + connection points on the group edges.
+  const halfW = Math.max(0.3, (W - EDGE_PAD_IN * 2 - COL_GAP_IN) / 2);
+  const topRowY = H - TITLE_BAND_IN - ROW_PITCH_IN / 2;
+  const placeColumn = (col: BlockPort[], side: "left" | "right") => {
+    for (let i = 0; i < col.length; i++) {
+      const p = col[i];
+      const y = topRowY - i * ROW_PITCH_IN;
+      const onLeft = side === "left";
+      const cx = onLeft ? EDGE_PAD_IN + halfW / 2 : W - EDGE_PAD_IN - halfW / 2;
+      const align: 0 | 2 = onLeft ? 0 : 2;
+      children.push(textChild(id++, seed, cx, y, halfW, ROW_PITCH_IN, `${p.name}\n${p.type}`, LABEL_SIZE, align, false));
+      const connX = onLeft ? 0 : W;
+      conns.push(
+        `<Row T='Connection' IX='${conns.length}'>` +
+          `<Cell N='X' V='${connX.toFixed(6)}'/><Cell N='Y' V='${y.toFixed(6)}'/>` +
+          "<Cell N='DirX' V='0'/><Cell N='DirY' V='0'/><Cell N='Type' V='0'/><Cell N='AutoGen' V='0'/>" +
+          `<Cell N='Prompt' V='${xml(p.name)}'/>` +
+          "</Row>"
+      );
+    }
+  };
+  placeColumn(model.left, "left");
+  placeColumn(model.right, "right");
+
+  const group = groupShape(model.title, W, H, conns.join(""), children.join(""));
+  return { xml: masterContentsDoc(group), width: W, height: H };
 }
 
 /**
- * Build a text-only master for a cable (no connector geometry). Cables in ODIO
- * are bodies, not port-bearing devices, so they become a labelled box master
- * (a Group with a single rectangle child, no connection points).
+ * Build a master for a cable: a named Group with a single filled, labelled box
+ * child (cables are bodies, not port-bearing devices, so no connection points).
  */
 function cableMasterContentsXml(label: string): { xml: string; width: number; height: number } {
-  const w = 3.0;
-  const h = 0.5;
-  const shape = shapeXml({ id: 1, name: label, width: w, height: h, text: label });
-  return { xml: masterContentsDoc(shape), width: w, height: h };
+  const w = Math.min(MAX_W_IN, Math.max(2.6, approxWidthIn(label, 0.1) + 0.3));
+  const h = 0.55;
+  let id = 2;
+  const children = [
+    rectChild(id++, label, w / 2, h / 2, w, h, HEADER_FILL),
+    textChild(id++, label, w / 2, h / 2, w - 0.12, h - 0.1, label, 0.1, 1, true)
+  ];
+  const group = groupShape(label, w, h, "", children.join(""));
+  return { xml: masterContentsDoc(group), width: w, height: h };
 }
 
 /** One master, accumulated before serialisation into masters.xml + master#.xml. */
@@ -564,7 +622,7 @@ export const VisioAdapter: Adapter = {
         }
         const qty = entry.quantity >= 1 ? entry.quantity : 1;
         for (let unit = 1; unit <= qty; unit++) {
-          addDeviceMaster({ device: view.device, ports: view.ports });
+          addDeviceMaster({ device: view.device, ports: view.ports, power: view.power });
         }
       }
       for (const entry of flat.cables) {

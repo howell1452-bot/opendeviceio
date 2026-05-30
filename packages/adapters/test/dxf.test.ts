@@ -63,11 +63,13 @@ describe("DXF adapter — structure", () => {
   it("emits a TEXT entity per connector (title + one label per expanded terminal)", () => {
     const dxf = runDxf(loadDevice("lightware-ucx-4x2-hc60d.odio.json"));
     const texts = countEntities(dxf, "TEXT");
-    // At least the title plus one label per terminal; UCX expands to >15 ports.
+    // Title (+ optional power subtitle) plus a two-line label (name + connector
+    // type) per terminal; UCX expands to >15 ports, so well over 15 TEXT entities.
     expect(texts).toBeGreaterThan(15);
-    // Each terminal label is rendered as "<label> (<type>)".
-    expect(dxf).toContain("HDMI IN 1 (hdmi)");
-    expect(dxf).toContain("Dante (dante)");
+    // Each terminal renders a name line and a connector-type line (AVCAD style):
+    // the port name "HDMI IN 1" over the connector "HDMI".
+    expect(dxf).toContain("HDMI IN 1");
+    expect(dxf).toContain("Dante");
   });
 
   it("emits a terminal CIRCLE + stub LINE per connector", () => {
