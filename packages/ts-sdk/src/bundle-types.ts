@@ -47,6 +47,10 @@ export type Port = {
    */
   label?: string;
   /**
+   * Optional terse label for tight layouts (e.g. an I/O-table cell), used only when 'label' is too long; presentation hint, no semantic effect.
+   */
+  shortLabel?: string;
+  /**
    * Overall port direction. Individual signal flows may override via signal.direction.
    */
   direction: "input" | "output" | "bidirectional";

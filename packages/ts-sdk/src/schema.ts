@@ -138,6 +138,10 @@ const deviceSchema = {
           "type": "string",
           "description": "Human-facing label as silkscreened on the device, e.g. 'HDMI INPUT 1'."
         },
+        "shortLabel": {
+          "type": "string",
+          "description": "Optional terse label for tight layouts (e.g. an I/O-table cell), used only when 'label' is too long; presentation hint, no semantic effect."
+        },
         "direction": {
           "type": "string",
           "description": "Overall port direction. Individual signal flows may override via signal.direction.",
