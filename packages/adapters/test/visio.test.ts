@@ -25,15 +25,21 @@ function runVisio(device: OdioDevice): Record<string, Uint8Array> {
   return unzipSync(bytes as Uint8Array);
 }
 
-// Fixed stencil OPC parts that must always be present.
+// Fixed stencil OPC parts that must always be present. This MUST match the part
+// set of the ground-truth reference (references/visio/DTP - CrossPoint 4K Eng.vssx)
+// — replicating the full part set is what makes the file open in real Visio.
 const REQUIRED_PARTS = [
   "[Content_Types].xml",
   "_rels/.rels",
+  "docProps/app.xml",
+  "docProps/core.xml",
+  "docProps/custom.xml",
   "visio/document.xml",
   "visio/_rels/document.xml.rels",
   "visio/masters/masters.xml",
   "visio/masters/_rels/masters.xml.rels",
   "visio/masters/master1.xml",
+  "visio/pages/pages.xml",
   "visio/windows.xml"
 ];
 
@@ -54,6 +60,35 @@ describe("Visio adapter — VSSX stencil of masters", () => {
     expect(ct).toContain("application/vnd.ms-visio.masters+xml");
     expect(ct).toContain("application/vnd.ms-visio.master+xml");
     expect(ct).toContain('PartName="/visio/masters/master1.xml"');
+    // Full reference part set: pages, windows + all three docProps overrides.
+    expect(ct).toContain("application/vnd.ms-visio.pages+xml");
+    expect(ct).toContain("application/vnd.ms-visio.windows+xml");
+    expect(ct).toContain('PartName="/docProps/core.xml"');
+    expect(ct).toContain('PartName="/docProps/app.xml"');
+    expect(ct).toContain('PartName="/docProps/custom.xml"');
+  });
+
+  it("entry set matches the ground-truth reference's part set for one device", () => {
+    // The reference (1 page + 20 masters) has exactly these non-master parts plus
+    // one master#.xml per master. A 1-master export must yield the same shape.
+    const entries = runVisio(loadDevice("lightware-ucx-4x2-hc60d.odio.json"));
+    const keys = Object.keys(entries).sort();
+    expect(keys).toEqual(
+      [
+        "[Content_Types].xml",
+        "_rels/.rels",
+        "docProps/app.xml",
+        "docProps/core.xml",
+        "docProps/custom.xml",
+        "visio/_rels/document.xml.rels",
+        "visio/document.xml",
+        "visio/masters/_rels/masters.xml.rels",
+        "visio/masters/master1.xml",
+        "visio/masters/masters.xml",
+        "visio/pages/pages.xml",
+        "visio/windows.xml"
+      ].sort()
+    );
   });
 
   it("the file is emitted as binary bytes with a .vssx path", () => {
@@ -71,7 +106,13 @@ describe("Visio adapter — VSSX stencil of masters", () => {
     const masters = strFromU8(entries["visio/masters/masters.xml"]);
     expect(masters).toContain("<Master ");
     expect(masters).toContain("Lightware UCX-4x2-HC60D");
-    expect(masters).toContain('<Rel r:id="rId1"/>');
+    expect(masters).toContain("<Rel r:id='rId1'/>");
+    // Reference Master attribute set is replicated (deterministic GUIDs included).
+    expect(masters).toContain("MasterType='2'");
+    expect(masters).toContain("IconUpdate='1'");
+    expect(masters).toContain("UniqueID='{");
+    expect(masters).toContain("BaseID='{");
+    expect(masters).toContain("<PageSheet ");
     // masters.xml.rels points rId1 at master1.xml via the master relationship.
     const rels = strFromU8(entries["visio/masters/_rels/masters.xml.rels"]);
     expect(rels).toContain('Id="rId1"');
@@ -87,32 +128,29 @@ describe("Visio adapter — VSSX stencil of masters", () => {
     expect(master).toContain("Lightware UCX-4x2-HC60D");
     expect(master).toContain("HDMI IN 1 (hdmi)");
     expect(master).toContain("Dante (dante)");
-    // Geometry rectangle + a Connection section.
-    expect(master).toContain('N="Geometry"');
-    expect(master).toContain('N="Connection"');
+    // Master shape is a Group carrying geometry + connection (matches reference).
+    expect(master).toContain("Type='Group'");
+    expect(master).toContain("N='Geometry'");
+    expect(master).toContain("N='Connection'");
     // One Connection Row per physical connector, matching expandConnectors.
-    const device = loadDevice("lightware-ucx-4x2-hc60d.odio.json");
-    const result = VisioAdapter.export(device);
-    void result;
-    const connectionRows = (master.match(/<Cell N="Type" V="0"\/>/g) ?? []).length;
+    const connectionRows = (master.match(/<Cell N='Type' V='0'\/>/g) ?? []).length;
     expect(connectionRows).toBeGreaterThan(0);
-    // Connection cells use the documented N attribute values.
-    expect(master).toContain('<Cell N="X"');
-    expect(master).toContain('<Cell N="Y"');
-    expect(master).toContain('<Cell N="Prompt"');
+    // Connection rows use the reference's row form + documented cell N values.
+    expect(master).toContain("<Row T='Connection' IX='0'>");
+    expect(master).toContain("<Cell N='X'");
+    expect(master).toContain("<Cell N='Y'");
+    expect(master).toContain("<Cell N='Prompt'");
     // The Prompt names a real port (label identifiable on the connection point).
-    expect(master).toContain('N="Prompt" V="HDMI IN 1"');
+    expect(master).toContain("N='Prompt' V='HDMI IN 1'");
   });
 
   it("connection-point count equals the expanded connector count", () => {
     const device = loadDevice("lightware-ucx-4x2-hc60d.odio.json");
     const entries = runVisio(device);
     const master = strFromU8(entries["visio/masters/master1.xml"]);
-    const rowCount = (master.match(/<Row IX="\d+"><Cell N="X"/g) ?? []).length;
-    // Re-derive the expected count from the shared expander.
-    // (Imported lazily to keep this test self-contained.)
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const portCount = (master.match(/<Cell N="Type" V="0"\/>/g) ?? []).length;
+    const rowCount = (master.match(/<Row T='Connection' IX='\d+'><Cell N='X'/g) ?? []).length;
+    // Each connection row has exactly one Type cell; counts must agree.
+    const portCount = (master.match(/<Cell N='Type' V='0'\/>/g) ?? []).length;
     expect(rowCount).toBe(portCount);
     expect(rowCount).toBeGreaterThanOrEqual(1);
   });

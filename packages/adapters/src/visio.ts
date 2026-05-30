@@ -6,52 +6,49 @@
 // "Shapes" stencil pane. Each ODIO device becomes one master that renders like
 // an EasySchematic block: a labeled rectangle with one CONNECTION POINT per
 // physical connector, so a user can drag the master onto a page and wire cables
-// to the green ✕ connection points.
+// to the green connection points.
 //
-// OPC package layout (stencil):
+// GROUND-TRUTH TEMPLATING
+// -----------------------
+// The previous hand-built .vssx failed in real Visio with "Error 271". This
+// rewrite is templated directly from a REAL Extron Visio stencil
+// (references/visio/DTP - CrossPoint 4K Eng.vssx). The package now carries the
+// FULL part set that a pristine Visio writes — including the parts the v1 omitted
+// (docProps/{app,core,custom}.xml, visio/pages/pages.xml, the document StyleSheets
+// machinery, the master PageSheet) — which is what makes Visio accept the file.
+//
+// OPC package layout (stencil), matching the reference exactly:
 //
 //   [Content_Types].xml                         — part content-type registry
 //   _rels/.rels                                 — package root relationships
-//   docProps/core.xml, docProps/app.xml         — document properties
-//   visio/document.xml                          — VisioDocument root (stencil)
-//   visio/_rels/document.xml.rels               — document -> masters + windows
+//   docProps/core.xml, app.xml, custom.xml      — document properties
+//   visio/document.xml                          — VisioDocument (StyleSheets etc.)
+//   visio/_rels/document.xml.rels               — document -> masters + pages + windows
+//   visio/pages/pages.xml                       — a (single, empty) drawing page
 //   visio/masters/masters.xml                   — <Masters> index (one <Master> each)
 //   visio/masters/_rels/masters.xml.rels        — masters index -> each master#.xml
 //   visio/masters/master1.xml ... masterN.xml   — one <MasterContents> per device
-//   visio/windows.xml                           — window state (stencil window)
+//   visio/windows.xml                           — window state
 //
-// Each master#.xml holds a single <Shape> with:
-//   * a rectangle <Section N="Geometry"> sized to the device's port count,
-//   * a <Text> label (device title + one line per port),
-//   * a <Section N="Connection"> with one Row per physical connector. Inputs are
-//     placed on the LEFT edge (X=0), outputs/bidirectional on the RIGHT edge
-//     (X=Width), distributed evenly down the rectangle by Y. Each connection
-//     point carries a Prompt cell set to the port label so it is identifiable.
+// REPLICATED FROM THE REAL MASTERS (so output opens in Visio):
+//   * <Master> attribute set: IsCustomNameU/IsCustomName, Prompt, IconSize,
+//     AlignName, MatchByName, IconUpdate='1', UniqueID, BaseID, PatternFlags,
+//     Hidden, MasterType='2', a <PageSheet> sized to the shape, and <Rel r:id>.
+//   * The master shape is a Group (Type='Group') carrying the <Section N='Connection'>
+//     (Rows T='Connection' IX from 0, cells X/Y/DirX/DirY/Type/AutoGen/Prompt) plus
+//     a child <Shape Type='Shape'> with the rectangle <Section N='Geometry'> and the
+//     <Text> label. All shapes reference the document's Normal style (Line/Fill/Text
+//     Style 3) so they inherit the StyleSheets carried in document.xml.
 //
-// FORMAT SOURCES (researched, see README + final report):
-//   * [MS-VSDX] (MS open spec): Document/Masters/Master XML parts, content types
-//     and source relationship URIs.
-//       - Masters part:  content type "application/vnd.ms-visio.masters+xml",
-//                        rel "http://schemas.microsoft.com/visio/2010/relationships/masters"
-//       - Master part:   content type "application/vnd.ms-visio.master+xml",
-//                        rel "http://schemas.microsoft.com/visio/2010/relationships/master",
-//                        root element <MasterContents>
-//       - Document part: MS-VSDX documents "application/vnd.ms-visio.drawing.main+xml";
-//                        the STENCIL variant uses "application/vnd.ms-visio.stencil.main+xml"
-//                        (same naming pattern as the .vssx extension). See CAVEAT.
-//   * Visio XML reference (learn.microsoft.com): Cell/Row/Section model — every
-//     ShapeSheet cell is a <Cell N=".." V=".."> and tabular data lives in
-//     <Section><Row><Cell/></Row></Section>. Connection-row cells use N = X, Y,
-//     DirX, DirY, Type, Prompt. Master_Type attributes: ID (required), NameU,
-//     Name, plus a required child <Rel r:id=".."> pointing at the master part.
-//
-// CAVEAT — REAL-VISIO VALIDATION: this is a hand-built minimal stencil targeting
-// the documented schema. It is a structurally valid OPC zip carrying real master
-// shapes with geometry + connection points (a large step up from the previous
-// text-only .vsdx). The exact bytes a pristine Visio writes (master Icon bitmaps,
-// full StyleSheet/Theme machinery, PageSheet defaults) are intentionally omitted.
-// Treat opening in the real Visio app as still requiring validation; the most
-// likely points to verify are listed in the final report / README.
+// SIMPLIFIED vs the real masters (intentional, noted for Visio verification):
+//   * One plain rectangle child shape per device (the real Extron masters draw the
+//     full faceplate with dozens of nested sub-shapes). Ports become text lines +
+//     connection points rather than individually drawn jacks.
+//   * Static <Icon> bitmaps are OMITTED. The real masters carry a base64 preview
+//     bitmap but also set IconUpdate='1', which tells Visio to regenerate the icon
+//     from the shape geometry — so the preview is produced on load without us
+//     shipping a bitmap.
+//   * Cell formulas (F='Width*..') are omitted; we emit resolved literal values.
 
 import { zipSync, strToU8, type Zippable } from "fflate";
 
@@ -67,6 +64,7 @@ import {
 
 import type { Adapter, AdapterResult } from "./types.js";
 import { expandConnectors, type ExpandedConnector } from "./ports.js";
+import { DOCUMENT_XML, PAGES_XML, WINDOWS_XML } from "./visio-template.js";
 
 /** XML-escape a text value for use in element text or attribute. */
 function xml(value: string): string {
@@ -96,11 +94,41 @@ function portTypeLabel(t: ExpandedConnector): string {
   return t.primaryTransport ?? t.primaryDomain ?? t.connector;
 }
 
+// --- Deterministic GUIDs ----------------------------------------------------
+//
+// Visio masters carry a UniqueID and a BaseID (GUIDs). They must be stable per
+// device (no Date.now/Math.random) so repeated exports of the same input are
+// byte-identical. We derive a GUID deterministically from a string seed via a
+// small FNV-1a hash expanded into 16 bytes formatted as a GUID. The exact value
+// is irrelevant to Visio as long as it is a well-formed, distinct GUID.
+
+function fnv1a(seed: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < seed.length; i++) {
+    h ^= seed.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h >>> 0;
+}
+
+/** Build a deterministic, well-formed GUID string from a seed. */
+function deterministicGuid(seed: string): string {
+  // Expand the seed into 16 bytes by hashing four salted variants.
+  const bytes: number[] = [];
+  for (let block = 0; block < 4; block++) {
+    const h = fnv1a(`${block}:${seed}`);
+    bytes.push((h >>> 24) & 0xff, (h >>> 16) & 0xff, (h >>> 8) & 0xff, h & 0xff);
+  }
+  const hex = bytes.map((b) => b.toString(16).padStart(2, "0"));
+  const g = hex.join("").toUpperCase();
+  return `{${g.slice(0, 8)}-${g.slice(8, 12)}-${g.slice(12, 16)}-${g.slice(16, 20)}-${g.slice(20, 32)}}`;
+}
+
 // --- Static OPC parts -------------------------------------------------------
 //
-// Content-type Overrides for the STENCIL document part + the masters/master
-// parts (see [MS-VSDX]). The document part uses the .stencil content type so the
-// package is recognised as a .vssx stencil rather than a .vsdx drawing.
+// Content-type Overrides matching the reference stencil EXACTLY: the document
+// part uses ".stencil." so the package is recognised as a .vssx, plus masters,
+// each master#, pages, windows and the three docProps parts.
 
 function buildContentTypes(masterCount: number): string {
   const masterOverrides: string[] = [];
@@ -114,67 +142,89 @@ function buildContentTypes(masterCount: number): string {
     '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
     '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
     '<Default Extension="xml" ContentType="application/xml"/>' +
-    // STENCIL document part (.vssx) — note ".stencil." not ".drawing.".
     '<Override PartName="/visio/document.xml" ContentType="application/vnd.ms-visio.stencil.main+xml"/>' +
     '<Override PartName="/visio/masters/masters.xml" ContentType="application/vnd.ms-visio.masters+xml"/>' +
     masterOverrides.join("") +
+    '<Override PartName="/visio/pages/pages.xml" ContentType="application/vnd.ms-visio.pages+xml"/>' +
     '<Override PartName="/visio/windows.xml" ContentType="application/vnd.ms-visio.windows+xml"/>' +
     '<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>' +
     '<Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>' +
+    '<Override PartName="/docProps/custom.xml" ContentType="application/vnd.openxmlformats-officedocument.custom-properties+xml"/>' +
     "</Types>"
   );
 }
 
+// Package root relationships — same relationship types/targets as the reference.
 const ROOT_RELS =
   XML_DECL +
   '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
   '<Relationship Id="rId1" Type="http://schemas.microsoft.com/visio/2010/relationships/document" Target="visio/document.xml"/>' +
   '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>' +
   '<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/>' +
+  '<Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/custom-properties" Target="docProps/custom.xml"/>' +
   "</Relationships>";
 
-const DOCUMENT_XML =
-  XML_DECL +
-  '<VisioDocument xmlns="http://schemas.microsoft.com/office/visio/2012/main" xml:space="preserve">' +
-  "<DocumentSettings/>" +
-  "<Colors/>" +
-  "<FaceNames/>" +
-  "<StyleSheets/>" +
-  "</VisioDocument>";
-
-// Document -> masters index + windows. (No pages part: a stencil has masters,
-// not drawing pages.)
+// Document relationships: masters + pages + windows (the reference includes a
+// pages relationship even though a stencil's page is empty).
 const DOCUMENT_RELS =
   XML_DECL +
   '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
   '<Relationship Id="rId1" Type="http://schemas.microsoft.com/visio/2010/relationships/masters" Target="masters/masters.xml"/>' +
-  '<Relationship Id="rId2" Type="http://schemas.microsoft.com/visio/2010/relationships/windows" Target="windows.xml"/>' +
+  '<Relationship Id="rId2" Type="http://schemas.microsoft.com/visio/2010/relationships/pages" Target="pages/pages.xml"/>' +
+  '<Relationship Id="rId3" Type="http://schemas.microsoft.com/visio/2010/relationships/windows" Target="windows.xml"/>' +
   "</Relationships>";
-
-// A stencil window rather than a drawing window.
-const WINDOWS_XML =
-  XML_DECL +
-  '<Windows xmlns="http://schemas.microsoft.com/office/visio/2012/main" xml:space="preserve">' +
-  '<Window ID="0" WindowType="Stencil" WindowState="1073741824"/>' +
-  "</Windows>";
 
 const CORE_XML =
   XML_DECL +
   '<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" ' +
   'xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" ' +
-  'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">' +
-  "<dc:creator>OpenDeviceIO</dc:creator><cp:lastModifiedBy>OpenDeviceIO</cp:lastModifiedBy>" +
+  'xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">' +
+  "<dc:title>OpenDeviceIO Stencil</dc:title><dc:subject></dc:subject>" +
+  "<dc:creator>OpenDeviceIO</dc:creator><cp:keywords></cp:keywords><dc:description></dc:description>" +
+  "<cp:lastModifiedBy>OpenDeviceIO</cp:lastModifiedBy><cp:category></cp:category><dc:language>en-US</dc:language>" +
   "</cp:coreProperties>";
 
-const APP_XML =
+// docProps/app.xml — genericised. The HeadingPairs/TitlesOfParts vectors are
+// populated per-export with the master names so the counts stay consistent with
+// the reference's app.xml shape (Pages + Masters heading pairs).
+function buildAppXml(masterNames: string[]): string {
+  const titleEntries = ["<vt:lpstr>Page-1</vt:lpstr>"]
+    .concat(masterNames.map((n) => `<vt:lpstr>${xml(n)}</vt:lpstr>`))
+    .join("");
+  const titlesSize = masterNames.length + 1;
+  return (
+    XML_DECL +
+    '<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" ' +
+    'xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">' +
+    "<Template></Template><TotalTime>0</TotalTime><Application>OpenDeviceIO adapters</Application>" +
+    "<ScaleCrop>false</ScaleCrop>" +
+    '<HeadingPairs><vt:vector size="4" baseType="variant">' +
+    "<vt:variant><vt:lpstr>Pages</vt:lpstr></vt:variant><vt:variant><vt:i4>1</vt:i4></vt:variant>" +
+    `<vt:variant><vt:lpstr>Masters</vt:lpstr></vt:variant><vt:variant><vt:i4>${masterNames.length}</vt:i4></vt:variant>` +
+    "</vt:vector></HeadingPairs>" +
+    `<TitlesOfParts><vt:vector size="${titlesSize}" baseType="lpstr">${titleEntries}</vt:vector></TitlesOfParts>` +
+    "<Manager></Manager><Company></Company><LinksUpToDate>false</LinksUpToDate><SharedDoc>false</SharedDoc>" +
+    "<HyperlinkBase></HyperlinkBase><HyperlinksChanged>false</HyperlinksChanged><AppVersion>16.0000</AppVersion>" +
+    "</Properties>"
+  );
+}
+
+// docProps/custom.xml — the reference carries Visio's private build/metric props.
+// Replicated with neutral fixed values (IsMetric=false matches our inch units).
+const CUSTOM_XML =
   XML_DECL +
-  '<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties">' +
-  "<Application>OpenDeviceIO adapters</Application></Properties>";
+  '<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/custom-properties" ' +
+  'xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">' +
+  '<property fmtid="{D5CDD505-2E9C-101B-9397-08002B2CF9AE}" pid="2" name="_VPID_ALTERNATENAMES"><vt:lpwstr></vt:lpwstr></property>' +
+  '<property fmtid="{D5CDD505-2E9C-101B-9397-08002B2CF9AE}" pid="3" name="BuildNumberCreated"><vt:i4>1074147066</vt:i4></property>' +
+  '<property fmtid="{D5CDD505-2E9C-101B-9397-08002B2CF9AE}" pid="4" name="BuildNumberEdited"><vt:i4>1075461591</vt:i4></property>' +
+  '<property fmtid="{D5CDD505-2E9C-101B-9397-08002B2CF9AE}" pid="5" name="IsMetric"><vt:bool>false</vt:bool></property>' +
+  "</Properties>";
 
 // --- Master geometry (inches; Visio's default page units) -------------------
-const SHAPE_W = 2.2; // master rectangle width
+const SHAPE_W = 2.25; // master rectangle width (matches the reference ~2.25in)
 const PORT_ROW = 0.28; // vertical pitch between port rows
-const TITLE_BAND = 0.45; // height reserved for the title band
+const TITLE_BAND = 0.5; // height reserved for the title band
 const PAD = 0.25;
 
 function shapeHeight(termCount: number): number {
@@ -182,147 +232,221 @@ function shapeHeight(termCount: number): number {
 }
 
 /**
- * Build the <MasterContents> XML for one device master. The single <Shape> is a
- * rectangle (LocPin at its centre) carrying the device title + port labels as
- * text, and one connection point per physical connector. Inputs land on the
- * left edge, outputs/bidirectional on the right edge, evenly spaced by Y, each
- * with a Prompt cell naming the port.
+ * Build the <MasterContents> XML for one device master. The master content is a
+ * single top-level Group shape (matching the reference, where each device master
+ * is a Group). The Group carries:
+ *   * a <Section N='Connection'> — one Row per physical connector, inputs on the
+ *     left edge (X=0), outputs/bidirectional on the right edge (X=Width), evenly
+ *     spaced by Y below the title band, each with a Prompt naming the port; and
+ *   * a child <Shape Type='Shape'> with the rectangle <Section N='Geometry'> and
+ *     the <Text> (title + one line per port).
+ * All shapes use the Normal style (Line/Fill/Text style 3 from document.xml).
  */
-function masterContentsXml(view: DeviceView): { xml: string; height: number; portCount: number } {
+function masterContentsXml(view: DeviceView): { xml: string; width: number; height: number } {
   const terms = expandConnectors(view);
   const h = shapeHeight(terms.length);
+  const w = SHAPE_W;
+  const groupUid = deterministicGuid(`group:${deviceTitle(view.device)}`);
+  const childUid = deterministicGuid(`child:${deviceTitle(view.device)}`);
 
   const parts: string[] = [];
-  parts.push(XML_DECL);
+  parts.push(XML_DECL.trimEnd() + "\n");
   parts.push(
-    '<MasterContents xmlns="http://schemas.microsoft.com/office/visio/2012/main" ' +
-      'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xml:space="preserve">'
+    "<MasterContents xmlns='http://schemas.microsoft.com/office/visio/2012/main' " +
+      "xmlns:r='http://schemas.openxmlformats.org/officeDocument/2006/relationships' xml:space='preserve'>"
   );
   parts.push("<Shapes>");
-  parts.push(`<Shape ID="1" Type="Shape" LineStyle="0" FillStyle="0" TextStyle="0">`);
-  // Shape transform: pin at the rectangle centre.
-  parts.push(`<Cell N="PinX" V="${(SHAPE_W / 2).toFixed(4)}"/>`);
-  parts.push(`<Cell N="PinY" V="${(h / 2).toFixed(4)}"/>`);
-  parts.push(`<Cell N="Width" V="${SHAPE_W.toFixed(4)}"/>`);
-  parts.push(`<Cell N="Height" V="${h.toFixed(4)}"/>`);
-  parts.push(`<Cell N="LocPinX" V="${(SHAPE_W / 2).toFixed(4)}"/>`);
-  parts.push(`<Cell N="LocPinY" V="${(h / 2).toFixed(4)}"/>`);
-  // Rectangle geometry (closed path).
+
+  // Top-level Group shape (the draggable master body).
   parts.push(
-    '<Section N="Geometry" IX="0">' +
-      '<Cell N="NoFill" V="0"/><Cell N="NoLine" V="0"/>' +
-      '<Row T="MoveTo" IX="1"><Cell N="X" V="0"/><Cell N="Y" V="0"/></Row>' +
-      `<Row T="LineTo" IX="2"><Cell N="X" V="${SHAPE_W.toFixed(4)}"/><Cell N="Y" V="0"/></Row>` +
-      `<Row T="LineTo" IX="3"><Cell N="X" V="${SHAPE_W.toFixed(4)}"/><Cell N="Y" V="${h.toFixed(4)}"/></Row>` +
-      `<Row T="LineTo" IX="4"><Cell N="X" V="0"/><Cell N="Y" V="${h.toFixed(4)}"/></Row>` +
-      '<Row T="LineTo" IX="5"><Cell N="X" V="0"/><Cell N="Y" V="0"/></Row>' +
-      "</Section>"
+    `<Shape ID='1' Type='Group' LineStyle='3' FillStyle='3' TextStyle='3' UniqueID='${groupUid}'>`
   );
-  // Connection points: one per physical connector. N attribute values per the
-  // Visio XML reference (Connection Row): X, Y, DirX, DirY, Type, Prompt.
-  // Type=0 = inward connection point. The Prompt names the port for identification.
+  parts.push(`<Cell N='PinX' V='${(w / 2).toFixed(6)}'/>`);
+  parts.push(`<Cell N='PinY' V='${(h / 2).toFixed(6)}'/>`);
+  parts.push(`<Cell N='Width' V='${w.toFixed(6)}'/>`);
+  parts.push(`<Cell N='Height' V='${h.toFixed(6)}'/>`);
+  parts.push(`<Cell N='LocPinX' V='${(w / 2).toFixed(6)}'/>`);
+  parts.push(`<Cell N='LocPinY' V='${(h / 2).toFixed(6)}'/>`);
+  parts.push("<Cell N='Angle' V='0'/>");
+  parts.push("<Cell N='FlipX' V='0'/>");
+  parts.push("<Cell N='FlipY' V='0'/>");
+  parts.push("<Cell N='ResizeMode' V='0'/>");
+
+  // Connection points: one Row per physical connector (T='Connection', IX from 0,
+  // matching the reference). Inputs left, outputs/bidirectional right.
   if (terms.length > 0) {
-    parts.push('<Section N="Connection">');
+    parts.push("<Section N='Connection'>");
     for (let i = 0; i < terms.length; i++) {
       const t = terms[i];
-      // Even Y distribution down the rectangle body (below the title band).
       const y = h - TITLE_BAND - (i + 0.5) * PORT_ROW;
       const onLeft = t.direction === "input";
-      const x = onLeft ? 0 : SHAPE_W;
+      const x = onLeft ? 0 : w;
       const dirX = onLeft ? -1 : 1; // alignment vector points outward from the edge
       parts.push(
-        `<Row IX="${i + 1}">` +
-          `<Cell N="X" V="${x.toFixed(4)}"/>` +
-          `<Cell N="Y" V="${y.toFixed(4)}"/>` +
-          `<Cell N="DirX" V="${dirX}"/>` +
-          `<Cell N="DirY" V="0"/>` +
-          `<Cell N="Type" V="0"/>` +
-          `<Cell N="Prompt" V="${xml(t.label)}" U="STR"/>` +
+        `<Row T='Connection' IX='${i}'>` +
+          `<Cell N='X' V='${x.toFixed(6)}'/>` +
+          `<Cell N='Y' V='${y.toFixed(6)}'/>` +
+          `<Cell N='DirX' V='${dirX}'/>` +
+          `<Cell N='DirY' V='0'/>` +
+          `<Cell N='Type' V='0'/>` +
+          `<Cell N='AutoGen' V='0'/>` +
+          `<Cell N='Prompt' V='${xml(t.label)}'/>` +
           "</Row>"
       );
     }
     parts.push("</Section>");
   }
+
+  // Child shape: the rectangle body + the text label.
+  parts.push("<Shapes>");
+  parts.push(
+    `<Shape ID='2' Type='Shape' LineStyle='3' FillStyle='3' TextStyle='3' UniqueID='${childUid}'>`
+  );
+  parts.push(`<Cell N='PinX' V='${(w / 2).toFixed(6)}'/>`);
+  parts.push(`<Cell N='PinY' V='${(h / 2).toFixed(6)}'/>`);
+  parts.push(`<Cell N='Width' V='${w.toFixed(6)}'/>`);
+  parts.push(`<Cell N='Height' V='${h.toFixed(6)}'/>`);
+  parts.push(`<Cell N='LocPinX' V='${(w / 2).toFixed(6)}'/>`);
+  parts.push(`<Cell N='LocPinY' V='${(h / 2).toFixed(6)}'/>`);
+  parts.push("<Cell N='Angle' V='0'/>");
+  parts.push("<Cell N='FlipX' V='0'/>");
+  parts.push("<Cell N='FlipY' V='0'/>");
+  // Rectangle geometry (closed path), matching the reference's Geometry cell set.
+  parts.push(
+    "<Section N='Geometry' IX='0'>" +
+      "<Cell N='NoFill' V='0'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/>" +
+      "<Cell N='NoSnap' V='0'/><Cell N='NoQuickDrag' V='0'/>" +
+      "<Row T='MoveTo' IX='1'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>" +
+      `<Row T='LineTo' IX='2'><Cell N='X' V='${w.toFixed(6)}'/><Cell N='Y' V='0'/></Row>` +
+      `<Row T='LineTo' IX='3'><Cell N='X' V='${w.toFixed(6)}'/><Cell N='Y' V='${h.toFixed(6)}'/></Row>` +
+      `<Row T='LineTo' IX='4'><Cell N='X' V='0'/><Cell N='Y' V='${h.toFixed(6)}'/></Row>` +
+      "<Row T='LineTo' IX='5'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>" +
+      "</Section>"
+  );
   // Shape text: title on the first line, one port label per following line.
   const lines = [deviceTitle(view.device)];
   for (const t of terms) lines.push(`${t.label} (${portTypeLabel(t)})`);
   parts.push(`<Text>${xml(lines.join("\n"))}</Text>`);
   parts.push("</Shape>");
-  parts.push("</Shapes>");
+  parts.push("</Shapes>"); // close child shapes
+
+  parts.push("</Shape>"); // close group
+  parts.push("</Shapes>"); // close top-level shapes
   parts.push("</MasterContents>");
 
-  return { xml: parts.join(""), height: h, portCount: terms.length };
+  return { xml: parts.join(""), width: w, height: h };
 }
 
 /**
- * Build a simple text-only master for a cable (no connector geometry). Cables in
- * ODIO are bodies, not port-bearing devices, so they become a labelled box
- * master with no connection points. (Design choice: a cable is still draggable
- * as a master so the stencil documents it, but it is not a wiring terminal.)
+ * Build a text-only master for a cable (no connector geometry). Cables in ODIO
+ * are bodies, not port-bearing devices, so they become a labelled box master
+ * (a Group with a single rectangle child, no connection points).
  */
-function cableMasterContentsXml(label: string): { xml: string } {
+function cableMasterContentsXml(label: string): { xml: string; width: number; height: number } {
   const w = 3.0;
-  const h = 0.4;
+  const h = 0.5;
+  const groupUid = deterministicGuid(`group:${label}`);
+  const childUid = deterministicGuid(`child:${label}`);
   const parts: string[] = [];
-  parts.push(XML_DECL);
+  parts.push(XML_DECL.trimEnd() + "\n");
   parts.push(
-    '<MasterContents xmlns="http://schemas.microsoft.com/office/visio/2012/main" ' +
-      'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xml:space="preserve">'
+    "<MasterContents xmlns='http://schemas.microsoft.com/office/visio/2012/main' " +
+      "xmlns:r='http://schemas.openxmlformats.org/officeDocument/2006/relationships' xml:space='preserve'>"
   );
   parts.push("<Shapes>");
-  parts.push(`<Shape ID="1" Type="Shape" LineStyle="0" FillStyle="0" TextStyle="0">`);
-  parts.push(`<Cell N="PinX" V="${(w / 2).toFixed(4)}"/>`);
-  parts.push(`<Cell N="PinY" V="${(h / 2).toFixed(4)}"/>`);
-  parts.push(`<Cell N="Width" V="${w.toFixed(4)}"/>`);
-  parts.push(`<Cell N="Height" V="${h.toFixed(4)}"/>`);
-  parts.push(`<Cell N="LocPinX" V="${(w / 2).toFixed(4)}"/>`);
-  parts.push(`<Cell N="LocPinY" V="${(h / 2).toFixed(4)}"/>`);
   parts.push(
-    '<Section N="Geometry" IX="0">' +
-      '<Cell N="NoFill" V="0"/><Cell N="NoLine" V="0"/>' +
-      '<Row T="MoveTo" IX="1"><Cell N="X" V="0"/><Cell N="Y" V="0"/></Row>' +
-      `<Row T="LineTo" IX="2"><Cell N="X" V="${w.toFixed(4)}"/><Cell N="Y" V="0"/></Row>` +
-      `<Row T="LineTo" IX="3"><Cell N="X" V="${w.toFixed(4)}"/><Cell N="Y" V="${h.toFixed(4)}"/></Row>` +
-      `<Row T="LineTo" IX="4"><Cell N="X" V="0"/><Cell N="Y" V="${h.toFixed(4)}"/></Row>` +
-      '<Row T="LineTo" IX="5"><Cell N="X" V="0"/><Cell N="Y" V="0"/></Row>' +
+    `<Shape ID='1' Type='Group' LineStyle='3' FillStyle='3' TextStyle='3' UniqueID='${groupUid}'>`
+  );
+  parts.push(`<Cell N='PinX' V='${(w / 2).toFixed(6)}'/>`);
+  parts.push(`<Cell N='PinY' V='${(h / 2).toFixed(6)}'/>`);
+  parts.push(`<Cell N='Width' V='${w.toFixed(6)}'/>`);
+  parts.push(`<Cell N='Height' V='${h.toFixed(6)}'/>`);
+  parts.push(`<Cell N='LocPinX' V='${(w / 2).toFixed(6)}'/>`);
+  parts.push(`<Cell N='LocPinY' V='${(h / 2).toFixed(6)}'/>`);
+  parts.push("<Cell N='Angle' V='0'/><Cell N='FlipX' V='0'/><Cell N='FlipY' V='0'/><Cell N='ResizeMode' V='0'/>");
+  parts.push("<Shapes>");
+  parts.push(
+    `<Shape ID='2' Type='Shape' LineStyle='3' FillStyle='3' TextStyle='3' UniqueID='${childUid}'>`
+  );
+  parts.push(`<Cell N='PinX' V='${(w / 2).toFixed(6)}'/>`);
+  parts.push(`<Cell N='PinY' V='${(h / 2).toFixed(6)}'/>`);
+  parts.push(`<Cell N='Width' V='${w.toFixed(6)}'/>`);
+  parts.push(`<Cell N='Height' V='${h.toFixed(6)}'/>`);
+  parts.push(`<Cell N='LocPinX' V='${(w / 2).toFixed(6)}'/>`);
+  parts.push(`<Cell N='LocPinY' V='${(h / 2).toFixed(6)}'/>`);
+  parts.push("<Cell N='Angle' V='0'/><Cell N='FlipX' V='0'/><Cell N='FlipY' V='0'/>");
+  parts.push(
+    "<Section N='Geometry' IX='0'>" +
+      "<Cell N='NoFill' V='0'/><Cell N='NoLine' V='0'/><Cell N='NoShow' V='0'/>" +
+      "<Cell N='NoSnap' V='0'/><Cell N='NoQuickDrag' V='0'/>" +
+      "<Row T='MoveTo' IX='1'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>" +
+      `<Row T='LineTo' IX='2'><Cell N='X' V='${w.toFixed(6)}'/><Cell N='Y' V='0'/></Row>` +
+      `<Row T='LineTo' IX='3'><Cell N='X' V='${w.toFixed(6)}'/><Cell N='Y' V='${h.toFixed(6)}'/></Row>` +
+      `<Row T='LineTo' IX='4'><Cell N='X' V='0'/><Cell N='Y' V='${h.toFixed(6)}'/></Row>` +
+      "<Row T='LineTo' IX='5'><Cell N='X' V='0'/><Cell N='Y' V='0'/></Row>" +
       "</Section>"
   );
   parts.push(`<Text>${xml(label)}</Text>`);
   parts.push("</Shape>");
   parts.push("</Shapes>");
+  parts.push("</Shape>");
+  parts.push("</Shapes>");
   parts.push("</MasterContents>");
-  return { xml: parts.join("") };
+  return { xml: parts.join(""), width: w, height: h };
 }
 
 /** One master, accumulated before serialisation into masters.xml + master#.xml. */
 interface MasterEntry {
   /** 1-based master index; drives master<index>.xml and the rels rId. */
   index: number;
-  /** Visio Master ID (== index here). */
+  /** Visio Master ID. */
   id: number;
   /** Master NameU/Name shown in the stencil pane. */
   name: string;
   /** The master#.xml body. */
   contents: string;
+  /** Master page width (inches). */
+  width: number;
+  /** Master page height (inches). */
+  height: number;
+}
+
+// masters.xml — replicates the reference <Master> attribute set + a PageSheet
+// sized to the shape + a Layer section + the <Rel>. Static <Icon> is omitted in
+// favour of IconUpdate='1' (Visio regenerates the preview from the shape).
+function masterXml(e: MasterEntry): string {
+  const uniqueId = deterministicGuid(`unique:${e.index}:${e.name}`);
+  const baseId = deterministicGuid(`base:${e.index}:${e.name}`);
+  return (
+    `<Master ID='${e.id}' NameU='${xml(e.name)}' IsCustomNameU='1' Name='${xml(e.name)}' IsCustomName='1' ` +
+    `Prompt='' IconSize='1' AlignName='2' MatchByName='0' IconUpdate='1' ` +
+    `UniqueID='${uniqueId}' BaseID='${baseId}' PatternFlags='0' Hidden='0' MasterType='2'>` +
+    `<PageSheet LineStyle='0' FillStyle='0' TextStyle='0'>` +
+    `<Cell N='PageWidth' V='${e.width.toFixed(6)}'/>` +
+    `<Cell N='PageHeight' V='${e.height.toFixed(6)}'/>` +
+    `<Cell N='ShdwOffsetX' V='0.125'/><Cell N='ShdwOffsetY' V='-0.125'/>` +
+    `<Cell N='PageScale' V='1' U='IN_F'/><Cell N='DrawingScale' V='1' U='IN_F'/>` +
+    `<Cell N='DrawingSizeType' V='4'/><Cell N='DrawingScaleType' V='0'/><Cell N='InhibitSnap' V='0'/>` +
+    `<Cell N='PageLockReplace' V='0' U='BOOL'/><Cell N='PageLockDuplicate' V='0' U='BOOL'/>` +
+    `<Cell N='UIVisibility' V='0'/><Cell N='ShdwType' V='0'/><Cell N='ShdwObliqueAngle' V='0'/>` +
+    `<Cell N='ShdwScaleFactor' V='1'/><Cell N='DrawingResizeType' V='1'/>` +
+    `<Section N='Layer'><Row IX='0'>` +
+    `<Cell N='Name' V='0'/><Cell N='Color' V='#000000'/><Cell N='Status' V='0'/><Cell N='Visible' V='1'/>` +
+    `<Cell N='Print' V='1'/><Cell N='Active' V='0'/><Cell N='Lock' V='0'/><Cell N='Snap' V='1'/>` +
+    `<Cell N='Glue' V='1'/><Cell N='NameUniv' V='0'/><Cell N='ColorTrans' V='0'/>` +
+    `</Row></Section>` +
+    `</PageSheet>` +
+    `<Rel r:id='rId${e.index}'/>` +
+    `</Master>`
+  );
 }
 
 function buildMastersXml(entries: MasterEntry[]): string {
-  const masters: string[] = [];
-  for (const e of entries) {
-    // Each <Master> references its master#.xml part via <Rel r:id>. The Rel id
-    // maps to masters.xml.rels below (rId<index>).
-    masters.push(
-      `<Master ID="${e.id}" NameU="${xml(e.name)}" Name="${xml(e.name)}" ` +
-        `IconUpdate="0" MatchByName="0" Hidden="0" MasterType="0">` +
-        `<Rel r:id="rId${e.index}"/>` +
-        "</Master>"
-    );
-  }
   return (
-    XML_DECL +
-    '<Masters xmlns="http://schemas.microsoft.com/office/visio/2012/main" ' +
-    'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xml:space="preserve">' +
-    masters.join("") +
+    "<?xml version='1.0' encoding='utf-8' ?>\r\n" +
+    "<Masters xmlns='http://schemas.microsoft.com/office/visio/2012/main' " +
+    "xmlns:r='http://schemas.openxmlformats.org/officeDocument/2006/relationships' xml:space='preserve'>" +
+    entries.map(masterXml).join("") +
     "</Masters>"
   );
 }
@@ -364,9 +488,9 @@ function cableLabel(cable: CableBody, qty: number): string {
 /**
  * The Microsoft Visio adapter. Validates the input via the SDK, then builds a
  * STENCIL (.vssx) OPC zip with one MASTER shape per device — a labelled
- * rectangle with one connection point per physical connector. For a bundle,
- * one master is emitted per leaf device; cables become simple text-only masters
- * (no connection points). Returns binary `bytes`.
+ * rectangle (Group) with one connection point per physical connector. For a
+ * bundle, one master is emitted per leaf device; cables become text-only
+ * masters. Returns binary `bytes`.
  */
 export const VisioAdapter: Adapter = {
   id: "visio",
@@ -388,30 +512,27 @@ export const VisioAdapter: Adapter = {
     let fileBase: string;
 
     const usedNames = new Set<string>();
-    const addDeviceMaster = (view: DeviceView) => {
-      const { xml: contents } = masterContentsXml(view);
-      let name = deviceTitle(view.device);
-      // Disambiguate duplicate names (e.g. multiple identical leaf devices).
+    const uniqueName = (base: string): string => {
+      let name = base;
       if (usedNames.has(name)) {
         let n = 2;
         while (usedNames.has(`${name} (${n})`)) n++;
         name = `${name} (${n})`;
       }
       usedNames.add(name);
+      return name;
+    };
+    const addDeviceMaster = (view: DeviceView) => {
+      const { xml: contents, width, height } = masterContentsXml(view);
+      const name = uniqueName(deviceTitle(view.device));
       const index = masters.length + 1;
-      masters.push({ index, id: index, name, contents });
+      masters.push({ index, id: index, name, contents, width, height });
     };
     const addCableMaster = (label: string) => {
-      const { xml: contents } = cableMasterContentsXml(label);
-      let name = label;
-      if (usedNames.has(name)) {
-        let n = 2;
-        while (usedNames.has(`${name} (${n})`)) n++;
-        name = `${name} (${n})`;
-      }
-      usedNames.add(name);
+      const { xml: contents, width, height } = cableMasterContentsXml(label);
+      const name = uniqueName(label);
       const index = masters.length + 1;
-      masters.push({ index, id: index, name, contents });
+      masters.push({ index, id: index, name, contents, width, height });
     };
 
     if (routed.kind === "bundle") {
@@ -453,15 +574,16 @@ export const VisioAdapter: Adapter = {
       fileBase = fileSlug(`${view.device.manufacturer}-${view.device.model}`);
     }
 
-    // Assemble the OPC stencil package. fflate's zipSync is synchronous,
-    // matching the synchronous Adapter contract.
+    // Assemble the OPC stencil package, matching the reference part set exactly.
     const pkg: Zippable = {
       "[Content_Types].xml": strToU8(buildContentTypes(masters.length)),
       "_rels/.rels": strToU8(ROOT_RELS),
       "docProps/core.xml": strToU8(CORE_XML),
-      "docProps/app.xml": strToU8(APP_XML),
+      "docProps/app.xml": strToU8(buildAppXml(masters.map((m) => m.name))),
+      "docProps/custom.xml": strToU8(CUSTOM_XML),
       "visio/document.xml": strToU8(DOCUMENT_XML),
       "visio/_rels/document.xml.rels": strToU8(DOCUMENT_RELS),
+      "visio/pages/pages.xml": strToU8(PAGES_XML),
       "visio/masters/masters.xml": strToU8(buildMastersXml(masters)),
       "visio/masters/_rels/masters.xml.rels": strToU8(buildMastersRels(masters)),
       "visio/windows.xml": strToU8(WINDOWS_XML)
