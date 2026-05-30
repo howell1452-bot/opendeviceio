@@ -482,11 +482,22 @@ def ingest_directory(
     docs = discover_documents(input_dir)
 
     # Ingest all docs to text, assigning a unique slug per doc (dedupe collisions).
+    # A single unreadable/corrupt file (e.g. an HTML page saved with a .pdf name,
+    # or a truncated download) must not abort an otherwise-good batch — log it and
+    # move on. A missing PDF *backend*, however, is a setup error worth surfacing.
     slugs: dict[str, ExtractedText] = {}
     used: set[str] = set()
     order: list[str] = []
+    unreadable: list[str] = []
     for path in docs:
-        extracted = ingest(path)
+        try:
+            extracted = ingest(path)
+        except MissingExtraError:
+            raise
+        except Exception as exc:  # noqa: BLE001 - per-file isolation is the point
+            unreadable.append(path.name)
+            print(f"  skip (unreadable): {path.name}  ({type(exc).__name__}: {exc})", flush=True)
+            continue
         slug = slugify(path.name)
         if slug in used:
             n = 2
@@ -496,6 +507,9 @@ def ingest_directory(
         used.add(slug)
         slugs[slug] = extracted
         order.append(slug)
+
+    if unreadable:
+        print(f"Skipped {len(unreadable)} unreadable file(s).", flush=True)
 
     # Optionally drop datasheets that mark the product discontinued (status
     # banners / EOL notices), before any extraction is paid for.
