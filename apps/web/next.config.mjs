@@ -1,16 +1,18 @@
 import { fileURLToPath } from "node:url";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+// The monorepo root (npm workspaces hoist node_modules here). Server functions must
+// trace from the workspace root so Next's own runtime (next/dist/*) and the workspace
+// SDK are bundled — pinning to the app dir caused "Cannot find module 'next/dist/...'".
+const monorepoRoot = join(__dirname, "..", "..");
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // The SDK ships as ESM+CJS but is consumed from source-shaped dist; transpile it
   // so Next can bundle it for both server and client where used.
   transpilePackages: ["@opendeviceio/sdk"],
-  // The monorepo has multiple lockfiles; pin tracing to this app to silence the
-  // inferred-workspace-root warning.
-  outputFileTracingRoot: __dirname,
+  outputFileTracingRoot: monorepoRoot,
   async headers() {
     return [
       {
