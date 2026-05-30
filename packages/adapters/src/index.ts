@@ -8,5 +8,15 @@ export {
   mapSignalType
 } from "./mappings.js";
 export { EasySchematicAdapter } from "./easyschematic.js";
-export { DxfAdapter, VisioAdapter, AvcadAdapter } from "./stubs.js";
+export { DxfAdapter } from "./dxf.js";
+export { VisioAdapter } from "./visio.js";
+export { AvcadAdapter } from "./stubs.js";
+export {
+  expandConnectors,
+  expandPort,
+  PRIMARY_DOMAIN_PRIORITY,
+  type ExpandedConnector,
+  type PortDirection,
+  type SignalView
+} from "./ports.js";
 export { adapters, adapterIds, getAdapter } from "./registry.js";

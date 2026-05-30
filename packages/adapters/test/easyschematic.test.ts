@@ -6,8 +6,6 @@ import { fileURLToPath } from "node:url";
 import { parse, type OdioDevice } from "@opendeviceio/sdk";
 import {
   EasySchematicAdapter,
-  DxfAdapter,
-  VisioAdapter,
   AvcadAdapter,
   NotImplementedError,
   type EsBulkImport,
@@ -335,16 +333,6 @@ describe("EasySchematic adapter — specific mappings", () => {
 });
 
 describe("Stub adapters", () => {
-  it("DxfAdapter.export throws NotImplementedError", () => {
-    const device = loadDevice("netgear-m4250-poe.odio.json");
-    expect(() => DxfAdapter.export(device)).toThrow(NotImplementedError);
-  });
-
-  it("VisioAdapter.export throws NotImplementedError", () => {
-    const device = loadDevice("netgear-m4250-poe.odio.json");
-    expect(() => VisioAdapter.export(device)).toThrow(NotImplementedError);
-  });
-
   it("AvcadAdapter.export throws NotImplementedError", () => {
     const device = loadDevice("netgear-m4250-poe.odio.json");
     expect(() => AvcadAdapter.export(device)).toThrow(NotImplementedError);

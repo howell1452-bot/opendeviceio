@@ -140,7 +140,12 @@ function main(): void {
     : join(dirname(inputPath), primary.path);
 
   try {
-    writeFileSync(outPath, primary.content, "utf8");
+    if (primary.bytes) {
+      // Binary target (e.g. VSDX zip): write bytes verbatim, not utf8 text.
+      writeFileSync(outPath, primary.bytes);
+    } else {
+      writeFileSync(outPath, primary.content ?? "", "utf8");
+    }
   } catch (err) {
     process.stderr.write(`Error: cannot write "${outPath}": ${(err as Error).message}\n`);
     process.exit(1);

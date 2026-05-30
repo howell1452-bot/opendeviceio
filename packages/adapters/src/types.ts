@@ -261,8 +261,16 @@ export interface EsExportOptions {
 export interface AdapterFile {
   /** Suggested relative file path (caller decides where to write). */
   path: string;
-  /** File contents. */
-  content: string;
+  /**
+   * Text file contents. Present for text targets (JSON, DXF). Mutually exclusive
+   * with {@link bytes}; exactly one is set.
+   */
+  content?: string;
+  /**
+   * Binary file contents. Present for binary targets (e.g. the VSDX zip package).
+   * Callers MUST write these bytes verbatim (not as utf8 text).
+   */
+  bytes?: Uint8Array;
 }
 
 /** The result of running an adapter over one device. */

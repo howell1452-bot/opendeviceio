@@ -2,7 +2,9 @@
 
 import type { Adapter } from "./types.js";
 import { EasySchematicAdapter } from "./easyschematic.js";
-import { DxfAdapter, VisioAdapter, AvcadAdapter } from "./stubs.js";
+import { DxfAdapter } from "./dxf.js";
+import { VisioAdapter } from "./visio.js";
+import { AvcadAdapter } from "./stubs.js";
 
 /** All registered adapters keyed by their stable id. */
 export const adapters: Readonly<Record<string, Adapter>> = {

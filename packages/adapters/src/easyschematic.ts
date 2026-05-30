@@ -32,50 +32,10 @@ import type {
   EsSignalType
 } from "./types.js";
 import { mapConnector, mapSignalType } from "./mappings.js";
-
-/** Structural view of a signal exposing the fields this adapter reads. */
-interface SignalView {
-  domain: string;
-  transport?: string;
-  direction?: EsDirection;
-  channels?: number;
-  maxResolution?: string;
-  maxRefreshHz?: number;
-  colorDepthBits?: number;
-}
+import { expandConnectors, type ExpandedConnector, type SignalView } from "./ports.js";
 
 function sig(signal: Signal): SignalView {
   return signal as unknown as SignalView;
-}
-
-/** Embedded audio transports that ride a co-located video connector. */
-const EMBEDDED_AUDIO_TRANSPORTS = new Set(["lpcm", "arc", "earc"]);
-
-/**
- * Domain priority for choosing a connector's single PRIMARY signal. EasySchematic
- * models one port = one physical connector with exactly one signalType, so an
- * ODIO port carrying multiple flows must collapse to one. The first present
- * domain in this order wins.
- */
-const PRIMARY_DOMAIN_PRIORITY = ["video", "audio", "control", "network", "data", "power"] as const;
-
-/** Pick the primary signal of an ODIO port by domain priority (first present). */
-function pickPrimary(signals: SignalView[]): SignalView | undefined {
-  for (const domain of PRIMARY_DOMAIN_PRIORITY) {
-    const found = signals.find((s) => s.domain === domain);
-    if (found) return found;
-  }
-  return signals[0];
-}
-
-/**
- * Concise descriptor for a signal in carried-signal notes. Uses the transport
- * when present (e.g. "displayport", "usb-data"), except for the power domain
- * where the broad "power" reads better than transports like "usb-pd"/"dc".
- */
-function signalDescriptor(view: SignalView): string {
-  if (view.domain === "power") return "power";
-  return view.transport ?? view.domain;
 }
 
 /**
@@ -293,7 +253,6 @@ function slug(value: string): string {
 
 interface PortContext {
   poePd: number | undefined;
-  poePse: boolean;
   linkSpeed: string | undefined;
 }
 
@@ -302,125 +261,50 @@ function portContext(port: Port): PortContext {
     .link;
   const poe = link?.poe;
   const isPd = poe?.role === "pd" && typeof poe.classWatts === "number";
-  const isPse = poe?.role === "pse";
   return {
     poePd: isPd ? poe!.classWatts : undefined,
-    poePse: isPse,
     linkSpeed: link?.speed
   };
 }
 
 /**
- * Build the EasySchematic ports for a single ODIO port. EasySchematic models one
- * port = one physical connector with a SINGLE signalType, so we emit exactly ONE
- * ES port per ODIO port INSTANCE (replicated across `count`), NOT one per signal.
- *
- * Each emitted port takes its signalType from a single PRIMARY signal chosen by
- * domain priority (video > audio > control > network > data > power). The other
- * flows carried on the same connector are not lost: they are summarized in the
- * port's `notes` (e.g. "Carries: displayport, usb-data, power"). Embedded audio
- * (lpcm/arc/earc on a video connector) is folded into the same note rather than
- * becoming its own port, as before.
+ * Map a shared {@link ExpandedConnector} terminal to an EasySchematic port.
+ * EasySchematic models one port = one physical connector with a SINGLE
+ * signalType; the shared expander already collapses each ODIO port to one
+ * terminal per physical connector instance, typed by a PRIMARY signal. Here we
+ * map that primary's (domain, transport) to an EsSignalType and the connector to
+ * an EsConnectorType, carry over video capabilities / channel count, and add the
+ * port-level PoE-draw / link-speed context (looked up by source port).
  */
-function expandPort(
-  port: Port,
-  warnings: string[],
-  usedIds: Set<string>
-): EsPort[] {
-  const portId = port.id;
-  const portLabel = port.label;
-  const groupLabel = portLabel ?? port.location?.group ?? portId;
+function toEsPort(term: ExpandedConnector, ctx: PortContext, warnings: string[]): EsPort {
   const connectorType: EsConnectorType = mapConnector(
-    port.connector,
-    port.connectorOther,
+    term.connector,
+    term.connectorOther,
     warnings,
-    portId
+    term.id
   );
-  const ctx = portContext(port);
-  const count = typeof port.count === "number" && port.count >= 1 ? port.count : 1;
-
-  const signals = port.signals.map(sig);
-
-  // The single primary signal that types this connector.
-  const primary = pickPrimary(signals);
-  const hasVideo = primary?.domain === "video" || signals.some((s) => s.domain === "video");
-
-  // Embedded audio: audio flows on lpcm/arc/earc that ride a co-located video
-  // connector. These were never separate ports; we fold them into the note.
-  const embeddedAudio = hasVideo
-    ? signals.filter(
-        (s) => s.domain === "audio" && EMBEDDED_AUDIO_TRANSPORTS.has(s.transport ?? "")
-      )
-    : [];
-
-  const signalType: EsSignalType = primary
-    ? mapSignalType(primary.domain, primary.transport, warnings, portId)
+  const signalType: EsSignalType = term.primaryDomain
+    ? mapSignalType(term.primaryDomain, term.primaryTransport, warnings, term.id)
     : "custom";
+  const direction = mapDirection(term.direction, "bidirectional");
 
-  // The other (non-primary) signals carried on this connector, for the note.
-  const carried = signals
-    .filter((s) => s !== primary && !embeddedAudio.includes(s))
-    .map(signalDescriptor);
-  // Distinct, order-preserving.
-  const carriedDistinct = carried.filter((d, i, arr) => arr.indexOf(d) === i);
+  const esPort: EsPort = {
+    id: term.id,
+    label: term.label,
+    signalType,
+    direction,
+    connectorType,
+    section: term.section
+  };
 
-  const embeddedNote =
-    embeddedAudio.length > 0
-      ? `Embedded audio: ${embeddedAudio
-          .map((s) => s.transport ?? "audio")
-          .join(", ")} (carried on the video connector).`
-      : undefined;
-  const carriesNote = carriedDistinct.length > 0 ? `Carries: ${carriedDistinct.join(", ")}` : undefined;
+  const caps = term.primary ? buildCapabilities(term.primary) : undefined;
+  if (caps) esPort.capabilities = caps;
+  if (typeof term.channels === "number") esPort.channelCount = term.channels;
+  if (typeof ctx.poePd === "number") esPort.poeDrawW = ctx.poePd;
+  if (ctx.linkSpeed && term.primaryDomain === "network") esPort.linkSpeed = ctx.linkSpeed;
+  if (term.notes) esPort.notes = term.notes;
 
-  // Note shared by every replicated unit: existing port note + the other carried
-  // flows + any embedded-audio fold-in.
-  const noteParts: string[] = [];
-  if (typeof port.notes === "string" && port.notes.length > 0) noteParts.push(port.notes);
-  if (carriesNote) noteParts.push(carriesNote);
-  if (embeddedNote) noteParts.push(embeddedNote);
-  const notes = noteParts.length > 0 ? noteParts.join(" ") : undefined;
-
-  const caps = primary ? buildCapabilities(primary) : undefined;
-  const channelCount =
-    primary && typeof primary.channels === "number" && primary.channels > 1
-      ? primary.channels
-      : undefined;
-  // Direction: prefer the ODIO port direction, fall back to the primary signal's.
-  const direction = mapDirection(port.direction, primary?.direction ?? "bidirectional");
-
-  const result: EsPort[] = [];
-
-  for (let unit = 1; unit <= count; unit++) {
-    const unitSuffix = count > 1 ? ` ${unit}` : "";
-    const label = `${portLabel ?? portId}${unitSuffix}`;
-
-    const baseId = `${slug(portId)}${count > 1 ? `-${unit}` : ""}`;
-    let id = baseId;
-    let dedupe = 1;
-    while (usedIds.has(id)) {
-      id = `${baseId}-${dedupe++}`;
-    }
-    usedIds.add(id);
-
-    const esPort: EsPort = {
-      id,
-      label,
-      signalType,
-      direction,
-      connectorType,
-      section: groupLabel
-    };
-
-    if (caps) esPort.capabilities = caps;
-    if (typeof channelCount === "number") esPort.channelCount = channelCount;
-    if (typeof ctx.poePd === "number") esPort.poeDrawW = ctx.poePd;
-    if (ctx.linkSpeed && primary?.domain === "network") esPort.linkSpeed = ctx.linkSpeed;
-    if (notes) esPort.notes = notes;
-
-    result.push(esPort);
-  }
-
-  return result;
+  return esPort;
 }
 
 /**
@@ -456,11 +340,25 @@ function buildTemplate(
   const modelNumber = d.model;
   const label = `${manufacturer} ${modelNumber}`.trim();
 
-  const usedIds = new Set<string>();
-  const ports: EsPort[] = [];
+  // Port-level PoE/link context keyed by the source port id slug, used to
+  // annotate each expanded terminal (the shared expander does not carry link
+  // details). Terminal ids are `slug(portId)` optionally suffixed with
+  // `-<unit>` / `-<dedupe>`, so we match the longest known slug prefix.
+  const slugToCtx = new Map<string, PortContext>();
   for (const port of device.ports) {
-    ports.push(...expandPort(port, warnings, usedIds));
+    slugToCtx.set(slug(port.id), portContext(port));
   }
+  const ports: EsPort[] = expandConnectors(device).map((term) => {
+    let ctx: PortContext = { poePd: undefined, linkSpeed: undefined };
+    let bestLen = -1;
+    for (const [s, c] of slugToCtx) {
+      if ((term.id === s || term.id.startsWith(`${s}-`)) && s.length > bestLen) {
+        ctx = c;
+        bestLen = s.length;
+      }
+    }
+    return toEsPort(term, ctx, warnings);
+  });
 
   const consumption = device.power?.consumptionWatts;
   const powerDrawW = consumption?.typical ?? consumption?.max;

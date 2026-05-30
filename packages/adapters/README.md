@@ -3,10 +3,18 @@
 Adapters that convert validated [OpenDeviceIO](https://opendeviceio.org) (`.odio.json`)
 documents into design-tool import formats.
 
-The first and only fully-implemented target is **EasySchematic**. AutoCAD-DXF,
-Microsoft Visio, and AVCAD are registered **stubs** behind the same `Adapter`
-interface — calling their `export()` throws `NotImplementedError` with a
-description of the intended output.
+Three targets are fully implemented — **EasySchematic**, **AutoCAD DXF**, and
+**Microsoft Visio**. **AVCAD** is a registered **stub** behind the same
+`Adapter` interface (calling its `export()` throws `NotImplementedError`).
+
+The DXF and Visio targets render a device as a **schematic block: a labeled
+rectangle with one labeled I/O terminal per physical connector**. All three
+implemented adapters share a single per-connector model (`src/ports.ts`,
+`expandConnectors`): each ODIO port is count-expanded into one terminal per
+physical connector, typed by a **primary** signal chosen by domain priority
+(video > audio > control > network > data > power); the remaining concurrent
+flows are summarized in the terminal's notes rather than fanned out. This keeps
+the three exporters in agreement about exactly which ports a device exposes.
 
 ## What it does
 
@@ -34,15 +42,60 @@ The adapter accepts a **device**, a **bundle (kit/assembly)**, or a standalone
   warning.
 - **Cable** — wrapped as a single cable-accessory template.
 
-One `DeviceTemplate` is produced per ODIO device. For every ODIO port the
-adapter emits one EasySchematic port per carried signal (so a single network
-connector carrying Dante + AES67 + control becomes three EasySchematic ports),
-replicating across `port.count`. Connectors and per-signal transports are mapped
-to EasySchematic's `ConnectorType` / `SignalType` enums via exhaustive tables;
-any value outside the known set falls back to `other` / `custom` and records a
-warning. Embedded HDMI audio (LPCM/ARC/eARC riding a video connector) is noted on
-the video port rather than emitted as a separate port. Power, thermal (BTU/h),
-PoE budget/draw, dimensions, and weight (g→kg) are carried onto the template.
+One `DeviceTemplate` is produced per ODIO device. Ports follow the shared
+per-connector model (`expandConnectors`): one EasySchematic port per physical
+connector instance (count-expanded), typed by the connector's **primary** signal
+(domain priority video > audio > control > network > data > power); the other
+concurrent flows are summarized in the port's `notes` (e.g.
+`Carries: usb-data, power`) rather than fanned out into extra ports. Connectors
+and the primary transport are mapped to EasySchematic's `ConnectorType` /
+`SignalType` enums via exhaustive tables; any value outside the known set falls
+back to `other` / `custom` and records a warning. Embedded HDMI audio
+(LPCM/ARC/eARC riding a video connector) is noted on the video port rather than
+emitted as a separate port. Power, thermal (BTU/h), PoE budget/draw, dimensions,
+and weight (g→kg) are carried onto the template.
+
+## AutoCAD DXF target (`--target dxf`)
+
+Emits a valid ASCII DXF (AutoCAD R12/2000-compatible) per document. Each device
+is defined as a reusable **BLOCK** in the `BLOCKS` section and dropped into model
+space with an `INSERT` in `ENTITIES`, so it behaves as a CAD block. Each block
+is a titled rectangle (`<manufacturer> <model>`) with, per physical connector, a
+short terminal stub `LINE`, a small terminal `CIRCLE` at the edge, and a `TEXT`
+label of the form `<port label> (<signalType-or-connector>)`. Inputs sit on the
+left edge; outputs and bidirectional ports on the right; rows are distributed
+evenly down the body. A minimal `HEADER` and a `TABLES` section with two layers
+(`DEVICE`, `PORTS`) are included so the file opens cleanly. The DXF text is
+hand-rolled (no dependency). **Bundles** emit one `BLOCK`+`INSERT` per leaf
+device (via `flattenBundle`), laid out in a row; cables are listed as `TEXT`
+annotations beneath the row (a full wiring diagram is out of scope for a block
+library).
+
+## Microsoft Visio target (`--target visio`)
+
+Emits a `.vsdx`, which is an **OPC (zip) package** of XML parts. The adapter
+builds a minimal but well-formed package with all required parts
+(`[Content_Types].xml`, `_rels/.rels`, `docProps/{core,app}.xml`,
+`visio/document.xml`, `visio/_rels/document.xml.rels`,
+`visio/pages/pages.xml`, `visio/pages/_rels/pages.xml.rels`,
+`visio/pages/page1.xml`, `visio/windows.xml`). Each device is a rectangle
+**Shape** titled `<manufacturer> <model>`, with explicit rectangle `Geometry`,
+the port labels rendered in the shape text (`<label> (<type>)`), and one
+`Connection` point per terminal (inputs on the left edge, others on the right)
+so Visio's connector tool can snap wires. **Bundles** place one device shape per
+leaf device on the page (laid out in a row); cables are added as text shapes.
+
+The `.vsdx` is **binary** — the adapter returns the zip as `files[0].bytes`
+(not `content`), and the CLI writes those bytes verbatim.
+
+> **VSDX real-Visio validation caveat.** This is a hand-built minimal package.
+> It targets the documented VSDX (MS-VSDX) schema closely enough to be a valid
+> OPC zip containing every required part, with the device rectangle + labeled
+> ports in the page XML, but it emits explicit shape `Geometry`/`Text` rather
+> than the full Master/stencil machinery a pristine Visio file produces. Like
+> the EasySchematic target before it was validated against the real app,
+> round-tripping cleanly in the actual Microsoft Visio application still needs
+> verification; see the comments in `src/visio.ts`.
 
 ## Install
 
@@ -104,12 +157,14 @@ const { files, warnings } = EasySchematicAdapter.export(device);
 
 ## Status of targets
 
-| Target        | id              | Status            |
-| ------------- | --------------- | ----------------- |
-| EasySchematic | `easyschematic` | Implemented       |
-| AutoCAD DXF   | `dxf`           | Stub (planned)    |
-| Visio         | `visio`         | Stub (planned)    |
-| AVCAD         | `avcad`         | Stub (planned)    |
+| Target        | id              | Status                          |
+| ------------- | --------------- | ------------------------------- |
+| EasySchematic | `easyschematic` | Implemented                     |
+| AutoCAD DXF   | `dxf`           | Implemented (schematic block)   |
+| Visio         | `visio`         | Implemented (schematic block) † |
+| AVCAD         | `avcad`         | Stub (planned)                  |
 
-DXF/Visio/AVCAD throw `NotImplementedError`; their planned output is documented
-in `src/stubs.ts`.
+† The Visio `.vsdx` is a valid OPC package with the device rectangle + labeled
+ports; round-tripping in the real Microsoft Visio app still needs validation
+(see the caveat above). AVCAD throws `NotImplementedError`; its planned output
+is documented in `src/stubs.ts`.
