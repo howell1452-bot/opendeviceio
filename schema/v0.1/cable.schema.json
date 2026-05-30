@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opendeviceio.org/schema/v0.1/cable.schema.json",
+  "title": "OpenDeviceIO Cable",
+  "description": "A cable (often factory-terminated) described by its typed ends and length. Usable as a standalone document or embedded as a bundle component. Reuses the device schema's connector and signal vocabularies.",
+  "type": "object",
+  "required": ["odioVersion", "kind", "id", "cable"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "odioVersion": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?$" },
+    "kind": { "const": "cable" },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*\\/[a-z0-9][a-z0-9._-]*(?:@[a-z0-9][a-z0-9._-]*)?$"
+    },
+    "cable": { "$ref": "#/$defs/cable" },
+    "provenance": { "$ref": "https://opendeviceio.org/schema/v0.1/device.schema.json#/$defs/provenance" }
+  },
+  "patternProperties": { "^x-": {} },
+  "additionalProperties": false,
+
+  "$defs": {
+    "cable": {
+      "type": "object",
+      "description": "The cable body. May be embedded in a bundle component or wrapped as a standalone cable document.",
+      "required": ["ends"],
+      "properties": {
+        "manufacturer": { "type": "string" },
+        "model": { "type": "string", "description": "Cable part number / model." },
+        "sku": { "type": "string" },
+        "label": { "type": "string" },
+        "factoryTerminated": { "type": "boolean", "description": "True if terminated at the factory (vs field-terminated)." },
+        "lengthMeters": { "type": "number", "exclusiveMinimum": 0 },
+        "lengthLabel": { "type": "string", "description": "Length as printed, e.g. '6 ft (1.8 m)'." },
+        "shielded": { "type": "boolean" },
+        "plenum": { "type": "boolean" },
+        "carries": {
+          "type": "array",
+          "description": "Signal(s) the cable conveys end to end (reuses the device signal model).",
+          "items": { "$ref": "https://opendeviceio.org/schema/v0.1/device.schema.json#/$defs/signal" }
+        },
+        "ends": {
+          "type": "array",
+          "description": "The cable's terminations. Usually 2; more for breakout/snake cables.",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/cableEnd" }
+        },
+        "notes": { "type": "string" }
+      },
+      "patternProperties": { "^x-": {} },
+      "additionalProperties": false
+    },
+
+    "cableEnd": {
+      "type": "object",
+      "required": ["connector"],
+      "properties": {
+        "id": { "type": "string" },
+        "label": { "type": "string", "description": "e.g. 'Display end', 'To RX', 'A', 'B'." },
+        "connector": { "$ref": "https://opendeviceio.org/schema/v0.1/device.schema.json#/$defs/connector" },
+        "connectorOther": { "type": "string" },
+        "gender": { "type": "string", "enum": ["male", "female"] }
+      },
+      "patternProperties": { "^x-": {} },
+      "additionalProperties": false,
+      "allOf": [
+        { "if": { "properties": { "connector": { "const": "other" } }, "required": ["connector"] }, "then": { "required": ["connectorOther"] } }
+      ]
+    }
+  }
+}

@@ -333,3 +333,61 @@ implementation (TS, Python, or a third-party tool) can run it to prove compatibi
   CODE_OF_CONDUCT, CI for schema + both packages, conformance-suite runner.
 
 Phase A is done carefully and first. B, C, and D fan out from the frozen schema.
+
+---
+
+## 10. Bundles & cables (kits / assemblies)
+
+Many products are **kits**: one orderable part number that contains several devices,
+often with factory-terminated cables and mounting hardware. Example: the Crestron
+**UC-CX100-T-WM** Flex kit = a TSW-1070 touch screen + a **UC Bracket Assembly**
+(itself a sub-assembly containing a UC Engine, a USB→Ethernet adapter, and an
+HDMI-over-CAT5→USB converter) + a UC-PR transmitter + six factory cables. A design tool
+importing the kit must render each device as its **own block**, while the kit part
+number must group/bill them together.
+
+### Decisions (agreed)
+- **Separate `bundle` document type** (`schema/v0.1/bundle.schema.json`), not an
+  overload of `device`. The clean "one file = one device" promise is preserved; the
+  device schema is unchanged.
+- A bundle has a kit `bundle` identity (the orderable part number) and a `components[]`
+  list. Each component is one of:
+  - **device** — a full device (inline `device`+`ports`+…, or a `ref` to an external
+    device document) with a `quantity` and optional `designator`;
+  - **bundle** — a nested sub-assembly (handles UC-BRKT), inline or by `ref`;
+  - **cable** — see below;
+  - **accessory** — a non-I/O BOM line item (mounting hardware).
+- **Inline or by-reference**: components may embed the device/bundle/cable directly, or
+  reference it by `{id}`/`{url}` so standalone products aren't duplicated (full
+  by-reference resolution lands with the future registry; inline works today).
+- **Cables are first-class** (`schema/v0.1/cable.schema.json`): a cable has typed `ends`
+  (each an ODIO `connector` + optional gender), the `signals` it `carries` (reusing the
+  device signal model — e.g. a DP→HDMI cable carries `video`), `lengthMeters`, and a
+  `factoryTerminated` flag. Cables are both BOM line items and, on a schematic, the
+  **edges** between devices. Usable inline in a bundle or as a standalone document.
+- **Discriminator**: bundle and cable documents carry `kind: "bundle" | "cable"`. Device
+  documents have no `kind` (unchanged); a loader routes on `kind` / top-level shape.
+
+### Versioning note
+Adding bundles/cables is additive (no change to `device.schema.json`). While pre-1.0 we
+keep the new schemas under `schema/v0.1/` to avoid churn; at the first tagged release the
+`$schema` URL may bump to `/v0.2/` per the MINOR-bump policy in §4. Bundle examples live
+in `examples/bundles/` so the device conformance corpus is unaffected.
+
+### Downstream
+Importers expand a bundle into separate device blocks plus cables-as-connections, keyed
+by the kit part number (EasySchematic, for instance, has an `isCableAccessory` concept).
+The SDK gains bundle types + a `flattenBundle()` helper; adapters expand bundles to
+multiple device templates; Genie can detect and emit kits.
+
+---
+
+## 11. Public website & distribution (roadmap — not yet built)
+
+Planned: a project website hosting (1) a **whitepaper** and **manufacturer authoring
+guide** for producing `.odio.json` files; (2) a **free, downloadable database** of
+community/manufacturer `.odio.json` device & kit files; and (3) a possible **paid hosted
+Genie** import service (spec-sheet → draft `.odio.json`). The free spec/SDK/CLI remain
+open (Apache-2.0 / CC-BY-4.0); monetization, if any, is the hosted convenience service,
+not the standard. To design later: hosting/stack, the device registry (which also
+satisfies §8.1 and bundle `ref` resolution), submission/review flow, and billing.

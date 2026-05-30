@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 // OpenDeviceIO conformance runner.
 //
-// Validates the example corpus against the canonical JSON Schema
-// (schema/v0.1/device.schema.json):
-//   - every examples/*.odio.json MUST validate (conformant)
-//   - every examples/invalid/*.odio.json MUST fail validation (non-conformant)
+// Validates the example corpus against the canonical JSON Schemas in schema/v0.1/:
+//   - every examples/*.odio.json         MUST validate against device.schema.json
+//   - every examples/invalid/*.odio.json MUST fail device validation
+//   - every examples/bundles/*.odio.json MUST validate against bundle.schema.json
 //
-// Exit code 0 if all expectations hold, 1 otherwise. Used by the "schema"
-// CI job and runnable locally via `npm run validate:examples`.
+// The bundle and cable schemas $ref the device schema, so all three are loaded
+// into one Ajv instance. Exit code 0 if all expectations hold, 1 otherwise.
+// Used by the "schema" CI job and runnable via `npm run validate:examples`.
 
 import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -17,9 +18,14 @@ import addFormats from "ajv-formats";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, "..");
-const schemaPath = join(repoRoot, "schema", "v0.1", "device.schema.json");
+const schemaDir = join(repoRoot, "schema", "v0.1");
+const deviceSchemaPath = join(schemaDir, "device.schema.json");
+const cableSchemaPath = join(schemaDir, "cable.schema.json");
+const bundleSchemaPath = join(schemaDir, "bundle.schema.json");
+
 const validDir = join(repoRoot, "examples");
 const invalidDir = join(repoRoot, "examples", "invalid");
+const bundlesDir = join(repoRoot, "examples", "bundles");
 
 const EXT = ".odio.json";
 
@@ -50,32 +56,47 @@ function formatErrors(errors) {
 const ajv = new Ajv2020({ allErrors: true, strict: false });
 addFormats(ajv);
 
-const schema = readJson(schemaPath);
-const validate = ajv.compile(schema);
+// Load all three schemas so cross-schema $refs (bundle/cable -> device) resolve.
+const deviceSchema = readJson(deviceSchemaPath);
+const cableSchema = readJson(cableSchemaPath);
+const bundleSchema = readJson(bundleSchemaPath);
+ajv.addSchema(deviceSchema);
+ajv.addSchema(cableSchema);
+ajv.addSchema(bundleSchema);
+
+const validateDevice = ajv.getSchema(deviceSchema.$id);
+const validateBundle = ajv.getSchema(bundleSchema.$id);
 
 let failures = 0;
 let checked = 0;
 
-console.log(`OpenDeviceIO conformance runner`);
-console.log(`schema: ${schemaPath}\n`);
-
-console.log(`Valid corpus (must PASS):`);
-for (const file of listOdio(validDir)) {
+function expectValid(file, validate, label) {
   checked++;
   const ok = validate(readJson(file));
   if (ok) {
     console.log(`  PASS  ${file}`);
   } else {
     failures++;
-    console.log(`  FAIL  ${file}  (expected valid, got errors)`);
+    console.log(`  FAIL  ${file}  (expected valid ${label}, got errors)`);
     console.log(formatErrors(validate.errors));
   }
 }
 
-console.log(`\nInvalid corpus (must FAIL):`);
+console.log(`OpenDeviceIO conformance runner`);
+console.log(`schemas: ${schemaDir}\n`);
+
+console.log(`Valid devices (must PASS device schema):`);
+for (const file of listOdio(validDir)) expectValid(file, validateDevice, "device");
+
+console.log(`\nValid bundles (must PASS bundle schema):`);
+const bundleFiles = listOdio(bundlesDir);
+if (bundleFiles.length === 0) console.log(`  (none)`);
+for (const file of bundleFiles) expectValid(file, validateBundle, "bundle");
+
+console.log(`\nInvalid devices (must FAIL device schema):`);
 for (const file of listOdio(invalidDir)) {
   checked++;
-  const ok = validate(readJson(file));
+  const ok = validateDevice(readJson(file));
   if (!ok) {
     console.log(`  PASS  ${file}  (correctly rejected)`);
   } else {

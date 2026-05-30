@@ -1,0 +1,397 @@
+{
+  "$schema": "https://opendeviceio.org/schema/v0.1/bundle.schema.json",
+  "odioVersion": "0.1.0",
+  "kind": "bundle",
+  "id": "crestron/uc-cx100-t-wm",
+  "bundle": {
+    "manufacturer": "Crestron",
+    "model": "UC-CX100-T-WM",
+    "category": "av/conferencing/kit",
+    "productLine": "Crestron Flex",
+    "description": "Crestron Flex Advanced Video Conference System Integrator Kit with a Wall Mounted Control Interface for Microsoft Teams Rooms."
+  },
+  "components": [
+    {
+      "type": "device",
+      "designator": "Wall Mount Touch Screen",
+      "device": {
+        "manufacturer": "Crestron",
+        "model": "TSW-1070-B-S-T-V",
+        "category": "av/control/touch-panel",
+        "productLine": "Crestron Flex"
+      },
+      "ports": [
+        {
+          "id": "lan",
+          "label": "LAN",
+          "direction": "bidirectional",
+          "connector": "rj45",
+          "link": {
+            "type": "ethernet",
+            "standard": "1000base-t",
+            "speed": "1g",
+            "poe": { "standard": "802.3at", "role": "pd", "classWatts": 30 }
+          },
+          "notes": "100/1000 Mbps; PoE+ PD, requests up to 30W; powered via PoE passthrough from the UC-PR.",
+          "signals": [
+            { "domain": "network", "transport": "control-network", "managed": true },
+            { "domain": "control", "transport": "ip-control" }
+          ]
+        }
+      ],
+      "physical": {
+        "dimensionsMm": { "width": 240, "height": 149, "depth": 51 },
+        "weightGrams": 730
+      }
+    },
+    {
+      "type": "bundle",
+      "designator": "UC Bracket Assembly",
+      "bundle": {
+        "manufacturer": "Crestron",
+        "model": "UC-BRKT-260-P-T-ASSY",
+        "category": "av/assembly",
+        "description": "Preassembled UC Engine and HDMI-over-CAT5-to-USB content-ingest converter on a mounting bracket."
+      },
+      "components": [
+        {
+          "type": "device",
+          "designator": "UC Engine",
+          "device": {
+            "manufacturer": "Crestron",
+            "model": "UC-ENGINE",
+            "category": "it/compute/uc-engine"
+          },
+          "ports": [
+            {
+              "id": "lan",
+              "label": "LAN",
+              "direction": "bidirectional",
+              "connector": "rj45",
+              "link": { "type": "ethernet", "standard": "1000base-t", "speed": "1g" },
+              "signals": [
+                { "domain": "network", "transport": "control-network" }
+              ]
+            },
+            {
+              "id": "display",
+              "label": "DISPLAY",
+              "direction": "output",
+              "connector": "hdmi-type-a",
+              "count": 2,
+              "link": { "type": "hdmi" },
+              "signals": [
+                { "domain": "video", "transport": "hdmi", "maxResolution": "1920x1080", "maxRefreshHz": 60 }
+              ]
+            },
+            {
+              "id": "content",
+              "label": "CONTENT",
+              "direction": "input",
+              "connector": "usb-a",
+              "link": { "type": "usb", "standard": "usb-3.0", "usbRole": "host" },
+              "notes": "Receives ingested content from the HD-CONV-USB-260 converter.",
+              "signals": [
+                { "domain": "data", "transport": "usb-data", "rateGbps": 5 }
+              ]
+            }
+          ],
+          "power": {
+            "inputs": [
+              { "type": "ac", "voltageRange": "100-240V", "frequencyHz": "50/60" }
+            ]
+          },
+          "x-note": "Mini PC, Windows 11 IoT, Microsoft Teams Rooms; single or dual 1080p display."
+        },
+        {
+          "type": "device",
+          "designator": "USB-to-Ethernet Adapter",
+          "device": {
+            "manufacturer": "Crestron",
+            "model": "ADPT-USB-ENET",
+            "category": "it/network/adapter"
+          },
+          "ports": [
+            {
+              "id": "usb",
+              "direction": "bidirectional",
+              "connector": "usb-a",
+              "link": { "type": "usb" },
+              "signals": [
+                { "domain": "data", "transport": "usb-data" }
+              ]
+            },
+            {
+              "id": "enet",
+              "direction": "bidirectional",
+              "connector": "rj45",
+              "link": { "type": "ethernet", "speed": "1g" },
+              "signals": [
+                { "domain": "network", "transport": "ethernet" }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "device",
+          "designator": "HDMI-over-CAT5 to USB 3.0 Converter",
+          "device": {
+            "manufacturer": "Crestron",
+            "model": "HD-CONV-USB-260",
+            "category": "av/converter"
+          },
+          "ports": [
+            {
+              "id": "hdmi-in",
+              "label": "HDMI IN",
+              "direction": "input",
+              "connector": "hdmi-type-a",
+              "link": { "type": "hdmi" },
+              "signals": [
+                { "domain": "video", "transport": "hdmi" }
+              ]
+            },
+            {
+              "id": "content",
+              "label": "CONTENT",
+              "direction": "input",
+              "connector": "rj45",
+              "link": { "type": "twisted-pair", "standard": "hdmi-over-cat5" },
+              "notes": "HDMI over CAT5 input.",
+              "signals": [
+                { "domain": "video", "transport": "hdbaset", "direction": "input" }
+              ]
+            },
+            {
+              "id": "usb-out",
+              "label": "USB 3.0 OUT",
+              "direction": "output",
+              "connector": "usb-b",
+              "link": { "type": "usb", "standard": "usb-3.0" },
+              "signals": [
+                { "domain": "data", "transport": "usb-data", "direction": "output", "rateGbps": 5 }
+              ]
+            }
+          ],
+          "power": {
+            "inputs": [
+              { "type": "dc", "nominalVoltage": 24, "connector": "barrel-dc" }
+            ]
+          },
+          "x-note": "24VDC via external 100-240VAC power pack."
+        },
+        {
+          "type": "accessory",
+          "name": "Mounting hardware",
+          "description": "Bracket mounting hardware (no I/O)."
+        }
+      ]
+    },
+    {
+      "type": "device",
+      "designator": "UC Presentation Transmitter",
+      "device": {
+        "manufacturer": "Crestron",
+        "model": "UC-PR",
+        "category": "av/transmitter",
+        "productLine": "Crestron Flex"
+      },
+      "ports": [
+        {
+          "id": "lan-poe",
+          "label": "LAN PoE",
+          "direction": "bidirectional",
+          "connector": "rj45",
+          "link": {
+            "type": "ethernet",
+            "standard": "100base-t",
+            "speed": "100m",
+            "poe": { "standard": "802.3at", "role": "pse", "classWatts": 30 }
+          },
+          "notes": "Supplies PoE to the wall-mount touch screen.",
+          "signals": [
+            { "domain": "network", "transport": "control-network" }
+          ]
+        },
+        {
+          "id": "to-rx",
+          "label": "To RX",
+          "direction": "output",
+          "connector": "rj45",
+          "link": { "type": "twisted-pair", "standard": "hdmi-over-cat5" },
+          "notes": "HDMI over CAT5 to the UC Engine/RX; carries HDCP + Ethernet.",
+          "signals": [
+            { "domain": "video", "transport": "hdbaset", "direction": "output" }
+          ]
+        },
+        {
+          "id": "lan",
+          "label": "LAN",
+          "direction": "bidirectional",
+          "connector": "rj45",
+          "link": { "type": "ethernet", "speed": "100m" },
+          "signals": [
+            { "domain": "network", "transport": "management" }
+          ]
+        },
+        {
+          "id": "acc",
+          "label": "ACC",
+          "direction": "bidirectional",
+          "connector": "usb-b",
+          "link": { "type": "usb", "standard": "usb-3.0" },
+          "notes": "Firmware loading only.",
+          "signals": [
+            { "domain": "data", "transport": "usb-data" }
+          ]
+        },
+        {
+          "id": "usb-a",
+          "label": "USB A",
+          "direction": "bidirectional",
+          "connector": "usb-a",
+          "link": { "type": "usb", "standard": "usb-2.0", "usbRole": "host" },
+          "signals": [
+            { "domain": "data", "transport": "usb-data" },
+            { "domain": "control", "transport": "usb-hid" }
+          ]
+        },
+        {
+          "id": "usb-b",
+          "label": "USB B",
+          "direction": "bidirectional",
+          "connector": "usb-b",
+          "link": { "type": "usb", "standard": "usb-2.0", "usbRole": "device" },
+          "signals": [
+            { "domain": "data", "transport": "usb-data" }
+          ]
+        },
+        {
+          "id": "usb-c",
+          "label": "USB",
+          "direction": "input",
+          "connector": "usb-c",
+          "link": { "type": "usb", "standard": "usb-2.0", "powerDeliveryWatts": 60, "usbRole": "host" },
+          "notes": "BYOD content + 60W charging over USB-C.",
+          "signals": [
+            {
+              "domain": "video",
+              "transport": "displayport",
+              "direction": "input",
+              "maxResolution": "1920x1080",
+              "hdcp": "2.2",
+              "notes": "DisplayPort 1.2 Alt Mode"
+            },
+            { "domain": "data", "transport": "usb-data" },
+            { "domain": "power", "transport": "usb-pd", "direction": "output", "role": "source", "maxWatts": 60 }
+          ]
+        },
+        {
+          "id": "hdmi-in",
+          "label": "HDMI IN",
+          "direction": "input",
+          "connector": "hdmi-type-a",
+          "link": { "type": "hdmi" },
+          "signals": [
+            { "domain": "video", "transport": "hdmi", "hdcp": "2.2" },
+            { "domain": "audio", "transport": "lpcm" }
+          ]
+        }
+      ],
+      "physical": {
+        "dimensionsMm": { "width": 235, "height": 40, "depth": 208 }
+      },
+      "power": {
+        "inputs": [
+          { "type": "dc", "nominalVoltage": 24, "connector": "barrel-dc", "voltageRange": "24V" }
+        ]
+      }
+    },
+    {
+      "type": "cable",
+      "designator": "Secondary display",
+      "quantity": 1,
+      "cable": {
+        "manufacturer": "Crestron",
+        "model": "CBL-4K-DP-HD-6",
+        "factoryTerminated": true,
+        "lengthMeters": 1.8,
+        "lengthLabel": "6 ft (1.8 m)",
+        "carries": [
+          { "domain": "video", "transport": "displayport" }
+        ],
+        "ends": [
+          { "label": "Source", "connector": "displayport", "gender": "male" },
+          { "label": "Display", "connector": "hdmi-type-a", "gender": "male" }
+        ]
+      }
+    },
+    {
+      "type": "cable",
+      "designator": "Primary display",
+      "quantity": 1,
+      "cable": {
+        "manufacturer": "Crestron",
+        "model": "CBL-HD-6",
+        "factoryTerminated": true,
+        "lengthMeters": 1.8,
+        "lengthLabel": "6 ft (1.8 m)",
+        "carries": [
+          { "domain": "video", "transport": "hdmi" }
+        ],
+        "ends": [
+          { "connector": "hdmi-type-a", "gender": "male" },
+          { "connector": "hdmi-type-a", "gender": "male" }
+        ]
+      }
+    },
+    {
+      "type": "cable",
+      "designator": "UC Engine LAN",
+      "quantity": 2,
+      "cable": {
+        "manufacturer": "Crestron",
+        "model": "CBL-CAT5E-7",
+        "factoryTerminated": true,
+        "lengthMeters": 2.1,
+        "lengthLabel": "7 ft (2.1 m)",
+        "carries": [
+          { "domain": "network", "transport": "ethernet" }
+        ],
+        "ends": [
+          { "connector": "rj45", "gender": "male" },
+          { "connector": "rj45", "gender": "male" }
+        ]
+      }
+    },
+    {
+      "type": "cable",
+      "designator": "Ethernet LAN (CAT6a)",
+      "quantity": 2,
+      "cable": {
+        "manufacturer": "Crestron",
+        "model": "DM-CBL-ULTRA-PC-20",
+        "factoryTerminated": true,
+        "shielded": true,
+        "lengthMeters": 6.1,
+        "lengthLabel": "20 ft (6.1 m)",
+        "carries": [
+          { "domain": "network", "transport": "ethernet" }
+        ],
+        "ends": [
+          { "connector": "rj45", "gender": "male" },
+          { "connector": "rj45", "gender": "male" }
+        ]
+      }
+    }
+  ],
+  "provenance": {
+    "generator": "manual",
+    "method": "manual",
+    "sourceDocuments": [
+      { "title": "ss_UC-CX100-T-WM.pdf", "retrieved": "2026-05-29" }
+    ],
+    "validation": { "status": "reviewed", "by": "howell1452@gmail.com", "date": "2026-05-29" }
+  },
+  "x-note": "Illustrative kit example demonstrating a nested sub-assembly (UC Bracket Assembly) plus factory-terminated cables."
+}
