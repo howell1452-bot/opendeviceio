@@ -56,6 +56,11 @@ export const MANUFACTURER_ALIASES: Record<string, string> = {
   steinel: "Steinel",
   // Shure ("Shure Incorporated" / "Shure Inc.")
   shure: "Shure",
+  // DIS — Danish Interpretation Systems, a Shure conferencing brand
+  dis: "DIS",
+  "dis digital conference systems": "DIS",
+  "dis (shure)": "DIS",
+  "dis (danish interpretation systems a/s)": "DIS",
   // Example/placeholder fixtures
   acme: "Acme",
   "acme audio": "Acme"
