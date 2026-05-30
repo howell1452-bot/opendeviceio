@@ -11,9 +11,9 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const pkgRoot = path.resolve(here, "..");
 
 // Import the built ESM entry; fall back to a helpful message if not built.
-let validate, formatErrors;
+let validateDocument, formatErrors;
 try {
-  ({ validate, formatErrors } = await import(
+  ({ validateDocument, formatErrors } = await import(
     pathToFileURL(path.join(pkgRoot, "dist", "esm", "index.js")).href
   ));
 } catch {
@@ -26,6 +26,8 @@ if (files.length === 0) {
   const examplesDir = path.resolve(pkgRoot, "..", "..", "examples");
   files = [];
   for await (const f of glob("**/*.odio.json", { cwd: examplesDir })) {
+    // Skip the intentionally-invalid fixtures (they are expected to fail).
+    if (f.split(/[\\/]/).includes("invalid")) continue;
     files.push(path.join(examplesDir, f));
   }
 }
@@ -40,12 +42,12 @@ for (const file of files) {
     failures++;
     continue;
   }
-  const res = validate(obj);
+  const res = validateDocument(obj);
   if (res.valid) {
-    console.log(`OK    ${file}`);
+    console.log(`OK    ${file}  (${res.kind})`);
   } else {
     failures++;
-    console.log(`FAIL  ${file}`);
+    console.log(`FAIL  ${file}  (${res.kind})`);
     console.log(formatErrors(res.errors));
   }
 }

@@ -35,3 +35,54 @@ export {
   type SignalDomain,
   type Direction
 } from "./accessors.js";
+
+// --- Bundle & cable document types ---------------------------------------
+// The generated root interfaces are `OpenDeviceIOBundle` / `OpenDeviceIOCable`;
+// re-export under friendlier `Bundle` / `Cable` aliases for the full documents.
+// `Cable` (the cable body sub-object) and supporting component types come from
+// the bundle types module. We export selected names (not `export *`) to avoid
+// clashing with the device `Port`/`Signal`/etc. already re-exported above.
+export type {
+  OpenDeviceIOBundle as Bundle,
+  BundleIdentity,
+  Component,
+  DeviceComponent,
+  BundleComponent,
+  CableComponent,
+  AccessoryComponent,
+  Ref as ComponentRef,
+  CableEnd,
+  Cable as CableBody
+} from "./bundle-types.js";
+export type { OpenDeviceIOCable as Cable } from "./cable-types.js";
+
+// --- Bundle & cable validation / parsing ---------------------------------
+export {
+  validateBundle,
+  validateCable,
+  validateDocument,
+  parseBundle,
+  parseCable,
+  parseDocument,
+  bundleSchema,
+  cableSchema,
+  type DocumentKind,
+  type DocumentValidationResult,
+  type OdioDocument
+} from "./validate-bundle.js";
+
+// --- Bundle expansion & BOM accessors ------------------------------------
+export {
+  flattenBundle,
+  bundleDeviceCount,
+  bundleBillOfMaterials,
+  type FlattenedBundle,
+  type FlattenedDevice,
+  type FlatDeviceEntry,
+  type FlatCableEntry,
+  type FlatAccessoryEntry,
+  type UnresolvedRefEntry,
+  type FlattenOptions,
+  type ResolvedDocument,
+  type BomLine
+} from "./bundle.js";

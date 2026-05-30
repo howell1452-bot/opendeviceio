@@ -12,7 +12,12 @@
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { parse, formatErrors, OdioValidationError } from "@opendeviceio/sdk";
+import {
+  parseDocument,
+  formatErrors,
+  OdioValidationError,
+  type OdioDevice
+} from "@opendeviceio/sdk";
 import { getAdapter, adapterIds } from "./registry.js";
 
 interface CliArgs {
@@ -88,10 +93,11 @@ function main(): void {
     process.exit(1);
   }
 
-  // Validate first (SDK throws OdioValidationError on invalid input).
-  let device;
+  // Validate first, routing by document kind (device/bundle/cable). The SDK
+  // throws OdioValidationError on invalid input.
+  let document;
   try {
-    device = parse(raw);
+    document = parseDocument(raw);
   } catch (err) {
     if (err instanceof OdioValidationError) {
       process.stderr.write(`Error: invalid OpenDeviceIO document:\n${formatErrors(err.errors)}\n`);
@@ -103,7 +109,9 @@ function main(): void {
 
   let result;
   try {
-    result = adapter.export(device);
+    // The adapter accepts device, bundle, or cable documents and routes
+    // internally; the OdioDevice cast satisfies the Adapter signature.
+    result = adapter.export(document as unknown as OdioDevice);
   } catch (err) {
     process.stderr.write(`Error: ${(err as Error).message}\n`);
     process.exit(1);

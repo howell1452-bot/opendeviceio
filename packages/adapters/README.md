@@ -17,6 +17,23 @@ of the shape EasySchematic's bulk importer expects:
 { "templates": [ { "manufacturer": "...", "modelNumber": "...", "ports": [ ... ] } ] }
 ```
 
+The adapter accepts a **device**, a **bundle (kit/assembly)**, or a standalone
+**cable** document (routed by the document's `kind`):
+
+- **Device** — one `DeviceTemplate`, exactly as before.
+- **Bundle/kit** — the kit is flattened via the SDK's `flattenBundle` (recursing
+  into nested sub-assemblies, multiplying quantities down the tree). Each leaf
+  device becomes one device template; a leaf with effective quantity > 1 is
+  expanded into that many disambiguated templates (`label … (n of N)`). Each
+  distinct cable becomes a **cable-accessory** template (`isCableAccessory: true`)
+  with one bidirectional port per cable **end** — `connectorType` mapped from the
+  end connector and `signalType` from the cable's carried signal — and its
+  effective quantity recorded on `quantity` (one template per distinct cable, not
+  N duplicates). The kit part number is added to every emitted template's
+  `searchTerms` for traceability. Unresolved `ref` components are skipped with a
+  warning.
+- **Cable** — wrapped as a single cable-accessory template.
+
 One `DeviceTemplate` is produced per ODIO device. For every ODIO port the
 adapter emits one EasySchematic port per carried signal (so a single network
 connector carrying Dante + AES67 + control becomes three EasySchematic ports),

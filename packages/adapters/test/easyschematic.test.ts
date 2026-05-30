@@ -191,3 +191,81 @@ describe("EasySchematic adapter — invalid input", () => {
     expect(() => EasySchematicAdapter.export({ not: "a device" } as unknown as OdioDevice)).toThrow();
   });
 });
+
+describe("EasySchematic adapter — bundle (kit) expansion", () => {
+  const bundleRel = "bundles/crestron-uc-cx100-t-wm.odio.json";
+
+  function runBundle(): { doc: EsBulkImport; warnings: string[] } {
+    const raw = readFileSync(join(examplesDir, bundleRel), "utf8");
+    // Pass the raw object through the adapter, which routes by `kind`.
+    const obj = JSON.parse(raw) as OdioDevice;
+    const result = EasySchematicAdapter.export(obj);
+    const doc = JSON.parse(result.files[0].content) as EsBulkImport;
+    return { doc, warnings: result.warnings };
+  }
+
+  it("emits one template per leaf device (all 5 models present)", () => {
+    const { doc } = runBundle();
+    const models = new Set(doc.templates.filter((t) => !t.isCableAccessory).map((t) => t.modelNumber));
+    for (const m of [
+      "TSW-1070-B-S-T-V",
+      "UC-ENGINE",
+      "ADPT-USB-ENET",
+      "HD-CONV-USB-260",
+      "UC-PR"
+    ]) {
+      expect(models.has(m)).toBe(true);
+    }
+  });
+
+  it("every device template has non-empty manufacturer + modelNumber and valid enums", () => {
+    const { doc } = runBundle();
+    const devices = doc.templates.filter((t) => !t.isCableAccessory);
+    expect(devices.length).toBeGreaterThanOrEqual(5);
+    for (const t of devices) {
+      expect(t.manufacturer.length).toBeGreaterThan(0);
+      expect(t.modelNumber.length).toBeGreaterThan(0);
+      expect(t.modelNumber).not.toBe("custom");
+      for (const p of t.ports) {
+        expect(SIGNAL_TYPES.has(p.signalType)).toBe(true);
+        expect(CONNECTOR_TYPES.has(p.connectorType)).toBe(true);
+      }
+    }
+  });
+
+  it("emits cable-accessory templates with valid enum ports", () => {
+    const { doc } = runBundle();
+    const cables = doc.templates.filter((t) => t.isCableAccessory === true);
+    expect(cables.length).toBeGreaterThanOrEqual(4);
+    for (const c of cables) {
+      expect(c.ports.length).toBeGreaterThanOrEqual(2);
+      for (const p of c.ports) {
+        expect(SIGNAL_TYPES.has(p.signalType)).toBe(true);
+        expect(CONNECTOR_TYPES.has(p.connectorType)).toBe(true);
+        expect(p.direction).toBe("bidirectional");
+      }
+    }
+  });
+
+  it("DP->HDMI cable yields displayport + hdmi ends", () => {
+    const { doc } = runBundle();
+    const dpHd = doc.templates.find((t) => t.modelNumber === "CBL-4K-DP-HD-6");
+    expect(dpHd?.isCableAccessory).toBe(true);
+    const connectors = new Set(dpHd?.ports.map((p) => p.connectorType));
+    expect(connectors.has("displayport")).toBe(true);
+    expect(connectors.has("hdmi")).toBe(true);
+  });
+
+  it("cable quantity recorded on the template (UC Engine LAN cable qty 2)", () => {
+    const { doc } = runBundle();
+    const lan = doc.templates.find((t) => t.modelNumber === "CBL-CAT5E-7");
+    expect(lan?.quantity).toBe(2);
+  });
+
+  it("kit part number UC-CX100-T-WM is discoverable on every template via searchTerms", () => {
+    const { doc } = runBundle();
+    for (const t of doc.templates) {
+      expect((t.searchTerms ?? []).includes("UC-CX100-T-WM")).toBe(true);
+    }
+  });
+});

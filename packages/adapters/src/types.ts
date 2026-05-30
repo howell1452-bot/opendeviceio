@@ -222,6 +222,20 @@ export interface EsDeviceTemplate {
   depthMm?: number;
   weightKg?: number;
   searchTerms?: string[];
+  /**
+   * Number of physical instances this template represents. Set by the bundle
+   * adapter when a leaf device/cable has an effective quantity > 1.
+   */
+  quantity?: number;
+  /**
+   * When true, this template models a (factory-terminated) cable rather than an
+   * active device. EasySchematic renders cable-accessory templates differently.
+   */
+  isCableAccessory?: boolean;
+  /**
+   * Optional id/model of a device this cable ships integrated with.
+   */
+  integratedWithCable?: string;
 }
 
 /** The top-level EasySchematic bulk-import document. */

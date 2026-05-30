@@ -47,7 +47,11 @@ const compiled: ValidateFunction<Device> = ajv.compile<Device>(
   deviceSchema as unknown as object
 );
 
-function toValidationError(err: ErrorObject): ValidationError {
+/**
+ * Map a raw Ajv {@link ErrorObject} to the package's {@link ValidationError}
+ * shape. Exported so other validators (bundle/cable) share identical formatting.
+ */
+export function toValidationError(err: ErrorObject): ValidationError {
   const instancePath = err.instancePath || "";
   // For "required"/additionalProperties, surface the property in the path.
   let path = instancePath;
