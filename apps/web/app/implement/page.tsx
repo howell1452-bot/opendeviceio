@@ -3,7 +3,7 @@ import Link from "next/link";
 import { CodeBlock } from "@/components/CodeBlock";
 
 export const metadata: Metadata = {
-  title: "Implement ODIO in your tool",
+  title: "For design software vendors",
   description:
     "A practical guide for AV / CAD / schematic tool vendors (EasySchematic, XTEN-AV, AVCAD, D-Tools, Visio, …) to consume OpenDeviceIO: the connector/link/signals model, the SDK, the public API, and the primary-signal mapping recipe used by the reference EasySchematic adapter."
 };
@@ -141,7 +141,7 @@ export default function ImplementPage() {
 
         <article className="prose-odio max-w-none">
           <p className="text-sm font-medium uppercase tracking-wide text-brand-700">
-            For tool builders
+            For design software vendors
           </p>
           <h1 className="mt-2 text-4xl font-extrabold tracking-tight text-slate-900">
             Implement ODIO in your tool

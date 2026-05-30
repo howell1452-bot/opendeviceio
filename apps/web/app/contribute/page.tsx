@@ -11,7 +11,7 @@ import { AccessRequestForm } from "./AccessRequestForm";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "Contribute as a manufacturer",
+  title: "For manufacturers",
   description:
     "Manufacturer reps: request access to publish manufacturer-verified .odio files for your brand on OpenDeviceIO."
 };

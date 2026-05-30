@@ -4,10 +4,10 @@ import { AuthNav } from "./AuthNav";
 const NAV = [
   { href: "/whitepaper", label: "Whitepaper" },
   { href: "/guide", label: "Authoring guide" },
-  { href: "/implement", label: "Implement" },
   { href: "/registry", label: "Registry" },
   { href: "/tools", label: "Tools" },
-  { href: "/contribute", label: "Contribute" },
+  { href: "/contribute", label: "For Manufacturers" },
+  { href: "/implement", label: "For Design Software Vendors" },
   { href: "/schema/v0.1/device.schema.json", label: "Schema" }
 ];
 
