@@ -581,3 +581,33 @@ These stay optional and never change the *meaning* of the data — they only ref
 
 A future optional `provenance.signature` block makes a published `.odio` tamper-evident,
 reinforcing the registry's *manufacturer-verified* trust tier. Tracked, not in this phase.
+
+## 15. Modular chassis (frames, cards, slots) — active track
+
+Many AV/IT products are a **frame** with **slots** that accept interchangeable **cards**
+(Crestron DM frames, Extron XTP II, AJA/Blackmagic frames, Q-SYS cores, blade switches).
+The fixed-device model alone can't express them. The model (additive, ships as `0.2.0`;
+the v0.1 schema gained the optional fields without a break):
+
+- **Cards are standalone `device`s.** A card is a normal device with its own `ports`, plus
+  a `card` block: `{ slotType, slotSpan, role?, powerDrawW? }` — the slot form-factor it
+  fits, how many physical slots it spans, optional direction. Cards get their own `.odio`,
+  registry entry, and I/O table like any device.
+- **The frame is a `device` + a `slots` topology.** It keeps its own fixed `ports` (PSUs,
+  control LAN, sync) and adds `slots: [{ id, accepts:[slotType…], role?, face?, position?,
+  powerBudgetW? }]`. An empty frame is a valid registry entry ("what it accepts").
+- **A populated/as-configured chassis is a `bundle`** with one new per-component field,
+  `component.slot` = the frame slot id a card occupies. Aggregate I/O = frame ports + Σ
+  populated cards' ports. `flattenBundle` already aggregates; rendering adds slot labels.
+- **Out of scope:** internal routing/crosspoint fabric — a capability note in `parameters`,
+  not core (ODIO describes I/O, not the switch matrix).
+
+Decisions (2026-05-30): representation = **bundle + slot assignment** (not a new
+`kind:chassis`); granularity = **cards & frames each their own device**. New schema surface
+is only `device.slots`, `device.card`, and the bundle component `slot`.
+
+Build order: schema + types + a conformance example ✅ (done) → slot-aware validation in
+`flattenBundle` (card `slotType` ∈ slot `accepts`; no double-occupancy; span/count; power
+budget) → I/O-table + adapter **slot labels** ("Slot in-1 / HDMI IN 1") → Genie prompts for
+slot/card extraction → SPECIFICATION section. Some already-seeded Crestron drafts are
+modular (DM-MD frames) and were captured as fixed devices — revisit once this lands.

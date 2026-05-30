@@ -173,6 +173,17 @@ export const bundleSchema = {
         "physical": {
           "$ref": "https://opendeviceio.org/schema/v0.1/device.schema.json#/$defs/physical"
         },
+        "slots": {
+          "type": "array",
+          "items": {
+            "$ref": "https://opendeviceio.org/schema/v0.1/device.schema.json#/$defs/slot"
+          },
+          "description": "Inline frame slot topology (when this component is a modular chassis described inline)."
+        },
+        "card": {
+          "$ref": "https://opendeviceio.org/schema/v0.1/device.schema.json#/$defs/card",
+          "description": "Inline card-fit block (when this component is a plug-in card described inline)."
+        },
         "standards": {
           "type": "array",
           "items": {
@@ -181,6 +192,10 @@ export const bundleSchema = {
         },
         "parameters": {
           "$ref": "https://opendeviceio.org/schema/v0.1/device.schema.json#/$defs/parameters"
+        },
+        "slot": {
+          "type": "string",
+          "description": "Slot assignment: when this component is a card, the id of the frame slot (a device.slots[].id on the frame component in this bundle) it occupies."
         },
         "ref": {
           "$ref": "#/$defs/ref"

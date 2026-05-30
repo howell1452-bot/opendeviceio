@@ -23,8 +23,17 @@ export type DeviceComponent = {
   ports?: Port[];
   power?: Power;
   physical?: Physical;
+  /**
+   * Inline frame slot topology (when this component is a modular chassis described inline).
+   */
+  slots?: Slot[];
+  card?: Card;
   standards?: Standard[];
   parameters?: Parameters;
+  /**
+   * Slot assignment: when this component is a card, the id of the frame slot (a device.slots[].id on the frame component in this bundle) it occupies.
+   */
+  slot?: string;
   ref?: Ref;
   /**
    * This interface was referenced by `undefined`'s JSON-Schema definition
@@ -1018,6 +1027,69 @@ export interface Physical {
   notes?: string;
   /**
    * This interface was referenced by `Physical`'s JSON-Schema definition
+   * via the `patternProperty` "^x-".
+   */
+  [k: string]: unknown;
+}
+/**
+ * One card slot on a modular chassis/frame.
+ */
+export interface Slot {
+  /**
+   * Slot identifier unique within this frame.
+   */
+  id: string;
+  /**
+   * Human-facing slot label as marked on the frame, e.g. 'INPUT 1'.
+   */
+  label?: string;
+  /**
+   * Card slotType values this slot accepts (a card fits when its card.slotType is in this list). Empty/omitted = universal.
+   */
+  accepts?: string[];
+  /**
+   * Directional role of the slot, where the frame fixes it (e.g. input-only vs output-only card cages).
+   */
+  role?: "input" | "output" | "universal";
+  face?: "front" | "rear" | "top" | "bottom" | "left" | "right";
+  /**
+   * Ordinal position on the frame for layout.
+   */
+  position?: number;
+  /**
+   * Power the frame can supply to a card in this slot, in watts.
+   */
+  powerBudgetW?: number;
+  notes?: string;
+  /**
+   * This interface was referenced by `Slot`'s JSON-Schema definition
+   * via the `patternProperty` "^x-".
+   */
+  [k: string]: unknown;
+}
+/**
+ * Inline card-fit block (when this component is a plug-in card described inline).
+ */
+export interface Card {
+  /**
+   * Slot form-factor/family this card fits, matched against a frame slot's `accepts`, e.g. 'dmcat-input', 'xtp-output', 'q-sys-io'.
+   */
+  slotType: string;
+  /**
+   * Number of physical slots the card occupies.
+   */
+  slotSpan?: number;
+  /**
+   * Directional role of the card, if fixed.
+   */
+  role?: "input" | "output" | "universal";
+  /**
+   * Power the card draws from the frame, in watts.
+   */
+  powerDrawW?: number;
+  notes?: string;
+  /**
+   * This interface was referenced by `Card`'s JSON-Schema definition
    * via the `patternProperty` "^x-".
    */
   [k: string]: unknown;

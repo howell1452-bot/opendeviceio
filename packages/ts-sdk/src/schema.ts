@@ -46,6 +46,16 @@ const deviceSchema = {
     "physical": {
       "$ref": "#/$defs/physical"
     },
+    "slots": {
+      "type": "array",
+      "description": "For a modular chassis/frame: the card slots it exposes. Cards (themselves devices with a `card` block) are assigned to these slots in a bundle (component.slot). Omit for fixed-I/O devices.",
+      "items": {
+        "$ref": "#/$defs/slot"
+      }
+    },
+    "card": {
+      "$ref": "#/$defs/card"
+    },
     "standards": {
       "type": "array",
       "items": {
@@ -112,6 +122,108 @@ const deviceSchema = {
         "releaseDate": {
           "type": "string",
           "format": "date"
+        }
+      },
+      "patternProperties": {
+        "^x-": {}
+      },
+      "additionalProperties": false
+    },
+    "slot": {
+      "type": "object",
+      "description": "One card slot on a modular chassis/frame.",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Slot identifier unique within this frame.",
+          "pattern": "^[a-z0-9][a-z0-9._-]*$"
+        },
+        "label": {
+          "type": "string",
+          "description": "Human-facing slot label as marked on the frame, e.g. 'INPUT 1'."
+        },
+        "accepts": {
+          "type": "array",
+          "description": "Card slotType values this slot accepts (a card fits when its card.slotType is in this list). Empty/omitted = universal.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "input",
+            "output",
+            "universal"
+          ],
+          "description": "Directional role of the slot, where the frame fixes it (e.g. input-only vs output-only card cages)."
+        },
+        "face": {
+          "type": "string",
+          "enum": [
+            "front",
+            "rear",
+            "top",
+            "bottom",
+            "left",
+            "right"
+          ]
+        },
+        "position": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Ordinal position on the frame for layout."
+        },
+        "powerBudgetW": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Power the frame can supply to a card in this slot, in watts."
+        },
+        "notes": {
+          "type": "string"
+        }
+      },
+      "patternProperties": {
+        "^x-": {}
+      },
+      "additionalProperties": false
+    },
+    "card": {
+      "type": "object",
+      "description": "Present on a device that is a plug-in card/module for a modular chassis. Declares how it fits a frame's slots; the card's I/O is described by its own `ports` like any device.",
+      "required": [
+        "slotType"
+      ],
+      "properties": {
+        "slotType": {
+          "type": "string",
+          "description": "Slot form-factor/family this card fits, matched against a frame slot's `accepts`, e.g. 'dmcat-input', 'xtp-output', 'q-sys-io'."
+        },
+        "slotSpan": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1,
+          "description": "Number of physical slots the card occupies."
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "input",
+            "output",
+            "universal"
+          ],
+          "description": "Directional role of the card, if fixed."
+        },
+        "powerDrawW": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Power the card draws from the frame, in watts."
+        },
+        "notes": {
+          "type": "string"
         }
       },
       "patternProperties": {

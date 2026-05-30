@@ -1,0 +1,77 @@
+{
+  "$schema": "https://opendeviceio.org/schema/v0.1/bundle.schema.json",
+  "odioVersion": "0.1.0",
+  "kind": "bundle",
+  "id": "example/frame-4-configured",
+  "bundle": {
+    "manufacturer": "Example",
+    "model": "FRAME-4 (configured: 1 HDMI in card + 1 HDBaseT out card)",
+    "category": "av/switcher/matrix"
+  },
+  "components": [
+    {
+      "type": "device",
+      "designator": "Modular frame",
+      "device": { "manufacturer": "Example", "model": "FRAME-4", "category": "av/switcher/matrix" },
+      "ports": [
+        {
+          "id": "lan",
+          "label": "LAN",
+          "direction": "bidirectional",
+          "connector": "rj45",
+          "link": { "type": "ethernet", "standard": "1000base-t", "speed": "1g" },
+          "signals": [{ "domain": "network", "transport": "ethernet" }, { "domain": "control", "transport": "ip-control" }]
+        },
+        {
+          "id": "ac-in",
+          "label": "AC IN",
+          "direction": "input",
+          "connector": "iec-c14",
+          "signals": [{ "domain": "power", "transport": "ac" }]
+        }
+      ],
+      "slots": [
+        { "id": "in-1", "label": "INPUT 1", "accepts": ["frame4-input"], "role": "input", "face": "rear", "powerBudgetW": 25 },
+        { "id": "in-2", "label": "INPUT 2", "accepts": ["frame4-input"], "role": "input", "face": "rear", "powerBudgetW": 25 },
+        { "id": "out-1", "label": "OUTPUT 1", "accepts": ["frame4-output"], "role": "output", "face": "rear", "powerBudgetW": 25 },
+        { "id": "out-2", "label": "OUTPUT 2", "accepts": ["frame4-output"], "role": "output", "face": "rear", "powerBudgetW": 25 }
+      ]
+    },
+    {
+      "type": "device",
+      "designator": "4x HDMI input card",
+      "slot": "in-1",
+      "device": { "manufacturer": "Example", "model": "CARD-HDMI-IN-4", "category": "av/switcher/input-card" },
+      "card": { "slotType": "frame4-input", "slotSpan": 1, "role": "input", "powerDrawW": 12 },
+      "ports": [
+        {
+          "id": "hdmi",
+          "label": "HDMI IN",
+          "direction": "input",
+          "connector": "hdmi-type-a",
+          "count": 4,
+          "link": { "type": "hdmi", "standard": "hdmi-2.0", "bandwidthGbps": 18 },
+          "signals": [{ "domain": "video", "transport": "hdmi" }, { "domain": "audio", "transport": "lpcm" }]
+        }
+      ]
+    },
+    {
+      "type": "device",
+      "designator": "4x HDBaseT output card",
+      "slot": "out-1",
+      "device": { "manufacturer": "Example", "model": "CARD-HDBT-OUT-4", "category": "av/switcher/output-card" },
+      "card": { "slotType": "frame4-output", "slotSpan": 1, "role": "output", "powerDrawW": 18 },
+      "ports": [
+        {
+          "id": "hdbt",
+          "label": "HDBaseT OUT",
+          "direction": "output",
+          "connector": "rj45",
+          "count": 4,
+          "link": { "type": "twisted-pair", "standard": "hdbaset", "poe": { "standard": "passive", "role": "pse" } },
+          "signals": [{ "domain": "video", "transport": "hdbaset" }, { "domain": "audio", "transport": "lpcm" }]
+        }
+      ]
+    }
+  ]
+}
