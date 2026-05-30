@@ -22,12 +22,18 @@ namespace OpenDeviceIO.Visio
 
         private static int Main(string[] args)
         {
-            if (args.Length < 1)
+            // Accept the id as an argument, or prompt (so a Start-menu shortcut works).
+            string id = args.Length >= 1 ? args[0] : null;
+            if (string.IsNullOrWhiteSpace(id))
             {
-                Console.Error.WriteLine("Usage: OdioToVisio <device-id>   (e.g. crestron/dm-nvx-360)");
+                Console.Write("OpenDeviceIO device id (e.g. crestron/dm-nvx-360): ");
+                id = (Console.ReadLine() ?? "").Trim();
+            }
+            if (string.IsNullOrWhiteSpace(id))
+            {
+                Console.Error.WriteLine("No device id given.");
                 return 2;
             }
-            string id = args[0];
             string apiBase = Environment.GetEnvironmentVariable("ODIO_API_BASE") ?? "https://opendeviceio.org";
 
             DocumentPrograms doc;

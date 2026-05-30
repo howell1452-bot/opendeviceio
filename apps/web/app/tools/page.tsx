@@ -57,7 +57,7 @@ const INTEGRATIONS: Tool[] = [
     href: `${REPO}/tree/main/integrations/visio`,
     cta: "Get it on GitHub",
     external: true,
-    note: "Source preview (.NET Framework 4.8) — build in Visual Studio; requires Visio at run time."
+    note: "Installable MSI (from Releases) — run with Visio open; an in-ribbon add-in is planned."
   },
   {
     name: "Adobe InDesign plugin",
