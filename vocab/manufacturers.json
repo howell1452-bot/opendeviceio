@@ -1,0 +1,31 @@
+{
+  "$comment": "Curated manufacturer aliases: the mechanical comparison key of a name variant (manufacturerKey: case-folded, '.' and ',' flattened, trailing legal suffixes such as Inc./LLC/GmbH removed) -> the canonical brand name. Add an entry only when the mechanical key can't safely unify the variants; a wrong merge hides a real, distinct brand. The canonical name's brand slug (lowercase, '&' -> 'and', anything else not a-z/0-9 -> '-') is the record id prefix. Read by the SDK (normalizeManufacturer, bundled by scripts/gen-types.mjs) and by Genie.",
+  "version": "1",
+  "aliases": {
+    "crestron": "Crestron",
+    "crestron electronics": "Crestron",
+    "qsc": "QSC",
+    "qsc audio": "QSC",
+    "qsc audio products": "QSC",
+    "q-sys": "QSC",
+    "q sys": "QSC",
+    "qsys": "QSC",
+    "attero tech": "Attero Tech",
+    "attero tech by qsc": "Attero Tech",
+    "usl": "USL",
+    "us linc": "USL",
+    "us-linc": "USL",
+    "uslinc": "USL",
+    "us l": "USL",
+    "ultra stereo labs": "USL",
+    "us kinema / usl": "USL",
+    "steinel": "Steinel",
+    "shure": "Shure",
+    "dis": "DIS",
+    "dis digital conference systems": "DIS",
+    "dis (shure)": "DIS",
+    "dis (danish interpretation systems a/s)": "DIS",
+    "acme": "Acme",
+    "acme audio": "Acme"
+  }
+}

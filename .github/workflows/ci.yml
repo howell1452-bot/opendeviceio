@@ -116,6 +116,16 @@ jobs:
           PGDATABASE: odio_test
         run: bash apps/web/supabase/tests/run.sh
 
+      - name: Every id prefix is its brand slug (test data plus the E2E seed)
+        env:
+          PGHOST: localhost
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: odio_test
+        run: |
+          psql -v ON_ERROR_STOP=1 -q -X -f apps/web/e2e/seed.sql
+          node scripts/check-id-prefixes.mjs --db
+
   e2e:
     name: End-to-end (Playwright, local Supabase)
     runs-on: ubuntu-latest

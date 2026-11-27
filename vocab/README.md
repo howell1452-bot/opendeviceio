@@ -69,3 +69,31 @@ rewrite (`tools/rewrite-categories.mjs`).
 Once the taxonomy has settled, an RFC may propose making `category` an enum (or an
 enum with an `other` escape hatch, as other vocabularies have) in schema **v0.2**.
 v0.1 stays as it is.
+
+# Brand names and record id prefixes
+
+A registry id looks like `<brand-slug>/<model-slug>[@<variant>]`. The prefix is always the
+brand slug of the manufacturer. To get it, take the canonical brand name and slug it the way
+the database does (`private.brand_slug`, stored as `organizations.slug`):
+
+- accents stripped
+- lowercase
+- `&` becomes `and`
+- every other run of characters outside a–z and 0–9 becomes `-`
+
+For example, "QSC Audio Products, LLC" is QSC, so its prefix is `qsc`; "Stem Audio" gives `stem-audio`.
+
+- **`manufacturers.json`**: curated aliases, mapping the comparison key of a name variant to
+  the canonical brand name.
+  - Used by the SDK's `normalizeManufacturer` and `expectedIdPrefix`, and by Genie.
+  - Add an alias only when the mechanical key can't unify the variants. A wrong merge hides a
+    real, distinct brand.
+- **`id-prefixes.json`**: prefixes that were retired by a rename migration, each with its
+  current prefix. Only add an entry together with the migration and its redirects.
+
+What happens to an id under the wrong prefix:
+
+- **Machine importers** (Genie, `tools/seed-registry.mjs`) rewrite it to the brand slug and log the change.
+- **The website's publish and submission routes** reject it, with the corrected id in the error.
+- **The database** rejects it as well (`id_prefix_mismatch`, `0013_record_id_cleanup.sql`).
+- **`scripts/check-id-prefixes.mjs`** checks the test database in CI, and checks the live registry daily.

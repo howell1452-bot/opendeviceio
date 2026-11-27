@@ -68,11 +68,14 @@ describe("record ids", () => {
     expect(manufacturerSlug("Société Générale")).toBe("societe-generale");
   });
 
-  it("matches the id prefix to the manufacturer, ignoring hyphens", () => {
+  it("matches the id prefix to the manufacturer's brand slug exactly", () => {
     expect(idMatchesManufacturer("crestron/dm-md8x8", "Crestron")).toBe(true);
+    expect(idMatchesManufacturer("crestron/dm-md8x8", "Crestron Electronics, Inc.")).toBe(true);
     expect(idMatchesManufacturer("audio-technica/atnd971", "Audio-Technica")).toBe(true);
-    expect(idMatchesManufacturer("audiotechnica/atnd971", "Audio-Technica")).toBe(true);
+    // The database's slug is audio-technica; anything else is rejected there too.
+    expect(idMatchesManufacturer("audiotechnica/atnd971", "Audio-Technica")).toBe(false);
     expect(idMatchesManufacturer("crestron/x", "Extron")).toBe(false);
     expect(idMatchesManufacturer("qsys/core", "QSC")).toBe(false);
+    expect(idMatchesManufacturer("qsc/core", "Q-SYS")).toBe(true);
   });
 });

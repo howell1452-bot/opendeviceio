@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import {
   normalizeManufacturer,
-  normalizeRecordId,
   validateDocument,
   type OdioDocument
 } from "@opendeviceio/sdk";
@@ -12,10 +11,9 @@ import { CONTRIBUTOR_TERMS_PATH, CONTRIBUTOR_TERMS_VERSION } from "@/lib/data-li
 import {
   MAX_SUBMISSION_BYTES,
   RECORD_ID_PATTERN,
-  idMatchesManufacturer,
-  manufacturerSlug,
   restampAsDraft
 } from "@/lib/submission-doc";
+import { idPrefixErrorMessage, idPrefixProblem } from "@/lib/id-prefix";
 import { decideSubmission, type BrandSubmissionPolicy } from "@/lib/conflict-rules";
 import {
   insertRevision,
@@ -134,12 +132,14 @@ export async function POST(req: Request) {
   const rawManufacturer = documentManufacturer(doc);
   if (!rawManufacturer) return err(400, "Document does not name a manufacturer.");
   const manufacturer = normalizeManufacturer(rawManufacturer) ?? rawManufacturer;
-  const rawId = (doc as { id?: unknown }).id;
-  const id = typeof rawId === "string" ? normalizeRecordId(rawId) : rawId;
-  if (typeof id === "string" && id !== rawId) (doc as { id?: unknown }).id = id;
+  const id = (doc as { id?: unknown }).id;
   if (typeof id !== "string" || !RECORD_ID_PATTERN.test(id)) {
     return err(400, 'Document id must look like "manufacturer/model" (lowercase, e.g. "crestron/dm-md8x8").');
   }
+  // The id's prefix must be the brand slug ("qsc/…" for QSC, never "qsys/…").
+  // The database rejects anything else too (id_prefix_mismatch).
+  const prefixProblem = await idPrefixProblem(service, id, manufacturer);
+  if (prefixProblem) return err(400, idPrefixErrorMessage(prefixProblem));
 
   // ---- who is submitting -----------------------------------------------------
   const contributor = await loadContributor(service, caller.userId);
@@ -177,11 +177,6 @@ export async function POST(req: Request) {
     if (existing && existing !== manufacturer) {
       return err(400, `Record ${id} belongs to ${existing}, but this document names ${manufacturer}.`);
     }
-  } else if (!idMatchesManufacturer(id, manufacturer)) {
-    return err(
-      400,
-      `A new record's id must start with the manufacturer: "${manufacturerSlug(manufacturer)}/…" for ${manufacturer}.`
-    );
   }
 
   let baseRevisionId = state.currentRevisionId;

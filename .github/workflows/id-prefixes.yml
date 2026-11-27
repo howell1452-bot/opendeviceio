@@ -1,0 +1,38 @@
+name: Live id prefixes
+
+# Read-only check of the live registry: every record id's prefix must be the
+# brand slug of its manufacturer (registry paging and ID cleanup brief, item
+# 4c). Pages the public GET /api/v1/devices; writes nothing.
+
+on:
+  schedule:
+    - cron: "41 7 * * *"
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  live:
+    name: Live registry id prefixes
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install workspace dependencies
+        run: npm ci || npm install
+
+      - name: Build SDK
+        run: npm run build:sdk
+
+      - name: Check https://opendeviceio.org
+        run: node scripts/check-id-prefixes.mjs --api https://opendeviceio.org

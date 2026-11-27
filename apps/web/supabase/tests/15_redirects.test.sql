@@ -10,11 +10,15 @@ end $$;
 
 -- Fixtures: two of the real old ids, as they exist before 0012 (each gets its
 -- first revision from the 0008c trigger), and a record request that names one.
+-- Old ids are off their brand slug, which the 0013 guard rejects, so it is off
+-- while they are inserted.
+alter table public.registry disable trigger registry_id_prefix_check;
 insert into public.registry (id, kind, manufacturer, model, validation_status, document) values
   ('attero-tech-by-qsc/axiom-ml1', 'device', 'Attero Tech', 'Axiom ML1', 'draft',
    '{"id":"attero-tech-by-qsc/axiom-ml1","device":{"manufacturer":"Attero Tech","model":"Axiom ML1"}}'),
   ('attero-tech-by-qsc/und6io', 'device', 'Attero Tech', 'unD6IO', 'draft',
    '{"id":"attero-tech-by-qsc/und6io","device":{"manufacturer":"Attero Tech","model":"unD6IO"}}');
+alter table public.registry enable trigger registry_id_prefix_check;
 insert into public.record_requests (request_type, record_ids, name, company, email, details)
 values ('correction', array['attero-tech-by-qsc/axiom-ml1', 'other/x'], 'Test', 'Test Co', 'someone@example.com', 'test');
 
@@ -60,10 +64,10 @@ select pg_temp.check(
 
 -- A collision aborts instead of overwriting.
 insert into public.registry (id, kind, manufacturer, model, validation_status, document) values
-  ('old-prefix/x1', 'device', 'Acme', 'X1', 'draft', '{"id":"old-prefix/x1"}'),
-  ('new-prefix/x1', 'device', 'Acme', 'X1', 'draft', '{"id":"new-prefix/x1"}');
+  ('acme/old-x1', 'device', 'Acme', 'X1', 'draft', '{"id":"acme/old-x1"}'),
+  ('acme/new-x1', 'device', 'Acme', 'X1', 'draft', '{"id":"acme/new-x1"}');
 do $$ begin
-  perform private.rename_record_id('old-prefix/x1', 'new-prefix/x1');
+  perform private.rename_record_id('acme/old-x1', 'acme/new-x1');
   raise exception 'FAIL: a rename onto an existing id went through';
 exception when raise_exception then
   if sqlerrm like 'rename_record_id: target id % already exists%' then
@@ -72,9 +76,9 @@ exception when raise_exception then
 end $$;
 
 -- A plain delete is still a removal.
-delete from public.registry where id = 'old-prefix/x1';
+delete from public.registry where id = 'acme/old-x1';
 select pg_temp.check(
-  exists (select 1 from public.registry_removals where id = 'old-prefix/x1'),
+  exists (select 1 from public.registry_removals where id = 'acme/old-x1'),
   'deleting a record still publishes a removal');
 
 -- Public read, no client writes.
