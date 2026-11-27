@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { REPO_URL } from "@/lib/project";
 
 export const metadata: Metadata = {
   title: "Tools & integrations",
@@ -7,7 +8,7 @@ export const metadata: Metadata = {
     "Ways to use OpenDeviceIO: the in-browser viewer and authoring form, the AutoCAD import add-in, the TypeScript SDK, and the free public API."
 };
 
-const REPO = "https://github.com/howell1452-bot/opendeviceio";
+const REPO = REPO_URL;
 
 interface Tool {
   name: string;

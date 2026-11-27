@@ -39,6 +39,11 @@ body {
 .prose-odio code {
   @apply rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[0.85em] text-slate-800;
 }
+/* Long inline identifiers/URLs wrap instead of widening the page on phones.
+   (Code blocks scroll horizontally inside their <pre>.) */
+.prose-odio :not(pre) > code {
+  overflow-wrap: anywhere;
+}
 .prose-odio strong {
   @apply font-semibold text-slate-900;
 }
