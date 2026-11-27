@@ -2,7 +2,6 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { approveRequest, rejectRequest } from "./actions";
 
 export interface AdminClaim {
@@ -21,7 +20,6 @@ export interface AdminClaim {
 }
 
 export function ClaimRow({ claim }: { claim: AdminClaim }) {
-  const router = useRouter();
   const [addDomain, setAddDomain] = useState(claim.suggestAddDomain);
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -32,11 +30,10 @@ export function ClaimRow({ claim }: { claim: AdminClaim }) {
     setError(null);
     startTransition(async () => {
       const res = await fn();
+      // No refresh: the decided claim would leave the queue and take this
+      // confirmation with it. The list updates on the next page load.
       if (!res.ok) setError(res.error ?? "Failed.");
-      else {
-        setDone(res.role ? `${label} as ${res.role}` : label);
-        router.refresh();
-      }
+      else setDone(res.role ? `${label} as ${res.role}` : label);
     });
   }
 

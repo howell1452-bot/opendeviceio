@@ -189,6 +189,9 @@ export function SettingsPanel({
   communitySubmissions: "allowed" | "suggestions-only" | "blocked";
 }) {
   const { pending, msg, run } = useAction();
+  // Optimistic: show the new value at once, revert if the save fails.
+  const [hiddenNow, setHiddenNow] = useState(hidden);
+  const [communityNow, setCommunityNow] = useState(communitySubmissions);
   return (
     <div className="space-y-8">
       <section>
@@ -196,9 +199,17 @@ export function SettingsPanel({
         <label className="mt-3 flex items-start gap-3 text-sm text-slate-700">
           <input
             type="checkbox"
-            checked={hidden}
+            checked={hiddenNow}
             disabled={pending}
-            onChange={(e) => run(() => setHideDrafts(slug, e.target.checked))}
+            onChange={(e) => {
+              const next = e.target.checked;
+              setHiddenNow(next);
+              run(async () => {
+                const res = await setHideDrafts(slug, next);
+                if (!res.ok) setHiddenNow(!next);
+                return res;
+              });
+            }}
             className="mt-1"
           />
           <span>
@@ -225,9 +236,17 @@ export function SettingsPanel({
               <input
                 type="radio"
                 name="community"
-                checked={communitySubmissions === value}
+                checked={communityNow === value}
                 disabled={pending}
-                onChange={() => run(() => setCommunitySubmissions(slug, value))}
+                onChange={() => {
+                  const before = communityNow;
+                  setCommunityNow(value);
+                  run(async () => {
+                    const res = await setCommunitySubmissions(slug, value);
+                    if (!res.ok) setCommunityNow(before);
+                    return res;
+                  });
+                }}
                 className="mt-1"
               />
               <span>

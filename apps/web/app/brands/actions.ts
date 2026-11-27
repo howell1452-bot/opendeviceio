@@ -120,7 +120,8 @@ export async function claimBrand(input: {
       requesterRole
     })
   );
-  revalidatePath(`/brands/${org.slug}/claim`);
+  // No revalidatePath here: re-rendering the claim page would swap the form
+  // for its "waiting for review" state before the confirmation shows.
   return { ok: true, slug: org.slug };
 }
 

@@ -56,7 +56,8 @@ test.describe.serial("claim your brand", () => {
     const admin = await newPage(browser);
     await signIn(admin, ADMIN, "/admin");
     const row = admin.locator("li", { hasText: REP }).filter({ hasText: "Acme Devices" });
-    await expect(row.getByText("acme-devices.test")).toBeVisible();
+    await expect(row.getByText("acme-devices.test", { exact: true }).first()).toBeVisible();
+    await expect(row.getByText("not a verified domain for this brand yet")).toBeVisible();
     await row.getByRole("button", { name: "Approve" }).click();
     await expect(row.getByText("Done: approved as brand-admin")).toBeVisible();
     await admin.context().close();
