@@ -38,7 +38,7 @@ function deviceBlockCount(dxf: string): number {
 
 describe("DXF adapter — structure", () => {
   it("emits the required DXF section markers, the 2013 version, and EOF", () => {
-    const dxf = runDxf(loadDevice("lightware-ucx-4x2-hc60d.odio.json"));
+    const dxf = runDxf(loadDevice("lightware-ucx-4x2-hc60d.odio"));
     expect(dxf).toContain("SECTION");
     expect(dxf).toContain("HEADER");
     expect(dxf).toContain("TABLES");
@@ -56,12 +56,12 @@ describe("DXF adapter — structure", () => {
   });
 
   it("includes the device title text", () => {
-    const dxf = runDxf(loadDevice("lightware-ucx-4x2-hc60d.odio.json"));
+    const dxf = runDxf(loadDevice("lightware-ucx-4x2-hc60d.odio"));
     expect(dxf).toContain("Lightware UCX-4x2-HC60D");
   });
 
   it("emits a TEXT entity per connector (title + one label per expanded terminal)", () => {
-    const dxf = runDxf(loadDevice("lightware-ucx-4x2-hc60d.odio.json"));
+    const dxf = runDxf(loadDevice("lightware-ucx-4x2-hc60d.odio"));
     const texts = countEntities(dxf, "TEXT");
     // Title (+ optional power subtitle) plus a two-line label (name + connector
     // type) per terminal; UCX expands to >15 ports, so well over 15 TEXT entities.
@@ -73,13 +73,13 @@ describe("DXF adapter — structure", () => {
   });
 
   it("emits a terminal CIRCLE + stub LINE per connector", () => {
-    const dxf = runDxf(loadDevice("lightware-ucx-4x2-hc60d.odio.json"));
+    const dxf = runDxf(loadDevice("lightware-ucx-4x2-hc60d.odio"));
     expect(countEntities(dxf, "CIRCLE")).toBeGreaterThan(10);
     expect(countEntities(dxf, "LINE")).toBeGreaterThan(10);
   });
 
   it("bundle yields one device BLOCK + INSERT per leaf device instance", () => {
-    const dxf = runDxf(loadRaw("bundles/crestron-uc-cx100-t-wm.odio.json"));
+    const dxf = runDxf(loadRaw("bundles/crestron-uc-cx100-t-wm.odio"));
     // 5 device models; one leaf has quantity 2 -> at least 5 device blocks.
     expect(deviceBlockCount(dxf)).toBeGreaterThanOrEqual(5);
     // One INSERT per device block we defined.

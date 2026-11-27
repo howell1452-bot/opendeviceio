@@ -1,7 +1,7 @@
 {
   "name": "@opendeviceio/adapters",
   "version": "0.1.1",
-  "description": "Adapters that convert validated OpenDeviceIO (.odio.json) documents into design-tool import formats. EasySchematic, AutoCAD-DXF, is fully implemented; AVCAD is a registered stub.",
+  "description": "Adapters that convert validated OpenDeviceIO `.odio` files into design-tool import formats. EasySchematic, AutoCAD-DXF, is fully implemented; AVCAD is a registered stub.",
   "license": "Apache-2.0",
   "type": "module",
   "publishConfig": {

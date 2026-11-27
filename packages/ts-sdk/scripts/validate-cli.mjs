@@ -1,5 +1,6 @@
-// Tiny CLI: validate one or more .odio.json files against the bundled schema.
-//   node scripts/validate-cli.mjs file1.odio.json [file2 ...]
+// Tiny CLI: validate one or more .odio files (legacy .odio.json accepted) against
+// the bundled schema.
+//   node scripts/validate-cli.mjs file1.odio [file2 ...]
 // If no files are given, validates the repository example corpus.
 
 import { readFile } from "node:fs/promises";
@@ -25,10 +26,13 @@ let files = process.argv.slice(2);
 if (files.length === 0) {
   const examplesDir = path.resolve(pkgRoot, "..", "..", "examples");
   files = [];
-  for await (const f of glob("**/*.odio.json", { cwd: examplesDir })) {
-    // Skip the intentionally-invalid fixtures (they are expected to fail).
-    if (f.split(/[\\/]/).includes("invalid")) continue;
-    files.push(path.join(examplesDir, f));
+  // `.odio` is the extension; the legacy `.odio.json` is still accepted.
+  for (const pattern of ["**/*.odio", "**/*.odio.json"]) {
+    for await (const f of glob(pattern, { cwd: examplesDir })) {
+      // Skip the intentionally-invalid fixtures (they are expected to fail).
+      if (f.split(/[\\/]/).includes("invalid")) continue;
+      files.push(path.join(examplesDir, f));
+    }
   }
 }
 

@@ -18,7 +18,7 @@ function loadRaw(rel: string): OdioDevice {
 
 describe("I/O-table projection + SVG renderer", () => {
   it("builds a single-section table for a device with grouped rows", () => {
-    const table = buildIoTable(loadDevice("lightware-ucx-4x2-hc60d.odio.json"));
+    const table = buildIoTable(loadDevice("lightware-ucx-4x2-hc60d.odio"));
     expect(table.title).toContain("Lightware");
     expect(table.sections).toHaveLength(1);
     const rows = table.sections[0].rows;
@@ -37,7 +37,7 @@ describe("I/O-table projection + SVG renderer", () => {
   });
 
   it("renders a self-contained SVG with title, headers and group bands", () => {
-    const svg = renderTableSvg(buildIoTable(loadDevice("lightware-ucx-4x2-hc60d.odio.json")));
+    const svg = renderTableSvg(buildIoTable(loadDevice("lightware-ucx-4x2-hc60d.odio")));
     expect(svg.startsWith("<?xml")).toBe(true);
     expect(svg).toContain("<svg ");
     expect(svg).toContain("Lightware UCX-4x2-HC60D");
@@ -54,7 +54,7 @@ describe("I/O-table projection + SVG renderer", () => {
   });
 
   it("builds a multi-section table + components list for a bundle", () => {
-    const table = buildIoTable(loadRaw("bundles/crestron-uc-cx100-t-wm.odio.json"));
+    const table = buildIoTable(loadRaw("bundles/crestron-uc-cx100-t-wm.odio"));
     expect(table.sections.length).toBeGreaterThanOrEqual(5);
     expect(table.sections.every((s) => typeof s.heading === "string")).toBe(true);
     expect(table.components && table.components.length).toBeGreaterThanOrEqual(5);
@@ -63,7 +63,7 @@ describe("I/O-table projection + SVG renderer", () => {
   });
 
   it("renders a self-contained HTML pack embedding the SVG + source .odio", () => {
-    const device = loadDevice("lightware-ucx-4x2-hc60d.odio.json");
+    const device = loadDevice("lightware-ucx-4x2-hc60d.odio");
     const html = renderTableHtml(device);
     expect(html.startsWith("<!doctype html>")).toBe(true);
     expect(html).toContain('<div class="card" id="table"><svg '); // SVG inlined (no XML decl)

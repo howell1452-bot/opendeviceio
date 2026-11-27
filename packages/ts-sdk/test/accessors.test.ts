@@ -29,10 +29,10 @@ function loadDevice(name: string): OdioDevice {
   return parse(readFileSync(path.join(examplesDir, name), "utf8"));
 }
 
-const crosscutting = loadDevice("av-processor-crosscutting.odio.json");
-const dsp = loadDevice("generic-dsp-8gpio.odio.json");
-const netgear = loadDevice("netgear-m4250-poe.odio.json");
-const extron = loadDevice("extron-dtp2-t-211.odio.json");
+const crosscutting = loadDevice("av-processor-crosscutting.odio");
+const dsp = loadDevice("generic-dsp-8gpio.odio");
+const netgear = loadDevice("netgear-m4250-poe.odio");
+const extron = loadDevice("extron-dtp2-t-211.odio");
 
 function portById(device: OdioDevice, id: string): Port {
   const p = device.ports.find((x) => (x as { id: string }).id === id);

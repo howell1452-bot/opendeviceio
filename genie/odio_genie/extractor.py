@@ -39,10 +39,10 @@ DEFAULT_MODEL = "claude-sonnet-4-6"
 # covers the kit/assembly shape. Given to Haiku as a cached system block so it sees a
 # worked example and emits far fewer schema-invalid drafts (cuts the escalation rate).
 _DEVICE_EXAMPLE_FILES = (
-    "extron-dtp2-t-211.odio.json",
-    "netgear-m4250-poe.odio.json",
+    "extron-dtp2-t-211.odio",
+    "netgear-m4250-poe.odio",
 )
-_BUNDLE_EXAMPLE_FILES = (("bundles", "crestron-uc-cx100-t-wm.odio.json"),)
+_BUNDLE_EXAMPLE_FILES = (("bundles", "crestron-uc-cx100-t-wm.odio"),)
 
 
 def _examples_dir() -> Path:

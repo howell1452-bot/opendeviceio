@@ -2,9 +2,13 @@
 
 **Status:** Draft for review · **Date:** 2026-05-29 · **Format version target:** `0.1.0`
 
+> **Note:** this memo was written before the switch to the `.odio` extension. It has been
+> updated to say `.odio`; an ODIO file is a `.odio` file written in JSON syntax, and the
+> legacy `.odio.json` extension is still accepted.
+
 OpenDeviceIO (ODIO) is an open, machine-readable format for describing the
 input/output (I/O), power, physical, and compliance characteristics of a hardware
-device. It is designed so that **manufacturers** can publish an `.odio.json` file
+device. It is designed so that **manufacturers** can publish a `.odio` file
 alongside a product's support documents, and **design software** (AVCAD, D-Tools SI,
 XTEN-AV, Stardraw, and others) can import it to produce accurate schematics, one-line
 drawings, rack elevations, and load calculations without re-keying data from PDFs.
@@ -49,7 +53,7 @@ curated for AV + IT.
 
 ## 3. Document model
 
-An ODIO document is a single JSON object. Top-level shape:
+An ODIO document is a `.odio` file whose top-level object has this shape:
 
 ```jsonc
 {
@@ -248,10 +252,10 @@ importer was unsure about.
 │     ├─ port.schema.json
 │     ├─ signal.*.schema.json
 │     └─ ...
-├─ examples/                 # real-world example .odio.json files (+ a few invalid ones for tests)
+├─ examples/                 # real-world example .odio files (+ a few invalid ones for tests)
 ├─ packages/
 │  └─ ts-sdk/                # @opendeviceio/sdk — generated TS types + Ajv validator + loader
-├─ genie/                    # Python importer (PDF -> draft .odio.json)
+├─ genie/                    # Python importer (PDF -> draft .odio)
 ├─ LICENSE                   # Apache-2.0 (code)
 ├─ LICENSE-docs              # CC-BY-4.0 (spec & docs)
 ├─ README.md
@@ -282,10 +286,10 @@ Hybrid pipeline — LLM extraction with schema-validated, confidence-flagged rev
    candidates (caching the spec and few-shot examples for cost/consistency).
 3. **Validate:** check the candidate against the JSON Schema (`jsonschema`).
 4. **Score:** assign per-field confidence; populate `provenance.confidence`.
-5. **Emit:** a draft `.odio.json` (status `draft`) + a human-readable review report
+5. **Emit:** a draft `.odio` (status `draft`) + a human-readable review report
    listing low-confidence fields to verify.
 
-CLI: `genie parse datasheet.pdf -o device.odio.json [--review-report report.md]`.
+CLI: `genie parse datasheet.pdf -o device.odio [--review-report report.md]`.
 The Claude API key is supplied at runtime (env var); Genie never ships a key.
 
 ### 6.3 Validation as a shared contract
@@ -391,14 +395,14 @@ A project website that does four things:
    files at those versioned URLs (so `$ref`/`$schema` resolve for anyone). This is a hard
    requirement, not a nicety.
 2. **Whitepaper + manufacturer authoring guide.** Why ODIO, the model, and a
-   step-by-step "how to produce a conformant `.odio.json`" guide (by hand, via the SDK,
+   step-by-step "how to produce a conformant `.odio`" guide (by hand, via the SDK,
    or via Genie), plus the conformance rules.
 3. **Free device/kit database (the registry).** A searchable, browsable, **freely
-   downloadable** library of `.odio.json` device, bundle, and cable files, with a
+   downloadable** library of `.odio` device, bundle, and cable files, with a
    read API. This is also the **registry** that resolves bundle `ref:` components and
    settles the id-authority question (§8.1), and the **labeled-data flywheel** for §12.
 4. **Hosted Genie (paid, later).** A convenience import service (spec sheet → draft
-   `.odio.json`). The spec/SDK/CLI stay open (Apache-2.0 / CC-BY-4.0); only the hosted
+   `.odio`). The spec/SDK/CLI stay open (Apache-2.0 / CC-BY-4.0); only the hosted
    convenience is monetized — never the standard.
 
 ### Architecture (proposed)
@@ -406,9 +410,9 @@ A project website that does four things:
   (`manufacturer/model[@rev]`), storing the document JSON + extracted metadata
   (manufacturer, category, connectors, kind) for search, plus `validation.status`
   (draft / reviewed / manufacturer-verified) and a moderation state. Files also
-  downloadable as raw `.odio.json`. Auth + storage via Supabase.
+  downloadable as raw `.odio`. Auth + storage via Supabase.
 - **Read API**: `GET /api/devices?...` (search/filter), `GET /registry/{id}` → the
-  `.odio.json` (this is what bundle `ref:{id}` resolves against), schema files served at
+  `.odio` (this is what bundle `ref:{id}` resolves against), schema files served at
   the versioned paths.
 - **Submission/review flow**: submit (validated against the schema on ingest) →
   moderation queue → published; manufacturers can claim/verify their own entries
@@ -481,7 +485,7 @@ Per manufacturer:
    ```
    genie ingest corpus/<manufacturer> -o staging/<manufacturer>
    ```
-   → one draft `.odio.json` + `.review.md` per sheet, plus `manifest.json` (model used,
+   → one draft `.odio` + `.review.md` per sheet, plus `manifest.json` (model used,
    valid?, confidence, low-confidence fields).
 3. **Review** the drafts/manifest; fix and set `provenance.validation.status` to
    `reviewed` (or `manufacturer-verified`).

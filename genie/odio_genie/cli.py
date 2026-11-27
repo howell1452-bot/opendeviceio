@@ -2,10 +2,10 @@
 
 Subcommands:
 
-* ``genie parse <input> -o <out.odio.json> [--review-report report.md] [--model ...]``
+* ``genie parse <input> -o <out.odio> [--review-report report.md] [--model ...]``
   Ingest a datasheet, extract an ODIO draft, score confidence, assemble provenance,
   emit the draft (and optionally a markdown review report).
-* ``genie validate <file.odio.json>``
+* ``genie validate <file.odio>`` (legacy ``.odio.json`` accepted)
   Validate an existing ODIO document against the canonical schema.
 * ``genie ingest <input_dir> -o <out_dir> [--model ...] [--escalate-model ...]``
   Bulk-ingest a whole directory of datasheets via the Message Batches API: cheap
@@ -58,11 +58,11 @@ def _build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_parse = sub.add_parser(
-        "parse", help="Extract a draft .odio.json from a datasheet."
+        "parse", help="Extract a draft .odio file from a datasheet."
     )
     p_parse.add_argument("input", help="Input datasheet (.pdf, .txt, .md).")
     p_parse.add_argument(
-        "-o", "--output", required=True, help="Output .odio.json draft path."
+        "-o", "--output", required=True, help="Output .odio draft path."
     )
     p_parse.add_argument(
         "--kind",
@@ -101,9 +101,9 @@ def _build_parser() -> argparse.ArgumentParser:
     p_parse.set_defaults(func=_cmd_parse)
 
     p_validate = sub.add_parser(
-        "validate", help="Validate an existing .odio.json against the schema."
+        "validate", help="Validate an existing .odio file against the schema."
     )
-    p_validate.add_argument("file", help="The .odio.json file to validate.")
+    p_validate.add_argument("file", help="The .odio file to validate (legacy .odio.json accepted).")
     p_validate.set_defaults(func=_cmd_validate)
 
     p_ingest = sub.add_parser(

@@ -6,7 +6,7 @@ import { LICENSE_LINK_HEADER } from "@/lib/data-license";
 
 // Public, read-only REST API: fetch one ODIO document by id, or a render-ready
 // projection via ?format= :
-//   (default)  the raw .odio document (JSON)
+//   (default)  the raw .odio document (JSON syntax)
 //   draw       host-agnostic DrawProgram(s) for native CAD/Visio/InDesign add-ins
 //   table      the standardized I/O-table model (JSON)
 //   svg        the standardized I/O table rendered as an SVG

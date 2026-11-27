@@ -54,7 +54,7 @@ export default function WhitepaperPage() {
             OpenDeviceIO (ODIO) is an open, machine-readable format for describing
             the input/output, power, physical, and compliance characteristics of a
             hardware device. One file — a{" "}
-            <code>.odio</code> document (JSON) — published by a manufacturer
+            <code>.odio</code> file, written in JSON syntax — published by a manufacturer
             alongside a product&apos;s support documents lets design software import
             accurate device data instead of re-keying it from PDFs, and renders a
             standardized I/O table you can drop onto a spec sheet, embed on a product
@@ -87,7 +87,7 @@ export default function WhitepaperPage() {
           </p>
 
           <h2 id="model">2. The data model</h2>
-          <p>An ODIO document is a single JSON object with this top-level shape:</p>
+          <p>An ODIO document is a <code>.odio</code> file whose top-level object has this shape:</p>
           <CodeBlock language="device document">{`{
   "$schema": "https://opendeviceio.org/schema/v0.1/device.schema.json",
   "odioVersion": "0.1.0",        // format version (semver)
@@ -113,8 +113,8 @@ export default function WhitepaperPage() {
           <p>
             Documents use the <code>.odio</code> file extension (the legacy{" "}
             <code>.odio.json</code> is still accepted) and the media type{" "}
-            <code>application/vnd.odio+json</code> — the content is plain JSON, so
-            every JSON tool still applies. The shape also allows optional{" "}
+            <code>application/vnd.odio+json</code>. The content uses JSON syntax,
+            so standard JSON tools still work. The shape also allows optional{" "}
             <code>network</code> (a device&apos;s OSI layer / managed class for
             switches and routers) and, for modular chassis, frame <code>slots</code>{" "}
             and a card&apos;s <code>card</code> block (see Bundles, below).

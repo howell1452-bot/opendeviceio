@@ -55,7 +55,7 @@ def test_build_draft_records_source_document():
 def test_assembled_draft_still_validates_after_full_round_trip(tmp_path):
     draft, errors = build_draft(_extracted(), MockExtractor())
     assert errors == []
-    out = write_draft(draft, tmp_path / "device.odio.json")
+    out = write_draft(draft, tmp_path / "device.odio")
     reloaded = json.loads(out.read_text(encoding="utf-8"))
     assert validate(reloaded) == []
 

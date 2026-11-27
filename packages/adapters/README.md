@@ -51,7 +51,7 @@ The input is validated against the ODIO v0.1 schema before export; invalid docum
 exit non-zero with readable errors. Mapping warnings print to stderr.
 
 ```bash
-node dist/cli.js ../../examples/lightware-ucx-4x2-hc60d.odio.json -t table-svg -o ./ucx.svg
+node dist/cli.js ../../examples/lightware-ucx-4x2-hc60d.odio -t table-svg -o ./ucx.svg
 ```
 
 ## Programmatic use

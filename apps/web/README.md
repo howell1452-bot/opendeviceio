@@ -30,7 +30,7 @@ install, so by the time `next build` runs the workspace-linked
 | `/guide` | Manufacturer authoring guide (by hand, via the SDK, or via Genie; id/`x-` rules; validation). |
 | `/registry` | Registry browser with search + kind/category/connector filters. |
 | `/registry/[...id]` | Detail page for one entry (catch-all because ids contain a slash). |
-| `/registry/download/[...id]` | Raw `.odio.json` download (`application/json`, `attachment`). |
+| `/registry/download/[...id]` | Raw `.odio` download (`application/vnd.odio+json`, `attachment`). |
 | `/schema/v0.1/device.schema.json` | Canonical device schema (served verbatim, `application/json`, permissive CORS). |
 | `/schema/v0.1/bundle.schema.json` | Canonical bundle schema. |
 | `/schema/v0.1/cable.schema.json` | Canonical cable schema. |

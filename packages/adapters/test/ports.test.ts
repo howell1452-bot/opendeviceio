@@ -47,7 +47,7 @@ describe("expandConnectors — shared per-connector model", () => {
   });
 
   it("count-expands a connector into one terminal per physical instance", () => {
-    const terms = expandConnectors(loadDevice("lightware-ucx-4x2-hc60d.odio.json"));
+    const terms = expandConnectors(loadDevice("lightware-ucx-4x2-hc60d.odio"));
     const hdmiIn = terms.filter((t) => t.section === "HDMI IN");
     expect(hdmiIn.length).toBe(2);
     expect(new Set(hdmiIn.map((t) => t.label))).toEqual(new Set(["HDMI IN 1", "HDMI IN 2"]));
@@ -58,7 +58,7 @@ describe("expandConnectors — shared per-connector model", () => {
   });
 
   it("folds embedded HDMI audio into the note rather than a separate terminal", () => {
-    const terms = expandConnectors(loadDevice("lightware-ucx-4x2-hc60d.odio.json"));
+    const terms = expandConnectors(loadDevice("lightware-ucx-4x2-hc60d.odio"));
     const hdmiIn = terms.filter((t) => t.section === "HDMI IN");
     for (const t of hdmiIn) {
       expect(t.primaryDomain).toBe("video");

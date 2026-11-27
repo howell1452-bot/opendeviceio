@@ -2,9 +2,11 @@
 // OpenDeviceIO conformance runner.
 //
 // Validates the example corpus against the canonical JSON Schemas in schema/v0.1/:
-//   - every examples/*.odio.json         MUST validate against device.schema.json
-//   - every examples/invalid/*.odio.json MUST fail device validation
-//   - every examples/bundles/*.odio.json MUST validate against bundle.schema.json
+//   - every examples/*.odio         MUST validate against device.schema.json
+//   - every examples/legacy/*       MUST validate (legacy .odio.json extension)
+//   - every examples/invalid/*.odio MUST fail device validation
+//   - every examples/bundles/*.odio MUST validate against bundle.schema.json
+// Both extensions are accepted everywhere (`.odio` preferred).
 //
 // The bundle and cable schemas $ref the device schema, so all three are loaded
 // into one Ajv instance. Exit code 0 if all expectations hold, 1 otherwise.
@@ -26,8 +28,11 @@ const bundleSchemaPath = join(schemaDir, "bundle.schema.json");
 const validDir = join(repoRoot, "examples");
 const invalidDir = join(repoRoot, "examples", "invalid");
 const bundlesDir = join(repoRoot, "examples", "bundles");
+const legacyDir = join(repoRoot, "examples", "legacy");
 
-const EXT = ".odio.json";
+// `.odio` is the extension; the legacy `.odio.json` is still accepted.
+const EXTS = [".odio", ".odio.json"];
+const isOdio = (name) => EXTS.some((ext) => name.toLowerCase().endsWith(ext));
 
 function readJson(path) {
   return JSON.parse(readFileSync(path, "utf8"));
@@ -41,7 +46,7 @@ function listOdio(dir) {
     return [];
   }
   return entries
-    .filter((e) => e.isFile() && e.name.endsWith(EXT))
+    .filter((e) => e.isFile() && isOdio(e.name))
     .map((e) => join(dir, e.name))
     .sort();
 }
@@ -87,6 +92,11 @@ console.log(`schemas: ${schemaDir}\n`);
 
 console.log(`Valid devices (must PASS device schema):`);
 for (const file of listOdio(validDir)) expectValid(file, validateDevice, "device");
+
+console.log(`\nLegacy extension (.odio.json) devices (must PASS device schema):`);
+const legacyFiles = listOdio(legacyDir);
+if (legacyFiles.length === 0) console.log(`  (none)`);
+for (const file of legacyFiles) expectValid(file, validateDevice, "device");
 
 console.log(`\nValid bundles (must PASS bundle schema):`);
 const bundleFiles = listOdio(bundlesDir);

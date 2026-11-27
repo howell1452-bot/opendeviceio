@@ -1,7 +1,7 @@
 # Genie — the OpenDeviceIO spec-sheet importer
 
 **Genie** turns hardware device datasheets into schema-validated, confidence-flagged
-[OpenDeviceIO](../docs/DESIGN.md) (`.odio.json`) drafts.
+[OpenDeviceIO](../docs/DESIGN.md) `.odio` drafts (JSON syntax).
 
 It uses a hybrid pipeline: an LLM extracts an ODIO-shaped candidate, the candidate is
 validated against the canonical JSON Schema (`schema/v0.1/device.schema.json`), every
@@ -50,12 +50,12 @@ Python 3.11+ (developed and tested on 3.14).
 
 ```bash
 export ANTHROPIC_API_KEY=sk-ant-...     # required for live LLM extraction
-genie parse datasheet.pdf -o device.odio.json --review-report report.md
+genie parse datasheet.pdf -o device.odio --review-report report.md
 ```
 
 Options:
 
-- `-o, --output` — draft `.odio.json` path (required)
+- `-o, --output` — draft `.odio` path (required)
 - `--review-report PATH` — also write a markdown review report
 - `--model` — Claude model id (default `claude-opus-4-8`)
 - `--by EMAIL` — record a reviewer in `provenance.validation.by`
@@ -67,10 +67,10 @@ Options:
 Offline smoke test with the mock extractor:
 
 ```bash
-genie parse datasheet.txt -o device.odio.json --review-report report.md --mock
+genie parse datasheet.txt -o device.odio --review-report report.md --mock
 
 # extract a kit/assembly bundle instead of a single device
-genie parse kit-datasheet.pdf -o kit.odio.json --kind bundle
+genie parse kit-datasheet.pdf -o kit.odio --kind bundle
 ```
 
 ### Bulk-ingest a catalog of datasheets
@@ -96,7 +96,7 @@ What it does, end to end:
    `provenance.confidence.overall` is `<= --confidence-threshold` (default `0.6`) is
    re-extracted in a **second batch** with **Sonnet** (`claude-sonnet-4-6`). The better
    result is kept — valid beats invalid, then higher confidence wins.
-6. **Write** `<out_dir>/<id-or-slug>.odio.json` + a `.review.md` per doc, plus a
+6. **Write** `<out_dir>/<id-or-slug>.odio` + a `.review.md` per doc, plus a
    `manifest.json` summarizing every document (source file, chosen model, valid,
    overall confidence, low-confidence field count, error count).
 
@@ -141,15 +141,15 @@ acquire PDFs  ->  genie ingest ./datasheets -o ./drafts  ->  review drafts + man
 2. **`genie ingest`** to produce drafts + `manifest.json`.
 3. **Human review**: open `manifest.json`, work the low-confidence / invalid docs first
    (the `.review.md` reports list exactly which fields to verify), and edit the
-   `.odio.json` drafts. Flip `provenance.validation.status` to `published` (and set
+   `.odio` drafts. Flip `provenance.validation.status` to `published` (and set
    `validation.by`/`date`) once a draft is checked.
-4. **Promote** the reviewed `.odio.json` files into the corpus.
+4. **Promote** the reviewed `.odio` files into the corpus.
 5. **Push to the registry** with `tools/seed-registry.mjs`.
 
 ### Validate an existing ODIO file
 
 ```bash
-genie validate device.odio.json   # device, bundle, or cable .odio.json
+genie validate device.odio   # device, bundle, or cable .odio (legacy .odio accepted)
 ```
 
 `genie validate` selects the schema from the document's top-level `kind`
@@ -181,5 +181,5 @@ pytest
 
 The tests use the deterministic `MockExtractor`, assert the assembled draft validates
 against the real schema, exercise the confidence scorer, and run the conformance
-corpus (`../examples/*.odio.json` must pass, `../examples/invalid/*.odio.json` must
+corpus (`../examples/*.odio` must pass, `../examples/invalid/*.odio` must
 fail). No network access or PDF libraries are required.

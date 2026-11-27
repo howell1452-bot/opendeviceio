@@ -1,7 +1,7 @@
 {
   "name": "@opendeviceio/sdk",
   "version": "0.1.0",
-  "description": "TypeScript SDK for OpenDeviceIO (.odio.json): generated types, Ajv 2020 validator, and convenience accessors built against the canonical v0.1 device schema.",
+  "description": "TypeScript SDK for OpenDeviceIO (.odio files): generated types, Ajv 2020 validator, and convenience accessors built against the canonical v0.1 device schema.",
   "license": "Apache-2.0",
   "type": "module",
   "publishConfig": { "access": "public" },

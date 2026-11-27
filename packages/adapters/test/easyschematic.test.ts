@@ -91,7 +91,8 @@ function runEs(name: string): { template: EsDeviceTemplate; warnings: string[] }
   return { template, warnings };
 }
 
-const validExamples = readdirSync(examplesDir).filter((f) => f.endsWith(".odio.json"));
+// `.odio` is the extension; the legacy `.odio.json` is still accepted.
+const validExamples = readdirSync(examplesDir).filter((f) => /\.odio(\.json)?$/i.test(f));
 
 describe("EasySchematic adapter — invariants across every valid example", () => {
   it("finds example files", () => {
@@ -134,13 +135,13 @@ describe("EasySchematic adapter — invariants across every valid example", () =
 
 describe("EasySchematic adapter — envelope / format option", () => {
   it("defaults to a bare ARRAY of templates (in-app importer format)", () => {
-    const device = loadDevice("lightware-ucx-4x2-hc60d.odio.json");
+    const device = loadDevice("lightware-ucx-4x2-hc60d.odio");
     const parsed = JSON.parse(EasySchematicAdapter.export(device).files[0].content) as unknown;
     expect(Array.isArray(parsed)).toBe(true);
   });
 
   it("format:'bulk' yields the { templates: [...] } wrapper", () => {
-    const device = loadDevice("lightware-ucx-4x2-hc60d.odio.json");
+    const device = loadDevice("lightware-ucx-4x2-hc60d.odio");
     const result = EasySchematicAdapter.export(device, { format: "bulk" });
     const parsed = JSON.parse(result.files[0].content) as EsBulkImport;
     expect(Array.isArray(parsed)).toBe(false);
@@ -149,17 +150,17 @@ describe("EasySchematic adapter — envelope / format option", () => {
   });
 
   it("lightware example maps to deviceType 'switcher'", () => {
-    const { template } = runEsArray("lightware-ucx-4x2-hc60d.odio.json");
+    const { template } = runEsArray("lightware-ucx-4x2-hc60d.odio");
     expect(template.deviceType).toBe("switcher");
   });
 
   it("netgear example maps to deviceType 'network-switch'", () => {
-    const { template } = runEsArray("netgear-m4250-poe.odio.json");
+    const { template } = runEsArray("netgear-m4250-poe.odio");
     expect(template.deviceType).toBe("network-switch");
   });
 
   it("device referenceUrl falls back to the registry id when no productUrl", () => {
-    const { template } = runEsArray("lightware-ucx-4x2-hc60d.odio.json");
+    const { template } = runEsArray("lightware-ucx-4x2-hc60d.odio");
     expect(template.referenceUrl).toBe(
       "https://opendeviceio.org/registry/lightware/ucx-4x2-hc60d"
     );
@@ -168,12 +169,12 @@ describe("EasySchematic adapter — envelope / format option", () => {
 
 describe("EasySchematic adapter — specific mappings", () => {
   it("netgear: poeBudgetW === 240 (8 ports x 30W PSE)", () => {
-    const { template } = runEs("netgear-m4250-poe.odio.json");
+    const { template } = runEs("netgear-m4250-poe.odio");
     expect(template.poeBudgetW).toBe(240);
   });
 
   it("lightware UCX emits ONE port per connector instance (per-connector model, not per-signal)", () => {
-    const { template } = runEs("lightware-ucx-4x2-hc60d.odio.json");
+    const { template } = runEs("lightware-ucx-4x2-hc60d.odio");
     // The old per-signal exporter exploded this device to 35 ports. The
     // per-connector model collapses each ODIO port to one ES port per instance
     // (respecting count) — roughly one per physical connector (~16-17 logical
@@ -187,7 +188,7 @@ describe("EasySchematic adapter — specific mappings", () => {
   });
 
   it("lightware UCX HDMI IN (count 2) -> exactly 2 ports labeled 'HDMI IN N' typed hdmi", () => {
-    const { template } = runEs("lightware-ucx-4x2-hc60d.odio.json");
+    const { template } = runEs("lightware-ucx-4x2-hc60d.odio");
     const hdmiIn = template.ports.filter((p) => p.section === "HDMI IN");
     expect(hdmiIn.length).toBe(2);
     for (const p of hdmiIn) {
@@ -198,7 +199,7 @@ describe("EasySchematic adapter — specific mappings", () => {
   });
 
   it("lightware UCX USB-C IN (count 2) -> 2 ports typed displayport (primary=video) noting the other flows", () => {
-    const { template } = runEs("lightware-ucx-4x2-hc60d.odio.json");
+    const { template } = runEs("lightware-ucx-4x2-hc60d.odio");
     const usbcIn = template.ports.filter((p) => p.section === "USB-C IN");
     expect(usbcIn.length).toBe(2);
     for (const p of usbcIn) {
@@ -212,19 +213,19 @@ describe("EasySchematic adapter — specific mappings", () => {
   });
 
   it("lightware UCX Dante connector -> single port typed dante", () => {
-    const { template } = runEs("lightware-ucx-4x2-hc60d.odio.json");
+    const { template } = runEs("lightware-ucx-4x2-hc60d.odio");
     const dante = template.ports.filter((p) => p.section === "Dante");
     expect(dante.length).toBe(1);
     expect(dante[0].signalType).toBe("dante");
   });
 
   it("lightware UCX: no port label contains a 'usb-data' signal suffix", () => {
-    const { template } = runEs("lightware-ucx-4x2-hc60d.odio.json");
+    const { template } = runEs("lightware-ucx-4x2-hc60d.odio");
     expect(template.ports.some((p) => p.label.includes("usb-data"))).toBe(false);
   });
 
   it("av-processor lan-a -> ONE port (per-connector) with the primary (video) signalType", () => {
-    const { template } = runEs("av-processor-crosscutting.odio.json");
+    const { template } = runEs("av-processor-crosscutting.odio");
     const lanPorts = template.ports.filter((p) => p.id.startsWith("lan-a"));
     // One physical RJ45 connector -> exactly one ES port, not five.
     expect(lanPorts.length).toBe(1);
@@ -268,7 +269,7 @@ describe("EasySchematic adapter — specific mappings", () => {
   });
 
   it("embedded HDMI lpcm audio does NOT create a separate audio/custom port", () => {
-    const { template } = runEs("lightware-ucx-4x2-hc60d.odio.json");
+    const { template } = runEs("lightware-ucx-4x2-hc60d.odio");
     // The HDMI IN port has video(hdmi) + audio(lpcm). The lpcm flow must be
     // embedded (no separate port), so among ports whose section is "HDMI IN"
     // there must be only hdmi-typed ports, none typed 'custom'.
@@ -284,32 +285,32 @@ describe("EasySchematic adapter — specific mappings", () => {
   });
 
   it("weightKg conversion (grams/1000)", () => {
-    const { template } = runEs("netgear-m4250-poe.odio.json");
+    const { template } = runEs("netgear-m4250-poe.odio");
     // weightGrams 2200 -> 2.2 kg
     expect(template.weightKg).toBeCloseTo(2.2, 6);
   });
 
   it("thermalBtuh passthrough when power.heatBtuPerHour present", () => {
-    const { template } = runEs("lightware-ucx-4x2-hc60d.odio.json");
+    const { template } = runEs("lightware-ucx-4x2-hc60d.odio");
     // heatBtuPerHour 471 in the source -> passthrough.
     expect(template.thermalBtuh).toBe(471);
   });
 
   it("thermalBtuh derived (W * 3.412) when heatBtuPerHour absent", () => {
-    const { template } = runEs("netgear-m4250-poe.odio.json");
+    const { template } = runEs("netgear-m4250-poe.odio");
     // No heatBtuPerHour; max 280W -> 280 * 3.412.
     expect(template.thermalBtuh).toBeCloseTo(280 * 3.412, 6);
   });
 
   it("lightware: video capabilities carried over (maxResolution / maxFrameRate)", () => {
-    const { template } = runEs("lightware-ucx-4x2-hc60d.odio.json");
+    const { template } = runEs("lightware-ucx-4x2-hc60d.odio");
     const hdmiIn = template.ports.find((p) => p.section === "HDMI IN" && p.signalType === "hdmi");
     expect(hdmiIn?.capabilities?.maxResolution).toBe("5120x2160");
     expect(hdmiIn?.capabilities?.maxFrameRate).toBe(60);
   });
 
   it("netgear: connector rj45 -> rj45, sfp+ -> sfp; linkSpeed on network ports", () => {
-    const { template } = runEs("netgear-m4250-poe.odio.json");
+    const { template } = runEs("netgear-m4250-poe.odio");
     const poePort = template.ports.find((p) => p.id.startsWith("ge-poe"));
     expect(poePort?.connectorType).toBe("rj45");
     expect(poePort?.linkSpeed).toBe("1g");
@@ -318,7 +319,7 @@ describe("EasySchematic adapter — specific mappings", () => {
   });
 
   it("av-processor lan-a is a PoE PD link -> poeDrawW recorded on its ports", () => {
-    const { template } = runEs("av-processor-crosscutting.odio.json");
+    const { template } = runEs("av-processor-crosscutting.odio");
     const lanPort = template.ports.find((p) => p.id.startsWith("lan-a"));
     expect(lanPort?.poeDrawW).toBe(25);
     // device-level poeDrawW
@@ -326,7 +327,7 @@ describe("EasySchematic adapter — specific mappings", () => {
   });
 
   it("gpio channelCount carried (channels=8)", () => {
-    const { template } = runEs("generic-dsp-8gpio.odio.json");
+    const { template } = runEs("generic-dsp-8gpio.odio");
     const gpio = template.ports.find((p) => p.signalType === "gpio");
     expect(gpio?.channelCount).toBe(8);
   });
@@ -334,7 +335,7 @@ describe("EasySchematic adapter — specific mappings", () => {
 
 describe("Stub adapters", () => {
   it("AvcadAdapter.export throws NotImplementedError", () => {
-    const device = loadDevice("netgear-m4250-poe.odio.json");
+    const device = loadDevice("netgear-m4250-poe.odio");
     expect(() => AvcadAdapter.export(device)).toThrow(NotImplementedError);
   });
 });
@@ -346,7 +347,7 @@ describe("EasySchematic adapter — invalid input", () => {
 });
 
 describe("EasySchematic adapter — bundle (kit) expansion", () => {
-  const bundleRel = "bundles/crestron-uc-cx100-t-wm.odio.json";
+  const bundleRel = "bundles/crestron-uc-cx100-t-wm.odio";
 
   function runBundle(): { templates: EsDeviceTemplate[]; warnings: string[] } {
     const raw = readFileSync(join(examplesDir, bundleRel), "utf8");

@@ -72,7 +72,8 @@ export default async function ManufacturersPage({
             Publish your I/O once. Every design tool gets it right.
           </h1>
           <p className="mt-5 max-w-2xl text-lg text-slate-600">
-            OpenDeviceIO is an open file format and a free public registry for a
+            OpenDeviceIO is an open file format (<code className="rounded bg-white/70 px-1 font-mono text-base">.odio</code>{" "}
+            files, written in JSON syntax) and a free public registry for a
             device&apos;s connectors, signals, power, and physical data. Publish
             it once, and AV and IT design tools can import it instead of
             re-keying your spec sheets by hand.

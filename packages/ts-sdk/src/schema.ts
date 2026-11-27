@@ -7,7 +7,7 @@ const deviceSchema = {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://opendeviceio.org/schema/v0.1/device.schema.json",
   "title": "OpenDeviceIO Device",
-  "description": "An open, machine-readable description of a hardware device's I/O, power, physical, and compliance characteristics. Canonical source of truth for the OpenDeviceIO (.odio.json) format, v0.1.",
+  "description": "An open, machine-readable description of a hardware device's I/O, power, physical, and compliance characteristics. Canonical source of truth for the OpenDeviceIO format (.odio files, JSON syntax), v0.1.",
   "type": "object",
   "required": [
     "odioVersion",

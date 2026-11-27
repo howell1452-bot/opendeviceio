@@ -21,7 +21,7 @@ def _write_text_datasheet(tmp_path):
 
 def test_cli_parse_mock_emits_valid_draft(tmp_path, capsys):
     src = _write_text_datasheet(tmp_path)
-    out = tmp_path / "device.odio.json"
+    out = tmp_path / "device.odio"
     report = tmp_path / "report.md"
     rc = main(
         ["parse", str(src), "-o", str(out), "--review-report", str(report), "--mock"]
@@ -47,7 +47,7 @@ def test_cli_validate_fails_on_invalid_examples(path):
 
 
 def test_cli_validate_missing_file_errors(tmp_path):
-    assert main(["validate", str(tmp_path / "nope.odio.json")]) == 1
+    assert main(["validate", str(tmp_path / "nope.odio")]) == 1
 
 
 def test_cli_parse_unsupported_input(tmp_path):

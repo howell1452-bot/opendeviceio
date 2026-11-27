@@ -3,7 +3,7 @@ import { normalizeManufacturer } from "@opendeviceio/sdk";
 import { getSupabase } from "./supabase";
 
 // A row of the `public.registry` table. The `document` column is the full
-// .odio.json (device | bundle | cable).
+// .odio file (device | bundle | cable), stored as its parsed object.
 export interface RegistryRow {
   id: string;
   kind: "device" | "bundle" | "cable";
