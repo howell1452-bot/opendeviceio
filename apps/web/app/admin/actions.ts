@@ -1,5 +1,6 @@
 "use server";
 
+import { normalizeManufacturer } from "@opendeviceio/sdk";
 import { getCurrentUser, isAdminEmail } from "@/lib/session";
 import { getServiceSupabase } from "@/lib/supabase-server";
 
@@ -10,11 +11,18 @@ import { getServiceSupabase } from "@/lib/supabase-server";
 async function requireAdminService() {
   const { user } = await getCurrentUser();
   if (!user || !isAdminEmail(user.email)) {
-    return { error: "Not authorized.", service: null, admin: null as string | null };
+    return {
+      error: "Not authorized.",
+      service: null,
+      admin: null as string | null,
+      adminId: null as string | null
+    };
   }
   const service = getServiceSupabase();
-  if (!service) return { error: "Service key not configured.", service: null, admin: user.email };
-  return { error: null, service, admin: user.email };
+  if (!service) {
+    return { error: "Service key not configured.", service: null, admin: user.email, adminId: user.id };
+  }
+  return { error: null, service, admin: user.email, adminId: user.id };
 }
 
 export async function approveRequest(
@@ -22,13 +30,20 @@ export async function approveRequest(
   userId: string,
   manufacturer: string
 ): Promise<{ ok: boolean; error?: string }> {
-  const { error, service, admin } = await requireAdminService();
+  const { error, service, adminId } = await requireAdminService();
   if (error || !service) return { ok: false, error: error ?? "Unavailable." };
+
+  // Store the canonical brand name (the same normalization the registry
+  // applies to documents), so "Crestron Electronics, Inc." grants "Crestron"
+  // and RLS / publish checks match the registry rows.
+  const brand = normalizeManufacturer(manufacturer.trim());
+  if (!brand) return { ok: false, error: "Empty brand name." };
 
   const { error: memErr } = await service
     .from("manufacturer_members")
     .upsert(
-      { user_id: userId, manufacturer, created_by: admin },
+      // created_by is a uuid FK to auth.users: the approving admin's user id.
+      { user_id: userId, manufacturer: brand, created_by: adminId },
       { onConflict: "user_id,manufacturer" }
     );
   if (memErr) return { ok: false, error: memErr.message };

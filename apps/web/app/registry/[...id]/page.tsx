@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import type { OdioDevice, Bundle } from "@opendeviceio/sdk";
+import { normalizeManufacturer, type OdioDevice, type Bundle } from "@opendeviceio/sdk";
 import { getRegistryRow } from "@/lib/registry";
 import {
   KindBadge,
@@ -57,7 +57,10 @@ export default async function RegistryDetailPage({
   const { user, client } = await getCurrentUser();
   const memberships = user && client ? await listMyMemberships(client) : [];
   const canEdit = Boolean(
-    row.manufacturer && memberships.some((m) => m.manufacturer === row.manufacturer)
+    row.manufacturer &&
+      memberships.some(
+        (m) => (normalizeManufacturer(m.manufacturer) ?? m.manufacturer) === row.manufacturer
+      )
   );
 
   const doc = row.document as Record<string, unknown>;
@@ -116,7 +119,7 @@ export default async function RegistryDetailPage({
                 href={`/author?id=${encodeURIComponent(row.id)}`}
                 className="inline-flex items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-800 shadow-sm transition hover:border-emerald-400"
               >
-                Edit / update →
+                {isUnverified(row.validation_status) ? "Verify / update this record →" : "Edit / update →"}
               </Link>
             ) : null}
           </div>

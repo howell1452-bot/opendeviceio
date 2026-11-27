@@ -57,6 +57,7 @@ export default async function AuthorPage({
                 initialJson={JSON.stringify(row.document, null, 2)}
                 signedIn={Boolean(user)}
                 brands={brands}
+                currentStatus={row.validation_status}
               />
             </div>
             {brands.includes(row.manufacturer ?? "") ? (

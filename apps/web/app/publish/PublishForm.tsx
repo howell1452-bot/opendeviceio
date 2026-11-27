@@ -2,43 +2,61 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { validateDocument, type OdioDocument } from "@opendeviceio/sdk";
+import {
+  normalizeManufacturer,
+  validateDocument,
+  type OdioDocument
+} from "@opendeviceio/sdk";
 import { getBrowserSupabase } from "@/lib/supabase-browser";
 import {
   deriveRegistryRow,
   documentManufacturer,
   stampManufacturerVerified
 } from "@/lib/odio-row";
+import { statusLabel } from "@/components/Badge";
 
 type Result =
-  | { kind: "ok"; id: string }
+  | { kind: "ok"; id: string; replaced: string | null }
   | { kind: "error"; message: string; details?: string[] };
+
+/** A validated document waiting for the publisher to confirm. */
+interface Pending {
+  row: ReturnType<typeof deriveRegistryRow>;
+  /** Validation status of the record this replaces, or null if new. */
+  existingStatus: string | null;
+  existing: boolean;
+}
 
 export function PublishForm({ brands }: { brands: string[] }) {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
+  const [pending, setPending] = useState<Pending | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
+
+  // Memberships are stored under the canonical brand name; compare canonically.
+  const canonicalBrands = brands.map((b) => normalizeManufacturer(b) ?? b);
 
   async function handleFile(file: File) {
     setBusy(true);
     setResult(null);
+    setPending(null);
     setFileName(file.name);
     try {
       const text = await file.text();
-      await publishText(text);
+      await prepare(text);
     } catch (err) {
       setResult({
         kind: "error",
-        message:
-          err instanceof Error ? err.message : "Could not read the file."
+        message: err instanceof Error ? err.message : "Could not read the file."
       });
     } finally {
       setBusy(false);
     }
   }
 
-  async function publishText(text: string) {
+  /** Validate, check brand scope, and look up the record this would replace. */
+  async function prepare(text: string) {
     const supabase = getBrowserSupabase();
     if (!supabase) {
       setResult({ kind: "error", message: "Supabase is not configured." });
@@ -66,8 +84,8 @@ export function PublishForm({ brands }: { brands: string[] }) {
     }
 
     const doc = parsed as OdioDocument;
-    const manufacturer = documentManufacturer(doc);
-    if (!manufacturer) {
+    const rawManufacturer = documentManufacturer(doc);
+    if (!rawManufacturer) {
       setResult({
         kind: "error",
         message:
@@ -75,10 +93,11 @@ export function PublishForm({ brands }: { brands: string[] }) {
       });
       return;
     }
-    if (!brands.includes(manufacturer)) {
+    const manufacturer = normalizeManufacturer(rawManufacturer) ?? rawManufacturer;
+    if (!canonicalBrands.includes(manufacturer)) {
       setResult({
         kind: "error",
-        message: `This document's manufacturer "${manufacturer}" is not one of your approved brands (${brands.join(
+        message: `This document's manufacturer "${rawManufacturer}" is not one of your approved brands (${canonicalBrands.join(
           ", "
         )}). You can only publish files for your own brand.`
       });
@@ -92,6 +111,30 @@ export function PublishForm({ brands }: { brands: string[] }) {
       return;
     }
     row.validation_status = "manufacturer-verified";
+
+    // Does this id already exist? (Members can read their brand's rows, including
+    // drafts hidden from the public.)
+    const { data: existingRow } = await supabase
+      .from("registry")
+      .select("id,validation_status")
+      .eq("id", row.id)
+      .maybeSingle();
+
+    setPending({
+      row,
+      existing: Boolean(existingRow),
+      existingStatus:
+        (existingRow as { validation_status?: string | null } | null)?.validation_status ??
+        null
+    });
+  }
+
+  async function publish() {
+    if (!pending) return;
+    const supabase = getBrowserSupabase();
+    if (!supabase) return;
+    setBusy(true);
+    const { row } = pending;
 
     // RLS enforces that the caller may only upsert rows whose manufacturer is
     // in their memberships, so this fails server-side for any other brand.
@@ -113,15 +156,18 @@ export function PublishForm({ brands }: { brands: string[] }) {
       },
       { onConflict: "id" }
     );
+    setBusy(false);
 
     if (error) {
-      setResult({
-        kind: "error",
-        message: `Publish failed: ${error.message}`
-      });
+      setResult({ kind: "error", message: `Publish failed: ${error.message}` });
       return;
     }
-    setResult({ kind: "ok", id: row.id });
+    setResult({
+      kind: "ok",
+      id: row.id,
+      replaced: pending.existing ? statusLabel(pending.existingStatus) : null
+    });
+    setPending(null);
   }
 
   return (
@@ -151,19 +197,65 @@ export function PublishForm({ brands }: { brands: string[] }) {
           onChange={(e) => {
             const file = e.target.files?.[0];
             if (file) void handleFile(file);
+            e.target.value = "";
           }}
         />
         <span className="font-medium text-slate-700">
-          {busy ? "Publishing…" : "Drop a .odio file here, or click to choose"}
+          {busy && !pending ? "Checking…" : "Drop a .odio file here, or click to choose"}
         </span>
         {fileName ? (
           <span className="mt-1 text-sm text-slate-500">{fileName}</span>
         ) : null}
       </label>
 
+      {pending ? (
+        <div className="mt-6 rounded-lg border border-brand-200 bg-brand-50 p-4 text-sm text-brand-900">
+          <p className="font-semibold">
+            Ready to publish{" "}
+            <span className="font-mono">{pending.row.id}</span>
+          </p>
+          <p className="mt-1">
+            {pending.existing ? (
+              <>
+                This replaces the existing{" "}
+                <strong>{statusLabel(pending.existingStatus).toLowerCase()}</strong>{" "}
+                record with the same id. After publishing it shows as{" "}
+                <strong>Manufacturer-verified</strong>, and tools that sync the
+                registry pick up the change.
+              </>
+            ) : (
+              <>
+                This is a new record. It will show as{" "}
+                <strong>Manufacturer-verified</strong>.
+              </>
+            )}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => void publish()}
+              disabled={busy}
+              className="rounded-md bg-brand-600 px-4 py-2 font-medium text-white transition hover:bg-brand-700 disabled:opacity-60"
+            >
+              {busy ? "Publishing…" : "Publish as manufacturer-verified"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setPending(null)}
+              disabled={busy}
+              className="rounded-md px-3 py-2 font-medium text-brand-900 hover:underline"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       {result?.kind === "ok" ? (
         <div className="mt-6 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
-          Published as <strong>manufacturer-verified</strong>. View it at{" "}
+          Published as <strong>manufacturer-verified</strong>
+          {result.replaced ? <> (replaced the {result.replaced.toLowerCase()} record)</> : null}
+          . View it at{" "}
           <Link
             className="font-mono font-semibold underline"
             href={`/registry/${result.id}`}
