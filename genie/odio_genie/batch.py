@@ -447,7 +447,7 @@ def ingest_directory(
     """Bulk-ingest every datasheet under ``input_dir`` into drafts + a manifest.
 
     Pipeline: discover -> ingest -> batch-extract (Haiku) -> validate/score/assemble ->
-    escalate the weak ones (Sonnet) -> write ``<out_dir>/<slug>.odio.json`` + ``.review.md``
+    escalate the weak ones (Sonnet) -> write ``<out_dir>/<slug>.odio`` + ``.review.md``
     per doc, plus ``<out_dir>/manifest.json`` summarizing every document.
 
     Args:
@@ -624,7 +624,7 @@ def ingest_directory(
                 stem = f"{base}-{n}"
                 n += 1
         used_stems.add(stem)
-        draft_path = out_root / f"{stem}.odio.json"
+        draft_path = out_root / f"{stem}.odio"
         report_path = out_root / f"{stem}.review.md"
 
         write_draft(draft, draft_path)

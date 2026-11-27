@@ -67,7 +67,10 @@ export function PublishForm({ brands }: { brands: string[] }) {
     try {
       parsed = JSON.parse(text);
     } catch {
-      setResult({ kind: "error", message: "File is not valid JSON." });
+      setResult({
+        kind: "error",
+        message: "This isn't a valid .odio file: it has a JSON syntax error."
+      });
       return;
     }
 

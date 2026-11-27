@@ -27,11 +27,11 @@ function load(file: string): unknown {
 
 function bundleFiles(): string[] {
   return readdirSync(bundlesDir)
-    .filter((f) => f.endsWith(".odio.json"))
+    .filter((f) => /\.odio(\.json)?$/i.test(f))
     .map((f) => path.join(bundlesDir, f));
 }
 
-const crestronFile = path.join(bundlesDir, "crestron-uc-cx100-t-wm.odio.json");
+const crestronFile = path.join(bundlesDir, "crestron-uc-cx100-t-wm.odio");
 const crestron = load(crestronFile) as Bundle;
 
 describe("validateBundle on the example corpus", () => {
@@ -62,7 +62,7 @@ describe("validateDocument routing", () => {
   });
 
   it("routes a device example (no kind) to kind 'device'", () => {
-    const device = load(path.join(examplesDir, "extron-dtp2-t-211.odio.json"));
+    const device = load(path.join(examplesDir, "extron-dtp2-t-211.odio"));
     const result = validateDocument(device);
     expect(result.kind).toBe("device");
     expect(result.valid).toBe(true);
@@ -275,7 +275,7 @@ describe("bundleDeviceCount and bundleBillOfMaterials", () => {
 });
 
 describe("modular chassis (slots / cards)", () => {
-  const frameFile = path.join(bundlesDir, "example-modular-frame-configured.odio.json");
+  const frameFile = path.join(bundlesDir, "example-modular-frame-configured.odio");
   const frame = load(frameFile) as Bundle;
 
   it("is a valid bundle and flattens frame + cards with slot assignments", () => {

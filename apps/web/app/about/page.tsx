@@ -28,12 +28,12 @@ export default function AboutPage() {
 
         <h2 id="what">What it is</h2>
         <p>
-          OpenDeviceIO (ODIO) is an open, machine-readable format for describing
-          a hardware device&apos;s connectors, signals, power, physical, and
-          compliance data. It comes with a free public{" "}
+          OpenDeviceIO (ODIO) is an open file format, <code>.odio</code> files
+          written in JSON syntax, plus a free public{" "}
           <Link href="/registry">registry</Link> and{" "}
-          <Link href="/api-docs">API</Link>, so AV and IT design tools can import
-          device data instead of re-keying it from PDF spec sheets.
+          <Link href="/api-docs">API</Link> that describe a hardware device&apos;s
+          connectors, signals, power, physical, and compliance data, so AV design
+          tools can import it instead of re-keying PDF spec sheets.
         </p>
 
         <h2 id="maintainers">Who maintains it</h2>

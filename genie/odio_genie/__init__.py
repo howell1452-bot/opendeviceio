@@ -1,7 +1,7 @@
 """Genie - the OpenDeviceIO (ODIO) spec-sheet importer.
 
 Genie turns hardware device datasheets into schema-validated, confidence-flagged
-``.odio.json`` drafts using a hybrid LLM-extraction pipeline.
+``.odio`` drafts (JSON syntax) using a hybrid LLM-extraction pipeline.
 
 The public surface is intentionally small and import-light: importing this package
 (and running the test suite) requires only stdlib + ``jsonschema`` + ``pydantic``.

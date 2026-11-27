@@ -1,6 +1,6 @@
 # @opendeviceio/sdk
 
-TypeScript SDK for the **OpenDeviceIO** (`.odio.json`) format — generated types,
+TypeScript SDK for **OpenDeviceIO** `.odio` files (JSON syntax) — generated types,
 an [Ajv](https://ajv.js.org/) 2020 validator, and convenience accessors, built
 against the canonical v0.1 device schema.
 
@@ -102,7 +102,7 @@ contributes `8 * 30 = 240` W to `poeBudget(device)`.
 | `npm run gen-types`| Regenerate `src/schema.ts` and `src/types.ts` from the canonical schema.    |
 | `npm run build`    | Run `gen-types`, then compile ESM + CJS with type declarations into `dist/`.|
 | `npm test`         | Run the Vitest suite (conformance corpus + accessor unit tests).            |
-| `npm run validate` | Validate `.odio.json` files (defaults to the repo example corpus) via CLI.  |
+| `npm run validate` | Validate `.odio` files (legacy `.odio.json` too; defaults to the repo example corpus) via CLI. |
 
 ## Development
 

@@ -23,7 +23,7 @@ BUNDLES_DIR = EXAMPLES_DIR / "bundles"
 
 
 def _bundle_examples() -> list:
-    return sorted(BUNDLES_DIR.glob("*.odio.json"))
+    return sorted(BUNDLES_DIR.glob("*.odio"))
 
 
 def _load(path) -> dict:
@@ -48,18 +48,18 @@ def test_bundle_examples_validate_clean(path):
 
 
 def test_at_least_one_bundle_example_present():
-    assert _bundle_examples(), "expected examples/bundles/*.odio.json"
+    assert _bundle_examples(), "expected examples/bundles/*.odio"
 
 
 def test_device_example_routes_as_device():
-    device_path = EXAMPLES_DIR / "extron-dtp2-t-211.odio.json"
+    device_path = EXAMPLES_DIR / "extron-dtp2-t-211.odio"
     doc = _load(device_path)
     assert validate_kind(doc) == "device"
     assert validate(doc) == []
 
 
 def test_invalid_example_still_fails():
-    inv = _load(INVALID_DIR / "missing-required-device.odio.json")
+    inv = _load(INVALID_DIR / "missing-required-device.odio")
     assert validate(inv), "invalid example should still produce errors"
 
 
@@ -104,24 +104,24 @@ def test_bundle_tool_schema_is_self_contained():
 
 
 def test_cli_validate_bundle_example_exit_0():
-    path = BUNDLES_DIR / "crestron-uc-cx100-t-wm.odio.json"
+    path = BUNDLES_DIR / "crestron-uc-cx100-t-wm.odio"
     assert main(["validate", str(path)]) == 0
 
 
 def test_cli_validate_device_example_exit_0():
-    path = EXAMPLES_DIR / "extron-dtp2-t-211.odio.json"
+    path = EXAMPLES_DIR / "extron-dtp2-t-211.odio"
     assert main(["validate", str(path)]) == 0
 
 
 def test_cli_validate_invalid_example_exit_1():
-    path = INVALID_DIR / "missing-required-device.odio.json"
+    path = INVALID_DIR / "missing-required-device.odio"
     assert main(["validate", str(path)]) == 1
 
 
 def test_cli_parse_bundle_mock(tmp_path):
     src = tmp_path / "kit.txt"
     src.write_text("Acme KIT-100 kit", encoding="utf-8")
-    out = tmp_path / "kit.odio.json"
+    out = tmp_path / "kit.odio"
     rc = main(["parse", str(src), "-o", str(out), "--kind", "bundle", "--mock"])
     assert rc == 0
     doc = json.loads(out.read_text(encoding="utf-8"))

@@ -11,7 +11,7 @@ import { getRegistryRow } from "@/lib/registry";
 // because a catch-all segment must be the last part of a route.)
 //
 // Format is selected via ?format= :
-//   odio         (default) — the raw .odio document (JSON)
+//   odio         (default) — the raw .odio document (JSON syntax)
 //   dxf                    — AutoCAD DXF (text)
 //   svg                    — standardized ODIO I/O table (SVG; opens in any browser)
 //

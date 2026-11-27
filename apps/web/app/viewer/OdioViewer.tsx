@@ -3,7 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 import { buildIoTable, renderTableSvg, renderTableHtml } from "@opendeviceio/adapters";
 
-// Client-side ODIO viewer: drop or open an .odio file (or paste JSON) and render
+// Client-side ODIO viewer: drop or open an .odio file (or paste its source) and render
 // the standardized I/O table. Everything runs in the browser via the adapters
 // package — no upload, nothing leaves the page.
 

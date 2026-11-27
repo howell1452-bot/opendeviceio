@@ -32,7 +32,8 @@ appear in all capitals.
 
 ### 1.2 Conformance
 
-An ODIO document is a single JSON value (RFC 8259) that is a JSON object. It is one of
+An ODIO document is a `.odio` file whose content uses JSON syntax (RFC 8259); its
+top-level value is an object. It is one of
 three **kinds** (§14): a *device*, a *bundle*, or a *cable*.
 
 > A file is **conformant** to ODIO 0.1 if and only if it validates, under JSON Schema
@@ -50,12 +51,14 @@ tool that reads them. Consumers MUST validate input against the schema before re
 it, and MUST ignore unknown extension keys (see §4).
 
 ODIO files use the extension **`.odio`** (the legacy **`.odio.json`** is also accepted);
-the media type is **`application/vnd.odio+json`**. Content is JSON regardless. See §17.
+the media type is **`application/vnd.odio+json`**. The content uses JSON syntax with
+either extension. See §17.
 
 ### 1.3 The conformance corpus
 
-The repository ships a corpus of valid example documents in `examples/*.odio.json` and
-intentionally invalid documents in `examples/invalid/*.odio.json`. Every valid example
+The repository ships a corpus of valid example documents in `examples/*.odio` (plus one
+copy under the legacy extension in `examples/legacy/`) and intentionally invalid
+documents in `examples/invalid/*.odio`. Every valid example
 MUST validate; every invalid example MUST fail validation. The runner
 `tools/validate-examples.mjs` (Ajv 2020 + `ajv-formats`) enforces this and is run in CI.
 Any conformant implementation SHOULD be able to reproduce these pass/fail results.
@@ -855,7 +858,7 @@ Beyond JSON Schema, a conforming tool SHOULD check (the SDK's `validateChassis` 
 `card.slotType` is in the slot's `accepts`; and `card.powerDrawW` ≤ the slot's `powerBudgetW`.
 Internal routing/crosspoint behavior is out of scope (describe it in `parameters` if needed).
 
-`examples/bundles/example-modular-frame-configured.odio.json` is a worked example.
+`examples/bundles/example-modular-frame-configured.odio` is a worked example.
 
 ---
 
@@ -947,11 +950,11 @@ A DisplayPort-to-HDMI factory cable carrying a video signal:
 
 ## 17. The `.odio` file (extension and media type)
 
-An ODIO document is a JSON text (§2). Its on-disk form:
+An ODIO document is a `.odio` file written in JSON syntax (§2). Its on-disk form:
 
 - The RECOMMENDED file extension is **`.odio`**. The extension **`.odio.json`** MAY be
-  used and consumers SHOULD accept both. The byte content is identical either way —
-  `.odio` is JSON, so any JSON tool can read it.
+  used and consumers SHOULD accept both. The byte content is identical either way.
+  Because `.odio` uses JSON syntax, any JSON tool can read it.
 - The media type is **`application/vnd.odio+json`**. Servers SHOULD send this
   `Content-Type` when serving documents; the `+json` suffix means generic JSON tooling
   still applies.
@@ -1030,13 +1033,13 @@ examples live in `examples/bundles/` so the device conformance corpus (§1.3) is
 The repository's `examples/` directory contains complete, conformant documents that
 exercise the model end to end, including:
 
-- `examples/generic-dsp-8gpio.odio.json` — the `poleCount`/`channels` distinction and
+- `examples/generic-dsp-8gpio.odio` — the `poleCount`/`channels` distinction and
   audio-over-IP flows on one RJ45.
-- `examples/av-processor-crosscutting.odio.json` — multiple cross-cutting flows on single
+- `examples/av-processor-crosscutting.odio` — multiple cross-cutting flows on single
   ports.
-- `examples/extron-dtp2-t-211.odio.json`, `examples/netgear-m4250-poe.odio.json` — real
+- `examples/extron-dtp2-t-211.odio`, `examples/netgear-m4250-poe.odio` — real
   device shapes including HDBaseT links and PoE.
-- `examples/bundles/crestron-uc-cx100-t-wm.odio.json` — a kit (§15) demonstrating a nested
+- `examples/bundles/crestron-uc-cx100-t-wm.odio` — a kit (§15) demonstrating a nested
   sub-assembly, device components, factory-terminated cable components (§16), and an
   accessory.
 

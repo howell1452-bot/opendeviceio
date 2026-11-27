@@ -33,7 +33,7 @@ export default async function AuthorPage({
   const memberships = user && client ? await listMyMemberships(client) : [];
   const brands = memberships.map((m) => m.manufacturer);
 
-  // Edit mode: load an existing registry document into the lossless JSON editor.
+  // Edit mode: load an existing registry document into the lossless .odio source editor.
   if (editId) {
     const row = await getRegistryRow(editId);
     return (
@@ -85,7 +85,7 @@ export default async function AuthorPage({
       <p className="mt-3 max-w-2xl text-slate-600">
         Describe a device&apos;s I/O once and get a validated{" "}
         <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-sm">.odio</code> file plus
-        the standardized I/O table — no JSON by hand, all in your browser. Download it for a spec
+        the standardized I/O table — no hand-editing, all in your browser. Download it for a spec
         sheet, or{" "}
         {brands.length > 0 ? (
           <>publish it to the registry for your approved brand{brands.length > 1 ? "s" : ""}.</>

@@ -496,7 +496,7 @@ export type SignalPower = {
 };
 
 /**
- * An open, machine-readable description of a hardware device's I/O, power, physical, and compliance characteristics. Canonical source of truth for the OpenDeviceIO (.odio.json) format, v0.1.
+ * An open, machine-readable description of a hardware device's I/O, power, physical, and compliance characteristics. Canonical source of truth for the OpenDeviceIO format (.odio files, JSON syntax), v0.1.
  */
 export interface OpenDeviceIODevice {
   /**

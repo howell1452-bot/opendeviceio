@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // OpenDeviceIO registry seed/ingest tool.
 //
-// Reads every .odio.json under examples/ (excluding examples/invalid/), derives
+// Reads every .odio file (legacy .odio.json too) under examples/ (excluding
+// examples/invalid/ and examples/legacy/, a duplicate kept for extension tests), derives
 // the registry row metadata, and either:
 //   * prints idempotent upsert SQL to stdout (default), or
 //   * applies it directly via the Supabase REST API when --apply is passed and
@@ -27,15 +28,18 @@ import { normalizeManufacturer } from "@opendeviceio/sdk";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, "..");
 const examplesDir = join(repoRoot, "examples");
-const EXT = ".odio.json";
+// `.odio` is the extension; the legacy `.odio.json` is still accepted.
+const EXTS = [".odio", ".odio.json"];
+const isOdio = (name) => EXTS.some((ext) => name.toLowerCase().endsWith(ext));
 
 function walkOdioFiles(dir) {
   const out = [];
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     if (entry.isDirectory()) {
       if (entry.name === "invalid") continue; // intentionally non-conformant fixtures
+      if (entry.name === "legacy") continue; // duplicate of an example, legacy extension
       out.push(...walkOdioFiles(join(dir, entry.name)));
-    } else if (entry.isFile() && entry.name.endsWith(EXT)) {
+    } else if (entry.isFile() && isOdio(entry.name)) {
       out.push(join(dir, entry.name));
     }
   }
@@ -172,7 +176,7 @@ const updateCols = cols
 
 const sql =
   rows.length === 0
-    ? "-- seed-registry: no matching .odio.json rows to upsert."
+    ? "-- seed-registry: no matching .odio rows to upsert."
     : `insert into public.registry (${cols}) values\n` +
       rows.map(valuesFor).join(",\n") +
       `\non conflict (id) do update set ${updateCols};`;
@@ -200,7 +204,7 @@ function loadDotEnv() {
 
 async function apply() {
   if (rows.length === 0) {
-    console.error("No matching .odio.json rows to upsert (check the directory / --status filter).");
+    console.error("No matching .odio rows to upsert (check the directory / --status filter).");
     return;
   }
   loadDotEnv();

@@ -2,15 +2,16 @@ import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { validate, parse, OdioValidationError } from "../src/index.js";
+import { validate, parse, OdioValidationError, isOdioPath } from "../src/index.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const examplesDir = path.resolve(here, "..", "..", "..", "examples");
 const invalidDir = path.join(examplesDir, "invalid");
+const legacyDir = path.join(examplesDir, "legacy");
 
 function odioFiles(dir: string): string[] {
   return readdirSync(dir)
-    .filter((f) => f.endsWith(".odio.json"))
+    .filter((f) => isOdioPath(f))
     .map((f) => path.join(dir, f));
 }
 
@@ -41,6 +42,20 @@ describe("valid example corpus", () => {
     const device = parse(readFileSync(file, "utf8"));
     expect(device.odioVersion).toMatch(/^\d+\.\d+\.\d+/);
     expect(device.ports.length).toBeGreaterThan(0);
+  });
+});
+
+describe("legacy .odio.json extension", () => {
+  const files = odioFiles(legacyDir);
+
+  it("keeps at least one legacy-extension example", () => {
+    expect(files.length).toBeGreaterThanOrEqual(1);
+    expect(files.every((f) => f.endsWith(".odio.json"))).toBe(true);
+  });
+
+  it.each(files)("%s is recognized and validates", (file) => {
+    expect(isOdioPath(file)).toBe(true);
+    expect(validate(load(file)).valid).toBe(true);
   });
 });
 

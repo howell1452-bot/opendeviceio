@@ -2,7 +2,7 @@
 
 export * from "./types.js";
 
-// File-format identity: media type + `.odio` / `.odio.json` extension helpers.
+// File-format identity: media type + `.odio` extension helpers (legacy `.odio.json` accepted).
 export {
   ODIO_MEDIA_TYPE,
   ODIO_EXTENSION,

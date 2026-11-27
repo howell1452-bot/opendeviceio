@@ -92,7 +92,7 @@ server.tool(
 server.tool(
   "validate_design",
   "Validate a proposed ODIO document (device, bundle, or cable) against the schema, and for a bundle also check modular-chassis slot assignments (card fit, occupancy, power budget). Use this to verify an AI-proposed device/design before trusting it — returns valid:true or the concrete errors to repair.",
-  { document: z.record(z.any()).describe("The ODIO document to validate, as a JSON object.") },
+  { document: z.record(z.any()).describe("The ODIO document to validate (the parsed contents of a .odio file).") },
   async ({ document }) => {
     try {
       const result = validateDocument(document as never);

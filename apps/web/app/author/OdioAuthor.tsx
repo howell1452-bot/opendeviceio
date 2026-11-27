@@ -5,7 +5,7 @@ import { deviceSchema, normalizeManufacturer, validate } from "@opendeviceio/sdk
 import { buildIoTable, renderTableSvg, renderTableHtml } from "@opendeviceio/adapters";
 
 // Form-based ODIO authoring: fill in identity, ports, and power; get a validated
-// .odio file plus a live I/O-table preview — no JSON by hand, nothing uploaded.
+// .odio file plus a live I/O-table preview — no hand-editing, nothing uploaded.
 
 const DOMAINS = ["video", "audio", "control", "network", "data", "power"] as const;
 const DIRECTIONS = ["input", "output", "bidirectional"] as const;
@@ -555,7 +555,7 @@ export function OdioAuthor({
         ) : null}
 
         <details className="mt-4">
-          <summary className="cursor-pointer text-sm text-slate-500">View .odio JSON</summary>
+          <summary className="cursor-pointer text-sm text-slate-500">View .odio source</summary>
           <pre className="mt-2 max-h-96 overflow-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100">
             {json}
           </pre>

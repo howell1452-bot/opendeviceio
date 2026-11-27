@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { normalizeManufacturer, validate } from "@opendeviceio/sdk";
 import { buildIoTable, renderTableSvg } from "@opendeviceio/adapters";
 
-// Lossless .odio editor: edit the raw document JSON (so no field is dropped), with
+// Lossless .odio editor: edit the .odio source (JSON syntax) so no field is dropped, with
 // live validation + I/O-table preview, and a gated "Publish update" that upserts via
 // POST /api/v1/devices (server re-checks brand scope). Used to fix/update an existing
 // registry device for an approved brand, and as the advanced/edit mode of /author.
@@ -96,7 +96,7 @@ export function OdioEditor({
   return (
     <div className="grid gap-8 lg:grid-cols-2">
       <div>
-        <label className="block text-xs font-medium text-slate-500">.odio document (JSON)</label>
+        <label className="block text-xs font-medium text-slate-500">.odio source (JSON syntax)</label>
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -116,7 +116,7 @@ export function OdioEditor({
       <div className="lg:sticky lg:top-6 lg:self-start">
         {parseError ? (
           <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-            <strong className="font-semibold">JSON error:</strong>
+            <strong className="font-semibold">Syntax error:</strong>
             <pre className="mt-1 whitespace-pre-wrap font-mono text-xs">{parseError}</pre>
           </div>
         ) : errors.length > 0 ? (

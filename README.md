@@ -3,7 +3,9 @@
 **An open, machine-readable format for describing a hardware device's I/O, power,
 physical, and compliance characteristics — plus tooling to author and consume it.**
 
-ODIO files use the `.odio.json` extension. The reference importer is called **Genie**.
+An ODIO file is a `.odio` file. Its content uses JSON syntax, so standard JSON tools can
+read it. The legacy `.odio.json` extension is still accepted. The reference importer is
+called **Genie**.
 
 - Code & schema: [Apache-2.0](LICENSE) · Spec & docs: [CC BY 4.0](LICENSE-docs) ·
   Registry data: [CC BY 4.0](https://opendeviceio.org/data-license)
@@ -59,10 +61,10 @@ RS-232-vs-8×-GPIO worked example.
 schema/v0.1/device.schema.json   # CANONICAL contract (JSON Schema 2020-12)
 docs/SPECIFICATION.md            # normative spec, written from the schema (CC BY 4.0)
 docs/DESIGN.md                   # design memo / rationale
-examples/                        # conformant *.odio.json (+ invalid/ for tests)
+examples/                        # conformant *.odio (+ invalid/, legacy/ for tests)
 tools/validate-examples.mjs      # conformance runner (Ajv 2020)
 packages/ts-sdk/                 # @opendeviceio/sdk — TS types + Ajv validator + loader
-genie/                           # "Genie" importer (Python): spec sheet -> draft .odio.json
+genie/                           # "Genie" importer (Python): spec sheet -> draft .odio
 ```
 
 The **JSON Schema is the single source of truth.** The TypeScript types are generated
@@ -78,8 +80,8 @@ from it and the specification prose is written to match it.
 
 ### Validate the example corpus (Node)
 
-Validates every `examples/*.odio.json` against the schema and confirms every
-`examples/invalid/*.odio.json` fails:
+Validates every `examples/*.odio` against the schema and confirms every
+`examples/invalid/*.odio` fails:
 
 ```bash
 npm install

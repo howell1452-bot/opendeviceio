@@ -58,8 +58,9 @@ export default function GuidePage() {
 
           <h2 id="what">What you are producing</h2>
           <p>
-            One <code>.odio</code> file per orderable model. It is a single
-            JSON object with a required <code>odioVersion</code>, <code>id</code>,{" "}
+            One <code>.odio</code> file per orderable model. It is a{" "}
+            <code>.odio</code> file containing one object (JSON syntax) with a
+            required <code>odioVersion</code>, <code>id</code>,{" "}
             <code>device</code> identity, and <code>ports</code> array, plus optional{" "}
             <code>power</code>, <code>physical</code>, <code>standards</code>,{" "}
             <code>parameters</code>, and <code>provenance</code> blocks. Start every
@@ -254,7 +255,7 @@ genie parse datasheet.pdf -o widget-100.odio --review-report review.md
             conformance runner to validate a directory of examples against the schema
             with Ajv 2020:
           </p>
-          <CodeBlock language="shell">{`# From the repo root — validates every examples/*.odio.json and confirms the
+          <CodeBlock language="shell">{`# From the repo root — validates every examples/*.odio and confirms the
 # examples/invalid/* fixtures fail, exactly as CI does:
 npm install
 npm run validate:examples     # node tools/validate-examples.mjs`}</CodeBlock>

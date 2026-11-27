@@ -25,8 +25,8 @@ def schema_path() -> Path:
 
 
 def valid_examples() -> list[Path]:
-    return sorted(EXAMPLES_DIR.glob("*.odio.json"))
+    return sorted(EXAMPLES_DIR.glob("*.odio"))
 
 
 def invalid_examples() -> list[Path]:
-    return sorted(INVALID_DIR.glob("*.odio.json"))
+    return sorted(INVALID_DIR.glob("*.odio"))

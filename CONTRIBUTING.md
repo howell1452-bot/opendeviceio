@@ -52,11 +52,12 @@ but still go through a PR and CI.
 ├─ docs/
 │  ├─ DESIGN.md                     # design memo (frozen input)
 │  └─ SPECIFICATION.md              # normative spec, written from the schema (CC BY 4.0)
-├─ examples/                        # conformant *.odio.json
-│  └─ invalid/                      # intentionally non-conformant *.odio.json (must fail)
+├─ examples/                        # conformant *.odio
+│  ├─ invalid/                      # intentionally non-conformant *.odio (must fail)
+│  └─ legacy/                       # one example under the legacy .odio.json extension
 ├─ tools/validate-examples.mjs      # conformance runner (Ajv 2020) used by CI
 ├─ packages/ts-sdk/                 # @opendeviceio/sdk — generated TS types + Ajv validator + loader
-├─ genie/                           # "Genie" importer (Python): spec sheet -> draft .odio.json
+├─ genie/                           # "Genie" importer (Python): spec sheet -> draft .odio
 ├─ package.json                     # root dev tooling (ajv, ajv-formats) + validate:examples script
 ├─ LICENSE / LICENSE-docs           # Apache-2.0 (code) / CC BY 4.0 (docs)
 ├─ README.md / CONTRIBUTING.md / GOVERNANCE.md / CODE_OF_CONDUCT.md
@@ -67,8 +68,8 @@ but still go through a PR and CI.
 
 ### Conformance / schema check (Node)
 
-Validates every `examples/*.odio.json` against the schema and confirms every
-`examples/invalid/*.odio.json` fails:
+Validates every `examples/*.odio` against the schema and confirms every
+`examples/invalid/*.odio` fails:
 
 ```bash
 npm install
@@ -123,7 +124,7 @@ an `x-` namespace (see `GOVERNANCE.md` and `docs/SPECIFICATION.md` §4).
 
 ## Style
 
-- Schema and JSON: 2-space indentation, valid JSON (no comments in `.odio.json` files).
+- Schema and `.odio` files: 2-space indentation, valid JSON syntax (no comments in `.odio` files).
 - Keep examples realistic and minimal; prefer a real device over an invented one when it
   illustrates the same point.
 - Spec prose uses RFC 2119 keywords (MUST/SHOULD/MAY) only when stating real requirements.

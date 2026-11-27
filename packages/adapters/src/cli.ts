@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-// odio-export — convert a validated .odio.json document into a design-tool
+// odio-export — convert a validated .odio file into a design-tool
 // import format.
 //
 // Usage:
-//   odio-export <input.odio.json> [--target <id>] [-o <out>]
+//   odio-export <input.odio> [--target <id>] [-o <out>]   (legacy .odio.json accepted)
 //
 //   --target, -t      adapter id (default: easyschematic). One of:
 //                     easyschematic | dxf | visio | avcad
