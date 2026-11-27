@@ -9,6 +9,7 @@ import { IntegrationRequestForm } from "./IntegrationRequestForm";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/implement/register" },
   title: "Register an integration",
   description:
     "Software vendors: register your product's use of OpenDeviceIO registry data to get removal and correction notices and a confirmed record of the data terms."

@@ -8,6 +8,7 @@ import { listMyMemberships } from "@/lib/membership";
 import { STATUS_FILTERS } from "@/lib/status-filters";
 import { categoryFilterValues, categoryOptionLabel } from "@/lib/category-filter";
 import { KindBadge, SourceBadge, StatusBadge } from "@/components/Badge";
+import { brandPath } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
 
@@ -17,17 +18,33 @@ function first(v: string | string[] | undefined): string {
   return Array.isArray(v) ? v[0] ?? "" : v ?? "";
 }
 
-export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+function pageNumber(v: string | string[] | undefined): number {
+  return Math.max(1, Number.parseInt(first(v) || "1", 10) || 1);
+}
+
+export async function generateMetadata({
+  params,
+  searchParams
+}: {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}): Promise<Metadata> {
   const { slug } = await params;
   const brand = await getBrandBySlug(slug);
   if (!brand) return { title: "Brand not found" };
   // The brand page is indexable even when every record is a draft (drafts
-  // themselves stay noindex on their own pages).
+  // themselves stay noindex on their own pages). Filters (status, category)
+  // canonicalize to the unfiltered page; pagination keeps ?page=N.
+  const title = `${brand.name} devices`;
+  const description =
+    brand.description ??
+    `${brand.name} device, bundle and cable records in the OpenDeviceIO registry, with their verification status.`;
+  const canonical = brandPath(brand.slug, pageNumber((await searchParams).page));
   return {
-    title: `${brand.name} devices`,
-    description:
-      brand.description ??
-      `${brand.name} device, bundle and cable records in the OpenDeviceIO registry, with their verification status.`
+    title,
+    description,
+    alternates: { canonical },
+    openGraph: { url: canonical, title, description, siteName: "OpenDeviceIO", type: "website" }
   };
 }
 
@@ -45,7 +62,7 @@ export default async function BrandPage({
 
   const status = first(sp.status);
   const category = first(sp.category);
-  const page = Math.max(1, Number.parseInt(first(sp.page) || "1", 10) || 1);
+  const page = pageNumber(sp.page);
   const statusFilter = STATUS_FILTERS.find((s) => s.value === status);
 
   const [{ user, client }, counts, categories, list] = await Promise.all([

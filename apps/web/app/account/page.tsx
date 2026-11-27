@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { NOINDEX } from "@/lib/site";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/session";
@@ -13,6 +14,7 @@ import { TokenManager, type TokenRow } from "./TokenManager";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
+  robots: NOINDEX,
   title: "Account",
   description: "Your OpenDeviceIO account, brands, and API tokens."
 };

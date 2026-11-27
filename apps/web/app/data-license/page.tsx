@@ -14,6 +14,7 @@ import {
 } from "@/lib/data-license";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/data-license" },
   title: "Registry data license & integration terms",
   description: `OpenDeviceIO registry records are licensed ${DATA_LICENSE.short}: store, normalize, and display them — including in commercial products — with attribution. Plus validation-status labeling, images, sync, and removal terms for integrations.`
 };

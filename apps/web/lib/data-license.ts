@@ -7,7 +7,9 @@
 // read from here. Bump DATA_TERMS_VERSION whenever the terms page changes in
 // substance, so registrations record which version a vendor accepted.
 
-export const SITE_URL = "https://opendeviceio.org";
+import { SITE_URL } from "./site";
+
+export { SITE_URL };
 
 export const DATA_LICENSE = {
   name: "Creative Commons Attribution 4.0 International",

@@ -10,6 +10,7 @@ import {
 } from "@/lib/project";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/about" },
   title: "About",
   description:
     "Who maintains OpenDeviceIO, how the project is governed and licensed, and how to get in touch."

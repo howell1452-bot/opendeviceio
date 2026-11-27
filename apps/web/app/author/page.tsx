@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { NOINDEX } from "@/lib/site";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/session";
 import { listMyMemberships } from "@/lib/membership";
@@ -12,6 +13,7 @@ import { vendorOrgsForUser } from "@/lib/orgs";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
+  robots: NOINDEX,
   title: "Author or edit an .odio file",
   description:
     "Create a valid OpenDeviceIO (.odio) device from a form, or edit an existing registry device's document. Download it, or (for approved manufacturers) publish/update it for your brand."

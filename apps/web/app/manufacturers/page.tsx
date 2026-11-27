@@ -14,6 +14,7 @@ import { CORRECTION_BUSINESS_DAYS } from "@/lib/data-license";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/manufacturers" },
   title: "For manufacturers",
   description:
     "Publish your products' I/O once, as an open file every design tool can read. See your products in the registry, report an error without signing up, or claim your brand. Free, no exclusivity, no contract."

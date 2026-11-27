@@ -12,6 +12,7 @@ import { VerificationSteps } from "@/components/VerificationSteps";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/contribute" },
   title: "Claim your brand",
   description:
     "Manufacturer reps: claim your brand on OpenDeviceIO to publish manufacturer-verified .odio files, manage your team and choose how community submissions are handled."

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { NOINDEX } from "@/lib/site";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/session";
 import { listMyMemberships } from "@/lib/membership";
@@ -10,6 +11,7 @@ import { SubmitForm } from "./SubmitForm";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
+  robots: NOINDEX,
   title: "Submit a record",
   description:
     "Submit a .odio file to the OpenDeviceIO registry. Submissions are labelled by source and stay unverified unless the manufacturer verifies them."

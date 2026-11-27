@@ -52,6 +52,27 @@ browser because Row Level Security on `public.registry` permits `SELECT` only.
 If the variables are unset or the database is unreachable, the registry renders a
 graceful empty state and the rest of the site works normally.
 
+`NEXT_PUBLIC_SITE_URL` (optional, default `https://opendeviceio.org`) is the
+public origin. Canonical URLs, `og:url`, `/sitemap.xml` and `/robots.txt` always
+use it, including on preview deployments. Every other host is sent
+`X-Robots-Tag: noindex` (see `next.config.mjs`). Set it only if the site moves.
+
+## Search engines
+
+- **Canonical URLs:**
+  - Record pages use the record's current id. An old id 308s there first.
+  - Brand pages use `/brands/<slug>`, keeping `?page=N` past page 1.
+  - `/registry` drops its filters.
+  - Static pages point at themselves.
+- **noindex:** pages behind sign-in and unverified drafts.
+- **`/sitemap.xml`** (`app/sitemap.ts`, `lib/sitemap.ts`) lists:
+  - the public pages
+  - every brand page with a public record
+  - every public record, read as anon, so hidden drafts and renamed ids are left out
+
+  One sitemap file holds at most 50,000 URLs. Split it with `generateSitemaps` before the registry gets close to that.
+- **`/robots.txt`** (`app/robots.ts`, `lib/robots.ts`) keeps sign-in pages, dashboards, the API and downloads out of crawls.
+
 ## Develop
 
 ```bash

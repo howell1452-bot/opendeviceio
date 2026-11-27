@@ -11,6 +11,7 @@ import type { RequestType } from "./actions";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/correct" },
   title: "Report an error in a record",
   description:
     "Manufacturers and anyone else can report an error in a registry record, or ask to verify it. No sign-up needed."

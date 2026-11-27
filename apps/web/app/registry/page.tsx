@@ -12,6 +12,8 @@ import { categoryFilterValues, categoryOptionLabel } from "@/lib/category-filter
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
+  // Filters and search (?brand=, ?source=, ?q=, ...) canonicalize to the plain listing.
+  alternates: { canonical: "/registry" },
   title: "Registry",
   description:
     "Browse the OpenDeviceIO registry: a free, searchable, downloadable library of device, bundle, and cable .odio files."

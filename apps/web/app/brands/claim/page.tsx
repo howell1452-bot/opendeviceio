@@ -9,6 +9,7 @@ import { ClaimForm } from "../ClaimForm";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/brands/claim" },
   title: "Claim your brand",
   description:
     "Manufacturers: claim your brand on OpenDeviceIO to publish manufacturer-verified records, manage your team and choose how community submissions are handled."

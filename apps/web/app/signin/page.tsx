@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import { NOINDEX } from "@/lib/site";
 import { SignInForm } from "./SignInForm";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
+  robots: NOINDEX,
   title: "Sign in",
   description:
     "Sign in to OpenDeviceIO with a magic link to submit records, or to request manufacturer access and publish verified .odio files for your brand."

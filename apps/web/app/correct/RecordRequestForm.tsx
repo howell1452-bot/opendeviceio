@@ -85,7 +85,7 @@ export function RecordRequestForm({
         <legend className="block text-sm font-medium text-slate-700">
           What would you like us to do?
         </legend>
-        <div className="mt-2 grid gap-2 sm:grid-cols-3">
+        <div className={`mt-2 grid gap-2 ${types.length > 2 ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
           {types.map((t) => (
             <label
               key={t.value}

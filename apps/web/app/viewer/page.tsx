@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { OdioViewer } from "./OdioViewer";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/viewer" },
   title: "ODIO viewer — see a device's I/O at a glance",
   description:
     "Open an .odio file in your browser to view its standardized I/O table — connectors, links, signals, and power — and export it as SVG or a self-contained HTML page."

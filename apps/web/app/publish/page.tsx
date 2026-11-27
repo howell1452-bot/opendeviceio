@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { NOINDEX } from "@/lib/site";
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/session";
 import { listMyMemberships } from "@/lib/membership";
@@ -9,6 +10,7 @@ import { PublishLicenseNote } from "@/components/PublishLicenseNote";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
+  robots: NOINDEX,
   title: "Publish a verified file",
   description:
     "Upload a .odio file for your approved brand. It validates against the ODIO schema and publishes as manufacturer-verified."
