@@ -13,7 +13,8 @@ import {
 import { DeviceView } from "@/components/DeviceView";
 import { BundleView } from "@/components/BundleView";
 import { IoTableView } from "@/components/IoTableView";
-import { getCurrentUser } from "@/lib/session";
+import { getCurrentUser, isAdminEmail } from "@/lib/session";
+import { ReviewControls } from "./ReviewControls";
 import { listMyMemberships } from "@/lib/membership";
 
 // Fetch the row at request time; build must not depend on the DB.
@@ -124,6 +125,10 @@ export default async function RegistryDetailPage({
             ) : null}
           </div>
         </div>
+
+        {user && isAdminEmail(user.email) ? (
+          <ReviewControls id={row.id} status={row.validation_status} />
+        ) : null}
 
         <p className="mt-5 text-sm">
           <Link

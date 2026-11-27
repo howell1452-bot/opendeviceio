@@ -207,3 +207,64 @@ export async function setBrandHidden(
   const res = (data ?? {}) as { drafts?: number; tombstones?: number };
   return { ok: true, drafts: res.drafts, tombstones: res.tombstones };
 }
+
+// ---- Review (P1-13): mark a draft "reviewed" in one click --------------------
+
+/**
+ * Set a record's validation status to "reviewed" (from draft) or back to
+ * "draft" (undo). Writes provenance.validation {status, by, date} into the
+ * document; `by` is the project, never a personal email, because documents are
+ * public and mirrored. updated_at is bumped by the registry trigger, so
+ * integrations pick the change up via updated_since. Manufacturer-verified
+ * records are never changed here.
+ */
+export async function setRecordReviewStatus(
+  id: string,
+  status: "reviewed" | "draft"
+): Promise<{ ok: boolean; error?: string }> {
+  const { error, service } = await requireAdminService();
+  if (error || !service) return { ok: false, error: error ?? "Unavailable." };
+  if (status !== "reviewed" && status !== "draft") {
+    return { ok: false, error: "Invalid status." };
+  }
+
+  const { data: row, error: getErr } = await service
+    .from("registry")
+    .select("id,validation_status,document")
+    .eq("id", id)
+    .maybeSingle();
+  if (getErr || !row) return { ok: false, error: getErr?.message ?? "Record not found." };
+
+  const current = (row as { validation_status: string | null }).validation_status ?? "draft";
+  if (current === "manufacturer-verified") {
+    return { ok: false, error: "Manufacturer-verified records can't be changed here." };
+  }
+  if (status === "reviewed" && current !== "draft") {
+    return { ok: false, error: `Record is already ${current}.` };
+  }
+  if (status === "draft" && current !== "reviewed") {
+    return { ok: false, error: "Only reviewed records can be reverted to draft." };
+  }
+
+  const doc = JSON.parse(
+    JSON.stringify((row as { document: Record<string, unknown> }).document)
+  ) as Record<string, unknown>;
+  const provenance = (doc.provenance as Record<string, unknown> | undefined) ?? {};
+  const validation = (provenance.validation as Record<string, unknown> | undefined) ?? {};
+  const today = new Date().toISOString().slice(0, 10);
+  const nextValidation: Record<string, unknown> =
+    status === "reviewed"
+      ? { ...validation, status: "reviewed", by: "OpenDeviceIO", date: today }
+      : { ...validation, status: "draft" };
+  if (status === "draft") delete nextValidation.by;
+  doc.provenance = { ...provenance, validation: nextValidation };
+
+  const { error: upErr } = await service
+    .from("registry")
+    .update({ validation_status: status, document: doc })
+    .eq("id", id)
+    // NULL status counts as draft; a plain .neq() would skip NULL rows.
+    .or("validation_status.is.null,validation_status.neq.manufacturer-verified");
+  if (upErr) return { ok: false, error: upErr.message };
+  return { ok: true };
+}
