@@ -7,6 +7,7 @@ import {
   DATA_TERMS_VERSION,
   LIST_MAX_LIMIT,
   LIST_MAX_LIMIT_WITH_DOCUMENTS,
+  REMOVAL_REQUEST_BUSINESS_DAYS,
   REMOVAL_WINDOW_DAYS,
   SYNC_INTERVAL_DAYS
 } from "@/lib/data-license";
@@ -25,6 +26,7 @@ const TOC = [
   ["images", "Images & trademarks"],
   ["sync", "Export, sync & limits"],
   ["integrations", "Integration terms"],
+  ["removals", "Corrections & removals"],
   ["warranty", "No warranty"],
   ["changes", "Changes"]
 ] as const;
@@ -324,6 +326,30 @@ export default function DataLicensePage() {
               <Link href="/implement/register">/implement/register</Link> if
               you store or display the data in a product. We use your
               registration to send removal, correction, and change notices.
+            </li>
+          </ul>
+
+          <h2 id="removals">Corrections &amp; removals</h2>
+          <p>
+            Anyone can ask for a record to be corrected, removed, or verified at{" "}
+            <Link href="/correct">/correct</Link>. No account is needed. A link
+            from every record page pre-fills the form for that record.
+          </p>
+          <ul>
+            <li>
+              <strong>Removals</strong> are completed within{" "}
+              {REMOVAL_REQUEST_BUSINESS_DAYS} business days of the request, and the
+              removed ids are published to{" "}
+              <code>GET /api/v1/removals</code> so mirrors can delete them.
+            </li>
+            <li>
+              <strong>Corrections</strong> are made to the registry record and
+              reach mirrors through <code>updated_since</code>.
+            </li>
+            <li>
+              <strong>Manufacturers</strong> can also become verified publishers
+              and correct their own records directly; see{" "}
+              <Link href="/contribute">For Manufacturers</Link>.
             </li>
           </ul>
 

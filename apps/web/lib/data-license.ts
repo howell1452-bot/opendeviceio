@@ -31,6 +31,13 @@ export const SYNC_INTERVAL_DAYS = 30;
 /** How quickly a registered integration should act on a removal (days). */
 export const REMOVAL_WINDOW_DAYS = 30;
 
+/**
+ * Turnaround commitment for a removal requested through /correct (or by
+ * email): the record is taken down and published to /api/v1/removals within
+ * this many business days.
+ */
+export const REMOVAL_REQUEST_BUSINESS_DAYS = 5;
+
 /** Page-size limits for the list API. */
 export const LIST_DEFAULT_LIMIT = 50;
 export const LIST_MAX_LIMIT = 200;

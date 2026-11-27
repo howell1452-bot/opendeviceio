@@ -111,6 +111,15 @@ export default async function RegistryDetailPage({
             ) : null}
           </div>
         </div>
+
+        <p className="mt-5 text-sm">
+          <Link
+            href={`/correct?id=${encodeURIComponent(row.id)}`}
+            className="font-medium text-brand-700 underline underline-offset-2 hover:text-brand-900"
+          >
+            Is this your product? Verify, correct, or request removal →
+          </Link>
+        </p>
       </header>
 
       {/* Kind-specific body */}

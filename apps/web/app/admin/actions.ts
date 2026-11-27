@@ -79,3 +79,78 @@ export async function reviewIntegrationRequest(
   if (upErr) return { ok: false, error: upErr.message };
   return { ok: true };
 }
+
+// ---- Record requests (public correct / remove / verify) ---------------------
+
+export async function setRecordRequestStatus(
+  requestId: string,
+  status: "new" | "in-progress" | "resolved" | "declined",
+  note?: string
+): Promise<{ ok: boolean; error?: string }> {
+  const { error, service, admin } = await requireAdminService();
+  if (error || !service) return { ok: false, error: error ?? "Unavailable." };
+  if (!["new", "in-progress", "resolved", "declined"].includes(status)) {
+    return { ok: false, error: "Invalid status." };
+  }
+  const done = status === "resolved" || status === "declined";
+  const { error: upErr } = await service
+    .from("record_requests")
+    .update({
+      status,
+      ...(note !== undefined ? { admin_note: note || null } : {}),
+      resolved_by: done ? admin : null,
+      resolved_at: done ? new Date().toISOString() : null
+    })
+    .eq("id", requestId);
+  if (upErr) return { ok: false, error: upErr.message };
+  return { ok: true };
+}
+
+/**
+ * Honor a removal request: delete the request's record ids from the registry
+ * (the registry_removals trigger publishes each to GET /api/v1/removals), tag
+ * the tombstones with the reason, and resolve the request.
+ */
+export async function removeRecordsForRequest(
+  requestId: string
+): Promise<{ ok: boolean; removed?: number; error?: string }> {
+  const { error, service, admin } = await requireAdminService();
+  if (error || !service) return { ok: false, error: error ?? "Unavailable." };
+
+  const { data: req, error: getErr } = await service
+    .from("record_requests")
+    .select("id,record_ids")
+    .eq("id", requestId)
+    .maybeSingle();
+  if (getErr || !req) return { ok: false, error: getErr?.message ?? "Request not found." };
+  const ids = ((req as { record_ids: string[] }).record_ids ?? []).filter(Boolean);
+  if (ids.length === 0) return { ok: false, error: "This request lists no record ids." };
+
+  const { data: deleted, error: delErr } = await service
+    .from("registry")
+    .delete()
+    .in("id", ids)
+    .select("id");
+  if (delErr) return { ok: false, error: delErr.message };
+
+  // registry_removals is publicly readable: keep the reason generic (no
+  // requester names).
+  await service
+    .from("registry_removals")
+    .update({ reason: "Removed on request" })
+    .in("id", ids)
+    .is("reason", null);
+
+  const removed = (deleted ?? []).length;
+  const { error: upErr } = await service
+    .from("record_requests")
+    .update({
+      status: "resolved",
+      admin_note: `Removed ${removed} of ${ids.length} record(s).`,
+      resolved_by: admin,
+      resolved_at: new Date().toISOString()
+    })
+    .eq("id", requestId);
+  if (upErr) return { ok: false, error: upErr.message };
+  return { ok: true, removed };
+}

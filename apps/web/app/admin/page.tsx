@@ -7,9 +7,14 @@ import {
   INTEGRATION_COLUMNS,
   type IntegrationRequest
 } from "@/lib/integrations";
-import { USE_CASES } from "@/lib/data-license";
+import { REMOVAL_REQUEST_BUSINESS_DAYS, USE_CASES } from "@/lib/data-license";
+import {
+  RECORD_REQUEST_COLUMNS,
+  type RecordRequest
+} from "@/lib/record-requests";
 import { RequestRow } from "./RequestRow";
 import { IntegrationRow } from "./IntegrationRow";
+import { RecordRequestRow } from "./RecordRequestRow";
 
 export const dynamic = "force-dynamic";
 
@@ -31,12 +36,14 @@ export default async function AdminPage() {
   let integrationsPending: IntegrationRequest[] = [];
   let integrationsApproved: IntegrationRequest[] = [];
   let integrationsError: string | null = null;
+  let recordRequests: RecordRequest[] = [];
+  let recordRequestsError: string | null = null;
 
   if (!service) {
     configError =
       "SUPABASE_SECRET_KEY is not set, so admin review is unavailable on this deployment.";
   } else {
-    const [access, integrations] = await Promise.all([
+    const [access, integrations, records] = await Promise.all([
       service
         .from("access_requests")
         .select("id,user_id,email,manufacturer,note,status,created_at")
@@ -46,8 +53,15 @@ export default async function AdminPage() {
         .from("integration_requests")
         .select(INTEGRATION_COLUMNS)
         .in("status", ["pending", "approved"])
+        .order("created_at", { ascending: true }),
+      service
+        .from("record_requests")
+        .select(RECORD_REQUEST_COLUMNS)
+        .in("status", ["new", "in-progress"])
         .order("created_at", { ascending: true })
     ]);
+    if (records.error) recordRequestsError = records.error.message;
+    else recordRequests = (records.data ?? []) as RecordRequest[];
     if (access.error) configError = access.error.message;
     else pending = (access.data ?? []) as AccessRequest[];
 
@@ -76,6 +90,34 @@ export default async function AdminPage() {
       ) : (
         <>
           <section className="mt-10">
+            <h2 className="text-xl font-bold text-slate-900">
+              Record requests
+            </h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Corrections, removals, and verification requests filed on{" "}
+              <code className="font-mono">/correct</code> (no sign-up). Removals
+              are promised within {REMOVAL_REQUEST_BUSINESS_DAYS} business days.
+            </p>
+            {recordRequestsError ? (
+              <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                {recordRequestsError}
+              </div>
+            ) : recordRequests.length === 0 ? (
+              <p className="mt-4 text-sm text-slate-500">No open requests.</p>
+            ) : (
+              <ul className="mt-4 space-y-3">
+                {recordRequests.map((r) => (
+                  <RecordRequestRow
+                    key={r.id}
+                    request={r}
+                    removalWindowDays={REMOVAL_REQUEST_BUSINESS_DAYS}
+                  />
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section className="mt-12">
             <h2 className="text-xl font-bold text-slate-900">
               Manufacturer access requests
             </h2>
