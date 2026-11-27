@@ -7,7 +7,10 @@ import { STATUS_FILTERS } from "@/lib/status-filters";
 export interface FilterOptions {
   kinds: string[];
   manufacturers: string[];
+  /** Controlled category paths (see lib/category-filter.ts). */
   categories: string[];
+  /** Display text per category path. */
+  categoryLabels?: Record<string, string>;
   connectors: string[];
 }
 
@@ -109,6 +112,7 @@ export function RegistryFilters({
           label="Category"
           value={initial.category}
           options={options.categories}
+          labels={options.categoryLabels}
           onChange={(v) => pushWith({ category: v })}
         />
         <Select

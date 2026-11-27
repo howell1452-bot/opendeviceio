@@ -1,6 +1,7 @@
 import type { OdioDocument } from "@opendeviceio/sdk";
 import { normalizeManufacturer } from "@opendeviceio/sdk";
 import { getSupabase } from "./supabase";
+import { controlledCategoryOf } from "./category-filter";
 
 // A row of the `public.registry` table. The `document` column is the full
 // .odio file (device | bundle | cable), stored as its parsed object.
@@ -40,7 +41,10 @@ export interface RegistryQuery {
   /** Embed the full `document` in each row (export / bulk sync). */
   includeDocument?: boolean;
   kind?: string;
+  /** Exact match on the stored category. */
   category?: string;
+  /** Match any of these stored categories (the website's controlled filter). */
+  categoryIn?: string[];
   manufacturer?: string;
   connector?: string;
   transport?: string;
@@ -92,6 +96,9 @@ export async function listRegistry(
     if (query.updatedSince) q = q.gte("updated_at", query.updatedSince);
     if (query.kind) q = q.eq("kind", query.kind);
     if (query.category) q = q.eq("category", query.category);
+    if (query.categoryIn && query.categoryIn.length > 0) {
+      q = q.in("category", query.categoryIn);
+    }
     if (query.manufacturer) q = q.eq("manufacturer", query.manufacturer);
     if (query.connector) q = q.contains("connectors", [query.connector]);
     if (query.transport) q = q.contains("transports", [query.transport]);
@@ -211,7 +218,10 @@ export async function getFacets(): Promise<RegistryFacets> {
         // Canonicalize for the facet so any un-migrated variant still folds into
         // its brand (storage is normalized on write, so this is belt-and-braces).
         if (r.manufacturer) manufacturers.add(normalizeManufacturer(r.manufacturer));
-        if (r.category) categories.add(r.category);
+        // Only controlled categories appear in the facet; raw spellings fold
+        // into the controlled path they map to (see lib/category-filter.ts).
+        const controlled = controlledCategoryOf(r.category);
+        if (controlled) categories.add(controlled);
         for (const c of r.connectors ?? []) connectors.add(c);
       }
       if (data.length < PAGE) break;

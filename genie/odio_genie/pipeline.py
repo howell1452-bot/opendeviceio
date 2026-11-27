@@ -444,10 +444,17 @@ def assemble(
 
     The document's ``kind`` (if any) is never clobbered, and the top-level ``$schema``
     is set to the device/bundle/cable schema URL matching that kind.
+
+    Extracted categories (the document's identity and any bundle components) are
+    canonicalized against the advisory taxonomy in ``vocab/`` - see
+    :mod:`odio_genie.category`.
     """
+    from .category import normalize_document_categories
+
     doc.setdefault("odioVersion", ODIO_VERSION)
     kind = validate_kind(doc)
     doc.setdefault("$schema", _KIND_TO_URL.get(kind, DEVICE_SCHEMA_URL))
+    normalize_document_categories(doc)
 
     provenance = doc.setdefault("provenance", {})
     provenance["generator"] = GENERATOR
