@@ -18,3 +18,17 @@ on conflict (id) do nothing;
 insert into public.record_redirects (old_id, new_id)
 values ('example-audio-old/x1', 'example-audio/x1')
 on conflict (old_id) do nothing;
+
+-- Paging fixtures (e2e/registry-paging.spec.ts): one brand with more records
+-- than a /registry page holds (100), so it spans two pages.
+insert into public.registry (id, kind, manufacturer, model, category, validation_status, odio_version, port_count, document)
+select 'paging-labs/p' || lpad(n::text, 3, '0'), 'device', 'Paging Labs', 'P' || lpad(n::text, 3, '0'),
+       'av/audio/dsp', 'draft', '0.1.0', 0,
+       jsonb_build_object(
+         'odioVersion', '0.1.0',
+         'id', 'paging-labs/p' || lpad(n::text, 3, '0'),
+         'device', jsonb_build_object('manufacturer', 'Paging Labs', 'model', 'P' || lpad(n::text, 3, '0'), 'category', 'av/audio/dsp'),
+         'ports', '[]'::jsonb,
+         'provenance', '{"method":"llm-extraction","validation":{"status":"draft"}}'::jsonb)
+from generate_series(1, 130) as n
+on conflict (id) do nothing;

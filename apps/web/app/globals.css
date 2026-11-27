@@ -14,6 +14,38 @@ body {
   @apply bg-white text-slate-800 antialiased;
 }
 
+/* Markup repeated on every card of a listing (/registry renders 100 per page):
+   one short class each keeps the page and its RSC payload small. */
+@layer components {
+  .badge {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset;
+  }
+  .chip {
+    @apply inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 font-mono text-xs text-slate-700 ring-1 ring-inset ring-slate-200;
+  }
+  .reg-card {
+    @apply relative flex h-full flex-col rounded-xl border border-slate-200 bg-white p-5 transition hover:border-brand-300 hover:shadow-md;
+  }
+  .reg-card-head {
+    @apply flex items-start justify-between gap-2;
+  }
+  .reg-card-brand {
+    @apply truncate text-sm font-medium text-slate-500;
+  }
+  .reg-card-brand a {
+    @apply relative z-10 hover:text-brand-700 hover:underline;
+  }
+  .reg-card-model {
+    @apply mt-0.5 block truncate font-semibold text-slate-900 after:absolute after:inset-0 after:content-[''];
+  }
+  .reg-card-tags {
+    @apply mt-3 flex flex-wrap items-center gap-2;
+  }
+  .reg-card-foot {
+    @apply mt-auto flex items-center justify-between pt-4 text-xs text-slate-500;
+  }
+}
+
 /* Long-form prose styling for the whitepaper / guide (no plugin dependency). */
 .prose-odio {
   @apply text-slate-700 leading-relaxed;

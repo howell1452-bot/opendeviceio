@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { listRegistry, getFacets, type RegistryListRow } from "@/lib/registry";
 import { listBrands } from "@/lib/brands";
 import { KindBadge, StatusBadge, SourceBadge, Chip } from "@/components/Badge";
@@ -7,17 +8,30 @@ import { SOURCE_FILTERS } from "@/lib/source";
 import { RegistryFilters } from "@/components/RegistryFilters";
 import { STATUS_FILTERS } from "@/lib/status-filters";
 import { categoryFilterValues, categoryOptionLabel } from "@/lib/category-filter";
+import { REGISTRY_PAGE_SIZE as PAGE_SIZE, listingQuery, pageCount, pageNumber } from "@/lib/paging";
+import { Pager } from "@/components/Pager";
 
 // Always render at request time so `next build` never depends on the DB.
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
-  // Filters and search (?brand=, ?source=, ?q=, ...) canonicalize to the plain listing.
-  alternates: { canonical: "/registry" },
-  title: "Registry",
-  description:
-    "Browse the OpenDeviceIO registry: a free, searchable, downloadable library of device, bundle, and cable .odio files."
-};
+/** Filters a pager link keeps (everything but page). */
+const FILTER_KEYS = ["q", "kind", "manufacturer", "category", "connector", "status", "source"] as const;
+
+export async function generateMetadata({
+  searchParams
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}): Promise<Metadata> {
+  // Page 1 is /registry; page N is /registry?page=N. Filters and search
+  // (?manufacturer=, ?source=, ?q=, ...) are always dropped from the canonical.
+  const page = pageNumber((await searchParams).page);
+  return {
+    alternates: { canonical: `/registry${listingQuery({ page })}` },
+    title: page > 1 ? `Registry, page ${page}` : "Registry",
+    description:
+      "Browse the OpenDeviceIO registry: a free, searchable, downloadable library of device, bundle, and cable .odio files."
+  };
+}
 
 function first(v: string | string[] | undefined): string {
   if (Array.isArray(v)) return v[0] ?? "";
@@ -41,18 +55,31 @@ export default async function RegistryPage({
   };
   const statusFilter = STATUS_FILTERS.find((s) => s.value === query.status);
   const sourceFilter = SOURCE_FILTERS.find((s) => s.value === query.source);
+  const page = pageNumber(sp.page);
 
-  const [{ rows, unavailable }, facets] = await Promise.all([
+  const [{ rows, total, unavailable }, facets] = await Promise.all([
     listRegistry({
       ...query,
       // The Category dropdown lists controlled paths; match every raw spelling.
       category: undefined,
       categoryIn: query.category ? categoryFilterValues(query.category) : undefined,
       statuses: statusFilter ? [...statusFilter.statuses] : undefined,
-      sources: sourceFilter ? [sourceFilter.value] : undefined
+      sources: sourceFilter ? [sourceFilter.value] : undefined,
+      limit: PAGE_SIZE,
+      offset: (page - 1) * PAGE_SIZE
     }),
     getFacets()
   ]);
+  const matched = total ?? rows.length;
+  const pages = pageCount(matched, PAGE_SIZE);
+  // Past the last page is a 404 (page 1 of an empty result is not).
+  if (!unavailable && page > pages) notFound();
+  const filters: Record<string, string> = {};
+  for (const k of FILTER_KEYS) {
+    const v = first(sp[k]);
+    if (v) filters[k] = v;
+  }
+  const pageHref = (n: number) => `/registry${listingQuery({ ...filters, page: n })}`;
   const brandSlugs = new Map(
     (await listBrands()).map((b) => [b.manufacturer ?? b.name, b.slug] as const)
   );
@@ -102,16 +129,18 @@ export default async function RegistryPage({
           <EmptyState unavailable={unavailable} filtered={Boolean(query.search || query.kind || query.manufacturer || query.category || query.connector || query.status || query.source)} />
         ) : (
           <>
-            <p className="mb-4 text-sm text-slate-500">
-              {rows.length} {rows.length === 1 ? "entry" : "entries"}
+            <p className="mb-4 text-sm text-slate-500" data-testid="registry-total">
+              {matched.toLocaleString("en-US")} {matched === 1 ? "entry" : "entries"}
+              {pages > 1 ? ` · page ${page} of ${pages}` : ""}
             </p>
-            <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {rows.map((row) => (
                 <li key={row.id}>
                   <RegistryCard row={row} brandSlug={brandSlugs.get(row.manufacturer ?? "")} />
                 </li>
               ))}
             </ul>
+            <Pager page={page} pages={pages} total={matched} pageSize={PAGE_SIZE} href={pageHref} label="Registry pages" />
           </>
         )}
       </div>
@@ -123,35 +152,32 @@ function RegistryCard({ row, brandSlug }: { row: RegistryListRow; brandSlug?: st
   // A "stretched link" card: the model link covers the card, and the brand
   // link sits above it (links can't nest).
   return (
-    <div className="group relative flex h-full flex-col rounded-xl border border-slate-200 bg-white p-5 transition hover:border-brand-300 hover:shadow-md">
-      <div className="flex items-start justify-between gap-2">
+    <div className="reg-card">
+      <div className="reg-card-head">
         <div className="min-w-0">
-          <div className="truncate text-sm font-medium text-slate-500">
+          <div className="reg-card-brand">
             {brandSlug ? (
-              <Link href={`/brands/${brandSlug}`} className="relative z-10 hover:text-brand-700 hover:underline">
+              <Link href={`/brands/${brandSlug}`}>
                 {row.manufacturer}
               </Link>
             ) : (
               row.manufacturer ?? "Unknown manufacturer"
             )}
           </div>
-          <Link
-            href={`/registry/${row.id}`}
-            className="mt-0.5 block truncate font-semibold text-slate-900 after:absolute after:inset-0 after:content-['']"
-          >
+          <Link href={`/registry/${row.id}`} className="reg-card-model">
             {row.model ?? row.id}
           </Link>
         </div>
         <KindBadge kind={row.kind} />
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-2">
+      <div className="reg-card-tags">
         <StatusBadge status={row.validation_status} />
         <SourceBadge source={row.source_type} org={row.source_org} />
         {row.category ? <Chip>{row.category}</Chip> : null}
       </div>
 
-      <div className="mt-auto flex items-center justify-between pt-4 text-xs text-slate-500">
+      <div className="reg-card-foot">
         <span className="font-mono">{row.id}</span>
         {row.kind === "device" && typeof row.port_count === "number" ? (
           <span>
