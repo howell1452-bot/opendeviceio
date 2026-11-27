@@ -14,7 +14,10 @@ sb() { supabase --workdir "$work" "$@"; }
 
 cfg="$work/supabase/config.toml"
 sb init </dev/null || true
-if [ -f "$cfg" ]; then
+if [ -f "$work/supabase/config.jsonc" ]; then
+  # Newer CLIs write JSONC (and prefer it over TOML).
+  node "$here/patch-supabase-config.cjs" "$work/supabase/config.jsonc"
+elif [ -f "$cfg" ]; then
   # Auth: magic links come back to the Next app; many sign-ins in one run.
   patch() { # key, value
     if ! grep -qE "^$1 = " "$cfg"; then echo "config.toml has no '$1'" >&2; exit 1; fi
@@ -28,7 +31,7 @@ else
   mkdir -p "$work/supabase"
   cp "$here/supabase/config.toml" "$cfg"
 fi
-grep -E '^(site_url|additional_redirect_urls|email_sent) = ' "$cfg"
+[ -f "$cfg" ] && grep -E '^(site_url|additional_redirect_urls|email_sent) = ' "$cfg" || true
 
 # The CLI only accepts <digits>_<name>.sql; keep the repo's order (0001,
 # 0001b, 0001c, ...) with sequential versions.
@@ -42,9 +45,15 @@ done
 ls "$work/supabase/migrations"
 
 sb start -x studio,imgproxy,edge-runtime,logflare,vector,realtime,postgres-meta
-sb status -o env > "$work/status.env"
+# Keep only KEY=value lines: some CLI versions print notices into this output.
+sb status -o env | grep -E '^[A-Z_][A-Z0-9_]*=' > "$work/status.env"
 # shellcheck disable=SC1091
 source "$work/status.env"
+ANON_KEY="${ANON_KEY:-${PUBLISHABLE_KEY:-}}"
+SERVICE_ROLE_KEY="${SERVICE_ROLE_KEY:-${SECRET_KEY:-}}"
+for v in API_URL ANON_KEY SERVICE_ROLE_KEY DB_URL; do
+  if [ -z "${!v:-}" ]; then echo "supabase status gave no $v" >&2; sed -E 's/=.*/=…/' "$work/status.env" >&2; exit 1; fi
+done
 
 mail_url="${INBUCKET_URL:-${MAILPIT_URL:-http://127.0.0.1:54324}}"
 {
