@@ -7,7 +7,7 @@ export const NAV = [
   { href: "/guide", label: "Authoring guide" },
   { href: "/registry", label: "Registry" },
   { href: "/tools", label: "Tools" },
-  { href: "/contribute", label: "For Manufacturers" },
+  { href: "/manufacturers", label: "For Manufacturers" },
   { href: "/implement", label: "For Design Software Vendors" },
   { href: "/schema/v0.1/device.schema.json", label: "Schema" },
   { href: "/about", label: "About" }
