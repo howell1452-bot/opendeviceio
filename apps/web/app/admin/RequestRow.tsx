@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { normalizeManufacturer } from "@opendeviceio/sdk";
 import type { AccessRequest } from "@/lib/membership";
 import { approveRequest, rejectRequest } from "./actions";
 
@@ -32,6 +33,16 @@ export function RequestRow({ request }: { request: AccessRequest }) {
     });
   }
 
+  const brand = normalizeManufacturer(request.manufacturer.trim()) ?? request.manufacturer;
+  const domain = (request.email ?? "").split("@")[1]?.toLowerCase() ?? "";
+  const brandKey = brand.toLowerCase().replace(/[^a-z0-9]/g, "");
+  // Heuristic hint only: does a domain label (ignoring the TLD) contain the
+  // brand, or vice versa? e.g. crestron.com -> Crestron, us.shure.com -> Shure.
+  const labels = domain.split(".").slice(0, -1).map((l) => l.replace(/[^a-z0-9]/g, ""));
+  const domainMatches =
+    brandKey.length > 0 &&
+    labels.some((l) => l.includes(brandKey) || (l.length >= 4 && brandKey.includes(l)));
+
   return (
     <li className="rounded-lg border border-slate-200 bg-white p-4">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -39,7 +50,21 @@ export function RequestRow({ request }: { request: AccessRequest }) {
           <div className="font-semibold text-slate-900">
             {request.manufacturer}
           </div>
-          <div className="text-sm text-slate-600">{request.email}</div>
+          <div className="text-sm text-slate-600">
+            {request.email}{" "}
+            <span
+              className={`ml-1 rounded px-1.5 py-0.5 text-xs font-medium ${
+                domainMatches
+                  ? "bg-emerald-50 text-emerald-800"
+                  : "bg-amber-50 text-amber-800"
+              }`}
+            >
+              {domainMatches ? "domain matches brand" : `check domain: ${domain || "none"}`}
+            </span>
+          </div>
+          <div className="mt-1 text-xs text-slate-500">
+            Approving grants: <strong className="text-slate-700">{brand}</strong>
+          </div>
           {request.note ? (
             <p className="mt-1 text-sm text-slate-500">{request.note}</p>
           ) : null}

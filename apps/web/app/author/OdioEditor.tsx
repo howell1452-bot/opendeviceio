@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { validate } from "@opendeviceio/sdk";
+import { normalizeManufacturer, validate } from "@opendeviceio/sdk";
 import { buildIoTable, renderTableSvg } from "@opendeviceio/adapters";
 
 // Lossless .odio editor: edit the raw document JSON (so no field is dropped), with
@@ -29,10 +29,13 @@ function download(name: string, text: string, type: string) {
 export function OdioEditor({
   initialJson,
   signedIn = false,
-  brands = []
+  brands = [],
+  currentStatus = null
 }: {
   initialJson: string;
   signedIn?: boolean;
+  /** Validation status of the registry record being edited (null = draft). */
+  currentStatus?: string | null;
   brands?: string[];
 }) {
   const [text, setText] = useState(initialJson);
@@ -64,7 +67,10 @@ export function OdioEditor({
   }, [text]);
 
   const mfr = doc ? manufacturerOf(doc) : "";
-  const brandOk = mfr.length > 0 && brands.includes(mfr);
+  // Memberships use the canonical brand name; compare canonically.
+  const brandOk =
+    mfr.length > 0 &&
+    brands.map((b) => normalizeManufacturer(b) ?? b).includes(normalizeManufacturer(mfr) ?? mfr);
   const docId = (doc as { id?: string } | null)?.id;
   const canPublish = signedIn && !parseError && errors.length === 0 && brandOk && publishState.status !== "busy";
 
@@ -136,8 +142,15 @@ export function OdioEditor({
                 disabled={!canPublish}
                 className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white enabled:hover:bg-emerald-700 disabled:opacity-40"
               >
-                {publishState.status === "busy" ? "Publishing…" : "Publish update"}
+                {publishState.status === "busy" ? "Publishing…" : "Publish as manufacturer-verified"}
               </button>
+              {currentStatus !== "manufacturer-verified" ? (
+                <p className="mt-2 text-xs text-slate-600">
+                  This replaces the current{" "}
+                  {currentStatus === "reviewed" ? "reviewed" : "unverified draft"} record.
+                  Once published it shows as <strong>Manufacturer-verified</strong>.
+                </p>
+              ) : null}
               {!parseError && errors.length === 0 && !brandOk ? (
                 <p className="mt-2 text-xs text-amber-700">
                   Your account isn&apos;t approved to publish for{" "}

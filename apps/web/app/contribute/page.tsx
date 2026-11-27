@@ -7,6 +7,7 @@ import {
 } from "@/lib/membership";
 import { supabaseConfigured } from "@/lib/supabase-server";
 import { AccessRequestForm } from "./AccessRequestForm";
+import { VerificationSteps } from "@/components/VerificationSteps";
 
 export const dynamic = "force-dynamic";
 
@@ -40,9 +41,9 @@ export default async function ContributePage() {
         upload files for their brand and they go live as{" "}
         <strong>manufacturer-verified</strong> in the public{" "}
         <Link className="text-brand-700 underline" href="/registry">
-          registry and in your device resource downloads.
-        </Link>
-        .
+          registry
+        </Link>{" "}
+        and in every download.
       </p>
 
       <section className="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-5">
@@ -81,6 +82,18 @@ export default async function ContributePage() {
           </li>
         </ul>
       </section>
+
+      <div className="mt-10">
+        <VerificationSteps />
+      </div>
+
+      <p className="mt-8 text-sm text-slate-600">
+        Just want one record fixed or taken down? Use the{" "}
+        <Link className="text-brand-700 underline" href="/correct">
+          correction and removal form
+        </Link>
+        . No account is needed.
+      </p>
 
       {!configured ? (
         <Notice tone="amber">

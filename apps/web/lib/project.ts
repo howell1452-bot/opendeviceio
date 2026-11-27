@@ -25,3 +25,6 @@ export const MAINTAINERS: Maintainer[] = [
     bio: "" // TODO(Austin): 1–2 sentences, no employer.
   }
 ];
+
+/** Target turnaround for approving a manufacturer's access request. */
+export const ACCESS_APPROVAL_BUSINESS_DAYS = 2;

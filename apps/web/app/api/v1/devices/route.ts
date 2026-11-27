@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { listRegistry } from "@/lib/registry";
-import { validateDocument, type OdioDocument } from "@opendeviceio/sdk";
+import {
+  normalizeManufacturer,
+  validateDocument,
+  type OdioDocument
+} from "@opendeviceio/sdk";
 import { getServerSupabase, getServiceSupabase } from "@/lib/supabase-server";
 import { membershipsForUser } from "@/lib/membership";
 import { hashToken } from "@/lib/tokens";
@@ -215,8 +219,10 @@ export async function POST(req: Request) {
     if (tokenErr || !tokenRow) return err(401, "Invalid API token.");
 
     const userId = (tokenRow as { user_id: string }).user_id;
-    const brands = await membershipsForUser(service, userId);
-    if (!brands.includes(manufacturer)) {
+    const brands = (await membershipsForUser(service, userId)).map(
+      (b) => normalizeManufacturer(b) ?? b
+    );
+    if (!brands.includes(normalizeManufacturer(manufacturer) ?? manufacturer)) {
       return err(
         403,
         `Manufacturer "${manufacturer}" is not in your approved brands.`

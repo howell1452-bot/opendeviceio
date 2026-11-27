@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { deviceSchema, validate } from "@opendeviceio/sdk";
+import { deviceSchema, normalizeManufacturer, validate } from "@opendeviceio/sdk";
 import { buildIoTable, renderTableSvg, renderTableHtml } from "@opendeviceio/adapters";
 
 // Form-based ODIO authoring: fill in identity, ports, and power; get a validated
@@ -190,7 +190,12 @@ export function OdioAuthor({
   // brands. The button is convenience over POST /api/v1/devices, which re-checks
   // auth + brand server-side (RLS), so this can't be bypassed from the client.
   const trimmedMfr = device.manufacturer.trim();
-  const brandOk = trimmedMfr.length > 0 && brands.includes(trimmedMfr);
+  // Memberships use the canonical brand name; compare canonically.
+  const brandOk =
+    trimmedMfr.length > 0 &&
+    brands
+      .map((b) => normalizeManufacturer(b) ?? b)
+      .includes(normalizeManufacturer(trimmedMfr) ?? trimmedMfr);
   const canPublish = signedIn && errors.length === 0 && brandOk && publishState.status !== "busy";
 
   const publish = async () => {
@@ -506,7 +511,7 @@ export function OdioAuthor({
                 disabled={!canPublish}
                 className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white enabled:hover:bg-emerald-700 disabled:opacity-40"
               >
-                {publishState.status === "busy" ? "Publishing…" : "Publish to registry"}
+                {publishState.status === "busy" ? "Publishing…" : "Publish as manufacturer-verified"}
               </button>
               {errors.length === 0 && !brandOk ? (
                 <p className="mt-2 text-xs text-amber-700">
