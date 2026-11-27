@@ -160,5 +160,4 @@ jobs:
 
       - name: Stop local Supabase
         if: always()
-        working-directory: ${{ runner.temp }}/odio-e2e
-        run: supabase stop --no-backup || true
+        run: supabase --workdir "${{ runner.temp }}/odio-e2e" stop --no-backup || true

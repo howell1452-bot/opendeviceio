@@ -10,34 +10,41 @@ rm -rf "$work"
 mkdir -p "$work"
 cd "$work"
 
-supabase init </dev/null >/dev/null
-cfg=supabase/config.toml
+sb() { supabase --workdir "$work" "$@"; }
 
-# Auth: magic links come back to the Next app; many sign-ins in one run.
-patch() { # key, value
-  if ! grep -qE "^$1 = " "$cfg"; then echo "config.toml has no '$1'" >&2; exit 1; fi
-  sed -i -E "s|^$1 = .*|$1 = $2|" "$cfg"
-}
-patch site_url '"http://localhost:3000"'
-patch additional_redirect_urls '["http://localhost:3000/**"]'
-patch email_sent 1000
+cfg="$work/supabase/config.toml"
+sb init </dev/null || true
+if [ -f "$cfg" ]; then
+  # Auth: magic links come back to the Next app; many sign-ins in one run.
+  patch() { # key, value
+    if ! grep -qE "^$1 = " "$cfg"; then echo "config.toml has no '$1'" >&2; exit 1; fi
+    sed -i -E "s|^$1 = .*|$1 = $2|" "$cfg"
+  }
+  patch site_url '"http://localhost:3000"'
+  patch additional_redirect_urls '["http://localhost:3000/**"]'
+  patch email_sent 1000
+else
+  echo "supabase init produced no config.toml; using e2e/supabase/config.toml"
+  mkdir -p "$work/supabase"
+  cp "$here/supabase/config.toml" "$cfg"
+fi
 grep -E '^(site_url|additional_redirect_urls|email_sent) = ' "$cfg"
 
 # The CLI only accepts <digits>_<name>.sql; keep the repo's order (0001,
 # 0001b, 0001c, ...) with sequential versions.
-mkdir -p supabase/migrations
+mkdir -p "$work/supabase/migrations"
 i=0
 for f in $(ls "$here/../supabase/migrations"/*.sql | sort); do
   i=$((i + 1))
   name="$(basename "$f" .sql | sed -E 's/^[0-9]+[a-z]?_//')"
-  cp "$f" "supabase/migrations/$(printf '20260101%06d' "$i")_${name}.sql"
+  cp "$f" "$work/supabase/migrations/$(printf '20260101%06d' "$i")_${name}.sql"
 done
-ls supabase/migrations
+ls "$work/supabase/migrations"
 
-supabase start -x studio,imgproxy,edge-runtime,logflare,vector,realtime,postgres-meta
-supabase status -o env > status.env
+sb start -x studio,imgproxy,edge-runtime,logflare,vector,realtime,postgres-meta
+sb status -o env > "$work/status.env"
 # shellcheck disable=SC1091
-source status.env
+source "$work/status.env"
 
 mail_url="${INBUCKET_URL:-${MAILPIT_URL:-http://127.0.0.1:54324}}"
 {
