@@ -118,6 +118,7 @@ CI runs the conformance runner plus the SDK and Genie test suites
 - [CONTRIBUTING.md](CONTRIBUTING.md) — RFC-in-PR process, how to run the tests, how
   vocabularies grow.
 - [GOVERNANCE.md](GOVERNANCE.md) — decision process, semver discipline, vendor neutrality.
+- [TRADEMARKS.md](TRADEMARKS.md) — how the "OpenDeviceIO" and "ODIO" names may be used.
 - [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) — Contributor Covenant 2.1.
 
 ## Maintainers

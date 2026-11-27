@@ -5,7 +5,8 @@ import {
   CONTACT_MAILTO,
   GOVERNANCE_URL,
   MAINTAINERS,
-  REPO_URL
+  REPO_URL,
+  TRADEMARKS_URL
 } from "@/lib/project";
 
 export const metadata: Metadata = {
@@ -75,6 +76,19 @@ export default function AboutPage() {
             <Link href="/data-license">data license and integration terms</Link>.
           </li>
         </ul>
+
+        <h2 id="names">Names and trademarks</h2>
+        <p>
+          The names &ldquo;OpenDeviceIO&rdquo; and &ldquo;ODIO&rdquo; are held by
+          Austin Howell, as maintainer, on behalf of the project until it has a
+          neutral home. You can use them to describe compatibility, for example
+          &ldquo;imports ODIO files&rdquo;. Don&apos;t use them to imply
+          endorsement or certification without permission. Manufacturer and
+          product names in registry records belong to their owners and imply no
+          endorsement (see the{" "}
+          <Link href="/data-license#images">data license</Link>). Details are in{" "}
+          <a href={TRADEMARKS_URL}>TRADEMARKS.md</a>.
+        </p>
 
         <h2 id="contact">Contact</h2>
         <p>
