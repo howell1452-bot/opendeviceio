@@ -2,14 +2,16 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { normalizeManufacturer, type OdioDevice, type Bundle } from "@opendeviceio/sdk";
-import { getRegistryRow } from "@/lib/registry";
+import { getRegistryRow, listPublicRevisions } from "@/lib/registry";
 import {
   KindBadge,
   StatusBadge,
+  SourceBadge,
   Chip,
   isUnverified,
   statusLabel
 } from "@/components/Badge";
+import { sourceLabel } from "@/lib/source";
 import { DeviceView } from "@/components/DeviceView";
 import { BundleView } from "@/components/BundleView";
 import { IoTableView } from "@/components/IoTableView";
@@ -64,6 +66,8 @@ export default async function RegistryDetailPage({
       )
   );
 
+  const history = (await listPublicRevisions(row.id)) ?? [];
+
   const doc = row.document as Record<string, unknown>;
   const provenance = doc.provenance as
     | {
@@ -88,6 +92,7 @@ export default async function RegistryDetailPage({
         <div className="flex flex-wrap items-center gap-2">
           <KindBadge kind={row.kind} />
           <StatusBadge status={row.validation_status} />
+          <SourceBadge source={row.source_type} org={row.source_org} />
           {row.odio_version ? (
             <span className="text-xs text-slate-400">ODIO {row.odio_version}</span>
           ) : null}
@@ -130,13 +135,21 @@ export default async function RegistryDetailPage({
           <ReviewControls id={row.id} status={row.validation_status} />
         ) : null}
 
-        <p className="mt-5 text-sm">
+        <p className="mt-5 flex flex-wrap gap-x-6 gap-y-2 text-sm">
           <Link
             href={`/correct?id=${encodeURIComponent(row.id)}`}
             className="font-medium text-brand-700 underline underline-offset-2 hover:text-brand-900"
           >
             Is this your product? Verify, correct, or request removal →
           </Link>
+          {user && !canEdit ? (
+            <Link
+              href={`/author?id=${encodeURIComponent(row.id)}`}
+              className="font-medium text-brand-700 underline underline-offset-2 hover:text-brand-900"
+            >
+              Suggest a change →
+            </Link>
+          ) : null}
         </p>
       </header>
 
@@ -146,11 +159,27 @@ export default async function RegistryDetailPage({
           className="mt-8 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900"
         >
           <p>
-            <strong>Unverified draft:</strong>{" "}
-            {provenance?.method === "llm-extraction"
-              ? "machine-extracted from the manufacturer's public documents"
-              : "compiled from public documents"}{" "}
-            and not yet reviewed. It may contain errors.
+            {row.source_type === "community" ? (
+              <>
+                <strong>Unverified:</strong> submitted by a community member and
+                not checked by the manufacturer. It may contain errors.
+              </>
+            ) : row.source_type === "design-vendor" ? (
+              <>
+                <strong>Unverified:</strong> submitted by{" "}
+                {row.source_org ?? "a design software vendor"}
+                {row.source_org ? ", a design software vendor," : ""} and not
+                checked by the manufacturer. It may contain errors.
+              </>
+            ) : (
+              <>
+                <strong>Unverified draft:</strong>{" "}
+                {provenance?.method === "llm-extraction"
+                  ? "machine-extracted from the manufacturer's public documents"
+                  : "compiled from public documents"}{" "}
+                and not yet reviewed. It may contain errors.
+              </>
+            )}
           </p>
           <p className="mt-2">
             <Link
@@ -191,14 +220,13 @@ export default async function RegistryDetailPage({
                 value={METHOD_LABELS[provenance.method] ?? provenance.method}
               />
             ) : null}
-            <Field
-              label="Validation"
-              value={statusLabel(provenance.validation?.status ?? row.validation_status)}
-            />
+            {/* The registry decides verification; the file's own claim is not shown. */}
+            <Field label="Validation" value={statusLabel(row.validation_status)} />
+            <Field label="Source" value={sourceLabel(row.source_type, row.source_org)} />
             {provenance.validation?.date ? (
               <Field
                 label={
-                  isUnverified(provenance.validation?.status ?? row.validation_status)
+                  isUnverified(row.validation_status)
                     ? "Drafted"
                     : row.validation_status === "manufacturer-verified"
                       ? "Verified"
@@ -238,6 +266,30 @@ export default async function RegistryDetailPage({
               </ul>
             </div>
           ) : null}
+        </section>
+      ) : null}
+
+      {/* History: published versions only, no personal names. */}
+      {history.length > 0 ? (
+        <section className="mt-8 rounded-xl border border-slate-200 bg-white p-6">
+          <h2 className="text-lg font-bold text-slate-900">History</h2>
+          <ol className="mt-4 divide-y divide-slate-100 text-sm">
+            {history.map((h) => (
+              <li key={h.revision_id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
+                <span className="w-24 shrink-0 font-mono text-xs text-slate-500">
+                  {h.created_at.slice(0, 10)}
+                </span>
+                <span className="text-slate-800">{sourceLabel(h.source_type, h.source_org)}</span>
+                <span className="text-xs text-slate-500">
+                  {h.revision_id === row.revision_id
+                    ? "Current version"
+                    : h.status === "superseded"
+                      ? "Replaced"
+                      : "Published"}
+                </span>
+              </li>
+            ))}
+          </ol>
         </section>
       ) : null}
     </div>

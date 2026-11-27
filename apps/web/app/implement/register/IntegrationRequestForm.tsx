@@ -151,8 +151,9 @@ export function IntegrationRequestForm({ email }: { email: string }) {
           className="mt-1"
         />
         <span className="text-sm text-slate-700">
-          We plan to include <strong>draft</strong> records (machine-extracted,
-          not yet human-reviewed), labeled as drafts in our product.
+          We plan to include <strong>draft</strong> records (unverified:
+          machine-extracted, or submitted by community members or design
+          software vendors), labeled as drafts in our product.
         </span>
       </label>
 

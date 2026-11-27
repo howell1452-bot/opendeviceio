@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { sourceLabel } from "@/lib/source";
 
 const KIND_STYLES: Record<string, string> = {
   device: "bg-brand-100 text-brand-800 ring-brand-200",
@@ -51,6 +52,33 @@ export function StatusBadge({ status }: { status: string | null | undefined }) {
   return (
     <Pill className={STATUS_STYLES[s] ?? "bg-slate-100 text-slate-700 ring-slate-200"}>
       {statusLabel(s)}
+    </Pill>
+  );
+}
+
+const SOURCE_STYLES: Record<string, string> = {
+  "machine-draft": "bg-slate-100 text-slate-700 ring-slate-200",
+  community: "bg-violet-50 text-violet-800 ring-violet-200",
+  "design-vendor": "bg-indigo-50 text-indigo-800 ring-indigo-200",
+  manufacturer: "bg-emerald-50 text-emerald-800 ring-emerald-200"
+};
+
+/**
+ * Who submitted the record (separate from StatusBadge, which says who vouched
+ * for it): "Machine draft", "Community submission", "Design vendor · <Org>",
+ * or "Manufacturer".
+ */
+export function SourceBadge({
+  source,
+  org
+}: {
+  source: string | null | undefined;
+  org?: string | null;
+}) {
+  const s = source ?? "machine-draft";
+  return (
+    <Pill className={SOURCE_STYLES[s] ?? SOURCE_STYLES["machine-draft"]}>
+      {sourceLabel(s, org)}
     </Pill>
   );
 }

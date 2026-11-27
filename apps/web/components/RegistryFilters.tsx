@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, type FormEvent } from "react";
 import { STATUS_FILTERS } from "@/lib/status-filters";
+import { SOURCE_FILTERS } from "@/lib/source";
 
 export interface FilterOptions {
   kinds: string[];
@@ -31,6 +32,7 @@ export function RegistryFilters({
     category: string;
     connector: string;
     status: string;
+    source: string;
   };
 }) {
   const router = useRouter();
@@ -58,6 +60,7 @@ export function RegistryFilters({
 
   const hasAny =
     initial.status ||
+    initial.source ||
     initial.search ||
     initial.kind ||
     initial.manufacturer ||
@@ -88,13 +91,20 @@ export function RegistryFilters({
         </button>
       </form>
 
-      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <Select
           label="Status"
           value={initial.status}
           options={STATUS_FILTERS.map((s) => s.value)}
           labels={Object.fromEntries(STATUS_FILTERS.map((s) => [s.value, s.label]))}
           onChange={(v) => pushWith({ status: v })}
+        />
+        <Select
+          label="Source"
+          value={initial.source}
+          options={SOURCE_FILTERS.map((s) => s.value)}
+          labels={Object.fromEntries(SOURCE_FILTERS.map((s) => [s.value, s.label]))}
+          onChange={(v) => pushWith({ source: v })}
         />
         <Select
           label="Manufacturer"

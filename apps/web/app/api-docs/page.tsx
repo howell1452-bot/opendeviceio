@@ -3,6 +3,8 @@ import Link from "next/link";
 import { CodeBlock } from "@/components/CodeBlock";
 import {
   ATTRIBUTION_TEXT,
+  CONTRIBUTOR_TERMS_PATH,
+  CONTRIBUTOR_TERMS_VERSION,
   DATA_LICENSE,
   DATA_TERMS_PATH,
   LIST_MAX_LIMIT,
@@ -21,6 +23,9 @@ const TOC = [
   ["overview", "Overview"],
   ["list", "GET /api/v1/devices"],
   ["byid", "GET /api/v1/devices/{id}"],
+  ["revisions", "GET /api/v1/devices/{id}/revisions"],
+  ["provenance", "Verification & source"],
+  ["submissions", "POST /api/v1/submissions"],
   ["sync", "Export & sync"],
   ["removals", "GET /api/v1/removals"],
   ["cors", "CORS"],
@@ -56,6 +61,10 @@ const LIST_RESPONSE = `{
       "transports": ["hdmi", "usb", "ethernet"],
       "created_at": "2026-01-10T00:00:00.000Z",
       "updated_at": "2026-01-10T00:00:00.000Z",
+      "source_type": "machine-draft",
+      "source_org": null,
+      "revision_id": "3b0b6e4e-2f53-4c43-9a59-0c3b0e7f5d21",
+      "revision_count": 1,
       "registry_url": "https://opendeviceio.org/registry/lightware/ucx-4x2-hc60d",
       "api_url": "https://opendeviceio.org/api/v1/devices/lightware/ucx-4x2-hc60d"
     }
@@ -167,6 +176,51 @@ const BYID_RESPONSE = `{
 }`;
 
 const NOT_FOUND = `{ "error": "not found" }`;
+
+const REVISIONS_RESPONSE = `{
+  "record_id": "lightware/ucx-4x2-hc60d",
+  "data": [
+    {
+      "revision_id": "3b0b6e4e-2f53-4c43-9a59-0c3b0e7f5d21",
+      "status": "published",
+      "source_type": "community",
+      "source_org": null,
+      "created_at": "2026-12-01T09:30:00.000Z",
+      "is_current": true
+    },
+    {
+      "revision_id": "9d1f0c2a-7a51-4c0e-8f1e-5b6c4e2d1a90",
+      "status": "superseded",
+      "source_type": "machine-draft",
+      "source_org": null,
+      "created_at": "2026-05-30T02:00:43.000Z",
+      "is_current": false
+    }
+  ],
+  "total": 2,
+  "license": { "...": "..." },
+  "terms_url": "https://opendeviceio.org${DATA_TERMS_PATH}",
+  "attribution": "${ATTRIBUTION_TEXT}"
+}`;
+
+const SUBMIT_CURL = `curl -X POST "https://opendeviceio.org/api/v1/submissions" \\
+  -H "Authorization: Bearer $ODIO_TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -d @- <<EOF
+{
+  "document": $(cat my-device.odio),
+  "accept_terms": "${CONTRIBUTOR_TERMS_VERSION}",
+  "change_note": "Added the second Dante port, from the spec sheet rev C."
+}
+EOF`;
+
+const SUBMIT_RESPONSE = `{
+  "revision_id": "5f0c3a8e-1b2d-4e6f-9a0b-1c2d3e4f5a6b",
+  "record_id": "acme/dsp-1212",
+  "status": "pending",
+  "source_type": "community",
+  "message": "New record from a contributor who isn't trusted yet; waiting for review."
+}`;
 
 function Method({ children }: { children: string }) {
   return (
@@ -304,6 +358,13 @@ export default function ApiDocsPage() {
                   <code>manufacturer-verified</code>. E.g.{" "}
                   <code>status=reviewed,manufacturer-verified</code>.
                 </Row>
+                <Row name="source" type="string">
+                  Comma-separated source types: <code>machine-draft</code>,{" "}
+                  <code>community</code>, <code>design-vendor</code>,{" "}
+                  <code>manufacturer</code>. Combines with{" "}
+                  <code>status</code>, e.g.{" "}
+                  <code>status=draft&amp;source=community</code>.
+                </Row>
                 <Row name="updated_since" type="ISO 8601">
                   Only entries whose <code>updated_at</code> is at or after this
                   time. For incremental sync.
@@ -340,8 +401,17 @@ export default function ApiDocsPage() {
             for attribution) and an <code>api_url</code>. <code>total</code> is
             the unpaginated match count. Ordering always ends on{" "}
             <code>id</code>, so offset paging is stable. Invalid{" "}
-            <code>status</code>, <code>updated_since</code>, <code>sort</code>
-            , or <code>include</code> values return <code>400</code>.
+            <code>status</code>, <code>source</code>,{" "}
+            <code>updated_since</code>, <code>sort</code>, or{" "}
+            <code>include</code> values return <code>400</code>.
+          </p>
+          <p>
+            Each row also says where the current version came from:{" "}
+            <code>source_type</code>, <code>source_org</code> (the submitting
+            organization&apos;s name, or <code>null</code>),{" "}
+            <code>revision_id</code> (the current revision) and{" "}
+            <code>revision_count</code> (published versions so far). See{" "}
+            <a href="#provenance">Verification &amp; source</a>.
           </p>
           <p className="mb-1 font-semibold text-slate-800">curl</p>
           <CodeBlock language="shell">{LIST_CURL}</CodeBlock>
@@ -373,6 +443,92 @@ export default function ApiDocsPage() {
           <CodeBlock language="json">{BYID_RESPONSE}</CodeBlock>
           <p className="mb-1 font-semibold text-slate-800">Not found (404)</p>
           <CodeBlock language="json">{NOT_FOUND}</CodeBlock>
+          <p>
+            The body is always the <code>.odio</code> file itself. The
+            registry&apos;s metadata comes in response headers:{" "}
+            <code>ODIO-Validation-Status</code>, <code>ODIO-Source-Type</code>,{" "}
+            <code>ODIO-Source-Org</code> (percent-encoded; absent when there is
+            no organization), <code>ODIO-Revision-Id</code> and{" "}
+            <code>ODIO-Revision-Count</code>. Pass{" "}
+            <code>?format=record</code> to get the registry record as JSON
+            instead: the same fields as a list row plus the{" "}
+            <code>document</code>.
+          </p>
+
+          {/* Revisions */}
+          <h2 id="revisions">
+            <Method>get</Method>{" "}
+            <code className="text-base">/api/v1/devices/&#123;id&#125;/revisions</code>
+          </h2>
+          <p>
+            The record&apos;s public history, newest first: every version that
+            was published, including ones later replaced (
+            <code>superseded</code>). Pending submissions, suggestions and
+            rejected versions are not listed, and nothing identifies a
+            submitter beyond <code>source_type</code> and{" "}
+            <code>source_org</code>. Add <code>?include=document</code> to get
+            each version&apos;s document.
+          </p>
+          <CodeBlock language="json">{REVISIONS_RESPONSE}</CodeBlock>
+
+          {/* Verification & source */}
+          <h2 id="provenance">Verification &amp; source</h2>
+          <p>
+            Every record carries two separate facts.
+          </p>
+          <ul>
+            <li>
+              <strong>Verification</strong>, in <code>validation_status</code>:{" "}
+              <code>draft</code> (unverified), <code>reviewed</code> (checked
+              by OpenDeviceIO) or <code>manufacturer-verified</code>.
+              It is set by the registry, not by the file. Whatever a submitted
+              file says in <code>provenance.validation</code> is ignored and
+              replaced; only a manufacturer&apos;s own publish makes a record{" "}
+              <code>manufacturer-verified</code>.
+            </li>
+            <li>
+              <strong>Source</strong>, in <code>source_type</code>:{" "}
+              <code>machine-draft</code> (machine-extracted from public
+              documents), <code>community</code> (a community submission),{" "}
+              <code>design-vendor</code> (a design software vendor, named in{" "}
+              <code>source_org</code>) or <code>manufacturer</code>.
+            </li>
+          </ul>
+          <p>
+            Community and design-vendor records stay <code>draft</code> unless
+            reviewed or verified. If you show drafts, label them as
+            unverified.
+          </p>
+
+          {/* Submissions */}
+          <h2 id="submissions">
+            <Method>post</Method>{" "}
+            <code className="text-base">/api/v1/submissions</code>
+          </h2>
+          <p>
+            Submit a <code>.odio</code> file as a community member or, with{" "}
+            <code>as_org</code>, as a verified design-vendor organization. Auth
+            is a signed-in session or <code>Authorization: Bearer</code> with
+            an API token from your account. The body is{" "}
+            <code>{`{ document, accept_terms, change_note?, as_org?, base_revision_id? }`}</code>
+            , up to 512 KB. <code>accept_terms</code> must be the current{" "}
+            <Link href={CONTRIBUTOR_TERMS_PATH}>contributor terms</Link> version
+            (<code>{CONTRIBUTOR_TERMS_VERSION}</code>).
+          </p>
+          <p>
+            The response <code>status</code> is <code>published</code> (live
+            now, as an unverified draft), <code>pending</code> (waiting for
+            review) or <code>suggested</code> (a change to a record you
+            can&apos;t overwrite, such as a manufacturer-verified one, saved
+            for the brand or the maintainers). Errors: <code>400</code> invalid
+            document or terms not accepted, <code>401</code> not signed in,{" "}
+            <code>403</code> suspended or the brand doesn&apos;t accept
+            submissions, <code>413</code> too large, <code>429</code> rate
+            limited. Manufacturers publishing their own records use{" "}
+            <code>POST /api/v1/devices</code> instead.
+          </p>
+          <CodeBlock language="shell">{SUBMIT_CURL}</CodeBlock>
+          <CodeBlock language="json">{SUBMIT_RESPONSE}</CodeBlock>
 
           {/* Sync */}
           <h2 id="sync">Export &amp; sync</h2>

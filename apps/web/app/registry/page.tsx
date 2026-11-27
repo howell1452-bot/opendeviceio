@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { listRegistry, getFacets, type RegistryListRow } from "@/lib/registry";
-import { KindBadge, StatusBadge, Chip } from "@/components/Badge";
+import { KindBadge, StatusBadge, SourceBadge, Chip } from "@/components/Badge";
+import { SOURCE_FILTERS } from "@/lib/source";
 import { RegistryFilters } from "@/components/RegistryFilters";
 import { STATUS_FILTERS } from "@/lib/status-filters";
 import { categoryFilterValues, categoryOptionLabel } from "@/lib/category-filter";
@@ -32,9 +33,11 @@ export default async function RegistryPage({
     manufacturer: first(sp.manufacturer),
     category: first(sp.category),
     connector: first(sp.connector),
-    status: first(sp.status)
+    status: first(sp.status),
+    source: first(sp.source)
   };
   const statusFilter = STATUS_FILTERS.find((s) => s.value === query.status);
+  const sourceFilter = SOURCE_FILTERS.find((s) => s.value === query.source);
 
   const [{ rows, unavailable }, facets] = await Promise.all([
     listRegistry({
@@ -42,7 +45,8 @@ export default async function RegistryPage({
       // The Category dropdown lists controlled paths; match every raw spelling.
       category: undefined,
       categoryIn: query.category ? categoryFilterValues(query.category) : undefined,
-      statuses: statusFilter ? [...statusFilter.statuses] : undefined
+      statuses: statusFilter ? [...statusFilter.statuses] : undefined,
+      sources: sourceFilter ? [sourceFilter.value] : undefined
     }),
     getFacets()
   ]);
@@ -89,7 +93,7 @@ export default async function RegistryPage({
 
       <div className="mt-6">
         {rows.length === 0 ? (
-          <EmptyState unavailable={unavailable} filtered={Boolean(query.search || query.kind || query.manufacturer || query.category || query.connector || query.status)} />
+          <EmptyState unavailable={unavailable} filtered={Boolean(query.search || query.kind || query.manufacturer || query.category || query.connector || query.status || query.source)} />
         ) : (
           <>
             <p className="mb-4 text-sm text-slate-500">
@@ -129,6 +133,7 @@ function RegistryCard({ row }: { row: RegistryListRow }) {
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <StatusBadge status={row.validation_status} />
+        <SourceBadge source={row.source_type} org={row.source_org} />
         {row.category ? <Chip>{row.category}</Chip> : null}
       </div>
 
