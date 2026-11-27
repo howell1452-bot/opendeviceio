@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, type FormEvent } from "react";
+import { STATUS_FILTERS } from "@/lib/status-filters";
 
 export interface FilterOptions {
   kinds: string[];
@@ -20,7 +21,14 @@ export function RegistryFilters({
   initial
 }: {
   options: FilterOptions;
-  initial: { search: string; kind: string; manufacturer: string; category: string; connector: string };
+  initial: {
+    search: string;
+    kind: string;
+    manufacturer: string;
+    category: string;
+    connector: string;
+    status: string;
+  };
 }) {
   const router = useRouter();
   const params = useSearchParams();
@@ -46,6 +54,7 @@ export function RegistryFilters({
   }
 
   const hasAny =
+    initial.status ||
     initial.search ||
     initial.kind ||
     initial.manufacturer ||
@@ -76,7 +85,14 @@ export function RegistryFilters({
         </button>
       </form>
 
-      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <Select
+          label="Status"
+          value={initial.status}
+          options={STATUS_FILTERS.map((s) => s.value)}
+          labels={Object.fromEntries(STATUS_FILTERS.map((s) => [s.value, s.label]))}
+          onChange={(v) => pushWith({ status: v })}
+        />
         <Select
           label="Manufacturer"
           value={initial.manufacturer}
@@ -120,11 +136,13 @@ function Select({
   label,
   value,
   options,
+  labels,
   onChange
 }: {
   label: string;
   value: string;
-  options: string[];
+  options: readonly string[];
+  labels?: Record<string, string>;
   onChange: (v: string) => void;
 }) {
   return (
@@ -138,7 +156,7 @@ function Select({
         <option value="">All</option>
         {options.map((o) => (
           <option key={o} value={o}>
-            {o}
+            {labels?.[o] ?? o}
           </option>
         ))}
       </select>
