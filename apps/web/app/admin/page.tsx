@@ -15,6 +15,8 @@ import {
 import { RequestRow } from "./RequestRow";
 import { IntegrationRow } from "./IntegrationRow";
 import { RecordRequestRow } from "./RecordRequestRow";
+import { BrandVisibilityRow } from "./BrandVisibilityRow";
+import type { BrandOverviewRow } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +38,8 @@ export default async function AdminPage() {
   let integrationsPending: IntegrationRequest[] = [];
   let integrationsApproved: IntegrationRequest[] = [];
   let integrationsError: string | null = null;
+  let brands: BrandOverviewRow[] = [];
+  let brandsError: string | null = null;
   let recordRequests: RecordRequest[] = [];
   let recordRequestsError: string | null = null;
 
@@ -43,7 +47,7 @@ export default async function AdminPage() {
     configError =
       "SUPABASE_SECRET_KEY is not set, so admin review is unavailable on this deployment.";
   } else {
-    const [access, integrations, records] = await Promise.all([
+    const [access, integrations, records, brandRows] = await Promise.all([
       service
         .from("access_requests")
         .select("id,user_id,email,manufacturer,note,status,created_at")
@@ -58,8 +62,11 @@ export default async function AdminPage() {
         .from("record_requests")
         .select(RECORD_REQUEST_COLUMNS)
         .in("status", ["new", "in-progress"])
-        .order("created_at", { ascending: true })
+        .order("created_at", { ascending: true }),
+      service.rpc("admin_brand_overview")
     ]);
+    if (brandRows.error) brandsError = brandRows.error.message;
+    else brands = (brandRows.data ?? []) as BrandOverviewRow[];
     if (records.error) recordRequestsError = records.error.message;
     else recordRequests = (records.data ?? []) as RecordRequest[];
     if (access.error) configError = access.error.message;
@@ -112,6 +119,31 @@ export default async function AdminPage() {
                     request={r}
                     removalWindowDays={REMOVAL_REQUEST_BUSINESS_DAYS}
                   />
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section className="mt-12">
+            <h2 className="text-xl font-bold text-slate-900">
+              Brand visibility
+            </h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Hide a brand&apos;s unverified drafts from the registry and API until
+              it opts in, e.g. when the manufacturer asks or while you contact
+              them. Members of the brand still see them. Nothing is hidden by
+              default.
+            </p>
+            {brandsError ? (
+              <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                {brandsError}
+              </div>
+            ) : brands.length === 0 ? (
+              <p className="mt-4 text-sm text-slate-500">No brands in the registry.</p>
+            ) : (
+              <ul className="mt-4 divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
+                {brands.map((b) => (
+                  <BrandVisibilityRow key={b.manufacturer} brand={b} />
                 ))}
               </ul>
             )}
