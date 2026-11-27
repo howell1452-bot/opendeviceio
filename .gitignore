@@ -35,3 +35,6 @@ staging/
 
 # Reference vendor stencils/blocks (not part of the repo; used to learn formats)
 references/
+
+# Local agent worktrees
+.claude/worktrees/

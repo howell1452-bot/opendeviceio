@@ -105,7 +105,8 @@ The core schema sets `additionalProperties: false` and allows extension keys mat
 
 References to manufacturer or product names within data files describe real devices and
 are the property of their respective owners; they do not imply endorsement. The project
-name and any marks are governed separately from the content license.
+names ("OpenDeviceIO", "ODIO") and logo are governed separately from the content
+licenses, by [TRADEMARKS.md](TRADEMARKS.md).
 
 ## Code of Conduct
 
