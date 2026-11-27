@@ -1,5 +1,10 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { CodeBlock } from "@/components/CodeBlock";
+
+export const metadata: Metadata = {
+  alternates: { canonical: "/" }
+};
 
 const EXAMPLE = `{
   "$schema": "https://opendeviceio.org/schema/v0.1/device.schema.json",

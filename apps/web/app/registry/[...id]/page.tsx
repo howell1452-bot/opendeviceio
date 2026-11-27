@@ -14,6 +14,7 @@ import {
 import { sourceLabel } from "@/lib/source";
 import { brandCounts, brandSlugForPrefix, getBrandByManufacturer } from "@/lib/brands";
 import { resolveRedirect } from "@/lib/redirects";
+import { recordPath } from "@/lib/site";
 import { DeviceView } from "@/components/DeviceView";
 import { BundleView } from "@/components/BundleView";
 import { IoTableView } from "@/components/IoTableView";
@@ -48,9 +49,14 @@ export async function generateMetadata({
   if (!row) return { title: "Not found" };
   const name = [row.manufacturer, row.model].filter(Boolean).join(" ") || id;
   const unverified = isUnverified(row.validation_status);
+  const description = `${name} — an OpenDeviceIO ${row.kind} document (${statusLabel(row.validation_status).toLowerCase()}).`;
+  // Always the record's current id (an old id 308s here first), no query.
+  const canonical = recordPath(row.id);
   return {
     title: name,
-    description: `${name} — an OpenDeviceIO ${row.kind} document (${statusLabel(row.validation_status).toLowerCase()}).`,
+    description,
+    alternates: { canonical },
+    openGraph: { url: canonical, title: name, description, siteName: "OpenDeviceIO", type: "website" },
     // Keep unverified machine drafts out of search results under
     // manufacturers' product names. Reviewed and verified records are indexed.
     ...(unverified ? { robots: { index: false, follow: true } } : {})

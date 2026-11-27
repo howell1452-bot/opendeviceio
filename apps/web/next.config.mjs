@@ -7,6 +7,12 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // SDK are bundled — pinning to the app dir caused "Cannot find module 'next/dist/...'".
 const monorepoRoot = join(__dirname, "..", "..");
 
+// The public site's host (lib/site.ts reads the same variable). Any other host
+// (preview deployments, *.vercel.app aliases, localhost) is sent
+// X-Robots-Tag: noindex; canonical URLs there still point at this host.
+const siteHost = new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://opendeviceio.org").hostname;
+const siteHostPattern = `(?:www\\.)?${siteHost.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`;
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // The SDK ships as ESM+CJS but is consumed from source-shaped dist; transpile it
@@ -15,6 +21,11 @@ const nextConfig = {
   outputFileTracingRoot: monorepoRoot,
   async headers() {
     return [
+      {
+        source: "/:path*",
+        missing: [{ type: "host", value: siteHostPattern }],
+        headers: [{ key: "X-Robots-Tag", value: "noindex" }]
+      },
       {
         // Canonical schema files: JSON content type + permissive CORS so that
         // $ref / $schema resolve from any tool, anywhere.

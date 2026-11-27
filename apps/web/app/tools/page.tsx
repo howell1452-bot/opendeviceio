@@ -3,6 +3,7 @@ import Link from "next/link";
 import { REPO_URL } from "@/lib/project";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/tools" },
   title: "Tools & integrations",
   description:
     "Ways to use OpenDeviceIO: the in-browser viewer and authoring form, the AutoCAD import add-in, the TypeScript SDK, and the free public API."

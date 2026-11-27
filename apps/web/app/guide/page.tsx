@@ -3,6 +3,7 @@ import Link from "next/link";
 import { CodeBlock } from "@/components/CodeBlock";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/guide" },
   title: "Manufacturer authoring guide",
   description:
     "How to produce a conformant .odio: by hand, with @opendeviceio/sdk, or via the Genie importer — the connector/link/signals model, the id slug rule, the x- extension rule, and how to validate."

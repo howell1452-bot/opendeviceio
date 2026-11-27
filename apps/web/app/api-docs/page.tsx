@@ -14,6 +14,7 @@ import {
 } from "@/lib/data-license";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/api-docs" },
   title: "API reference",
   description:
     "Reference for the free, read-only OpenDeviceIO REST API: list / search devices and fetch full .odio documents by id. CORS-enabled, no key required."

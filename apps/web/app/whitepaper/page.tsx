@@ -3,6 +3,7 @@ import Link from "next/link";
 import { CodeBlock } from "@/components/CodeBlock";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/whitepaper" },
   title: "Whitepaper",
   description:
     "The OpenDeviceIO whitepaper: motivation, the data model, bundles and cables, governance and licensing, and the roadmap."

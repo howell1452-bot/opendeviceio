@@ -4,6 +4,7 @@ import { CodeBlock } from "@/components/CodeBlock";
 import { DATA_LICENSE, DATA_TERMS_PATH } from "@/lib/data-license";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/implement" },
   title: "For design software vendors",
   description:
     "A practical guide for AV / CAD / schematic tool vendors (EasySchematic, XTEN-AV, AVCAD, D-Tools, Visio, …) to consume OpenDeviceIO: the connector/link/signals model, the SDK, the public API, and the primary-signal mapping recipe used by the reference EasySchematic adapter."

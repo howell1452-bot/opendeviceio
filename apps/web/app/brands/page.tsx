@@ -5,6 +5,7 @@ import { listBrands } from "@/lib/brands";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "/brands" },
   title: "Brands",
   description:
     "Every brand in the OpenDeviceIO registry. Manufacturers can claim their brand to verify and maintain their own records."

@@ -156,7 +156,7 @@ jobs:
           npm install --no-save @playwright/test@1.49.1
           npx playwright install --with-deps chromium
 
-      - name: Claim a brand end to end
+      - name: End-to-end specs (claim a brand; canonical URLs, sitemap, robots)
         working-directory: apps/web
         run: npx playwright test -c e2e
 

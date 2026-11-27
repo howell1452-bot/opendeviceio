@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
+import { SITE_URL } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: {
@@ -10,7 +11,9 @@ export const metadata: Metadata = {
   },
   description:
     "OpenDeviceIO (ODIO) is an open, machine-readable format for describing a hardware device's I/O, power, physical, and compliance characteristics — so design tools can import accurate device data instead of re-keying PDFs.",
-  metadataBase: new URL("https://opendeviceio.org")
+  // Canonical and og:url values resolve against this, on every host
+  // (preview deployments included).
+  metadataBase: new URL(SITE_URL)
 };
 
 export default function RootLayout({
