@@ -347,6 +347,12 @@ export default function DataLicensePage() {
               reach mirrors through <code>updated_since</code>.
             </li>
             <li>
+              <strong>A manufacturer can ask us to hide its unverified drafts</strong>{" "}
+              until it has reviewed or published its own records. Hidden drafts
+              are left out of the registry and API, and can be listed in the
+              removal feed.
+            </li>
+            <li>
               <strong>Manufacturers</strong> can also become verified publishers
               and correct their own records directly; see{" "}
               <Link href="/contribute">For Manufacturers</Link>.

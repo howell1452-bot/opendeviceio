@@ -154,3 +154,41 @@ export async function removeRecordsForRequest(
   if (upErr) return { ok: false, error: upErr.message };
   return { ok: true, removed };
 }
+
+// ---- Brand visibility (hidden_until_opt_in) ---------------------------------
+
+export interface BrandOverviewRow {
+  manufacturer: string;
+  drafts: number;
+  reviewed: number;
+  verified: number;
+  hidden: boolean;
+  note: string | null;
+  updated_at: string | null;
+}
+
+/**
+ * Hide or show a brand's unverified drafts everywhere public. With
+ * `publishRemovals`, hiding also lists the drafts in GET /api/v1/removals so
+ * mirrors delete them; showing again bumps updated_at and clears those
+ * entries. See supabase/migrations/0006_brand_visibility.sql.
+ */
+export async function setBrandHidden(
+  manufacturer: string,
+  hidden: boolean,
+  publishRemovals: boolean,
+  note?: string
+): Promise<{ ok: boolean; drafts?: number; tombstones?: number; error?: string }> {
+  const { error, service, admin } = await requireAdminService();
+  if (error || !service) return { ok: false, error: error ?? "Unavailable." };
+  const { data, error: rpcErr } = await service.rpc("admin_set_brand_hidden", {
+    p_manufacturer: manufacturer,
+    p_hidden: hidden,
+    p_publish_removals: hidden && publishRemovals,
+    p_note: note?.trim() || null,
+    p_actor: admin
+  });
+  if (rpcErr) return { ok: false, error: rpcErr.message };
+  const res = (data ?? {}) as { drafts?: number; tombstones?: number };
+  return { ok: true, drafts: res.drafts, tombstones: res.tombstones };
+}
