@@ -35,7 +35,7 @@ export function AuthNav() {
   }, []);
 
   const base =
-    "rounded-md px-2.5 py-1.5 font-medium transition sm:px-3";
+    "whitespace-nowrap rounded-md px-2.5 py-1.5 font-medium transition sm:px-3";
 
   if (ready && email) {
     return (

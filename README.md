@@ -120,6 +120,13 @@ CI runs the conformance runner plus the SDK and Genie test suites
 - [GOVERNANCE.md](GOVERNANCE.md) — decision process, semver discipline, vendor neutrality.
 - [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) — Contributor Covenant 2.1.
 
+## Maintainers
+
+- **Austin Howell** — Maintainer
+
+Contact: [outreach@opendeviceio.org](mailto:outreach@opendeviceio.org) ·
+[About the project](https://opendeviceio.org/about)
+
 ## License
 
 - **Code and JSON Schema:** [Apache License 2.0](LICENSE) (with explicit patent grant).

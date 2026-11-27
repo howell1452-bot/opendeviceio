@@ -37,6 +37,17 @@ emeritus status by the same process. No single organization should hold a majori
 maintainer seats; the steering group SHOULD actively recruit across vendors and
 manufacturers to avoid capture.
 
+## Maintainers
+
+| Name | Role |
+| --- | --- |
+| Austin Howell | Maintainer |
+
+OpenDeviceIO is currently maintained by one independent maintainer. Seats are open to
+engineers from manufacturers and software vendors under the nomination process above.
+
+Contact: [outreach@opendeviceio.org](mailto:outreach@opendeviceio.org)
+
 ## Decision process
 
 We decide by **lazy consensus**, escalating only when needed:

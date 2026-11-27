@@ -102,7 +102,7 @@ export default function HomePage() {
 
       {/* The problem */}
       <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
-        <div className="grid gap-10 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-10 md:grid-cols-2">
           <div>
             <h2 className="text-2xl font-bold text-slate-900">The problem</h2>
             <p className="mt-4 text-slate-600">
