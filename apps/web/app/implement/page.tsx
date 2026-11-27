@@ -200,8 +200,8 @@ export default function ImplementPage() {
               files for their own products. Approved reps upload{" "}
               <code>.odio</code> files through the web UI or an authenticated{" "}
               <code>POST /api/v1/devices</code> token.{" "}
-              <Link href="/contribute" className="font-semibold underline">
-                Request access on the Contribute page →
+              <Link href="/manufacturers" className="font-semibold underline">
+                See how it works for manufacturers →
               </Link>
             </p>
           </div>

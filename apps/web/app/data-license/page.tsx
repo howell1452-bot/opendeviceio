@@ -355,7 +355,7 @@ export default function DataLicensePage() {
             <li>
               <strong>Manufacturers</strong> can also become verified publishers
               and correct their own records directly; see{" "}
-              <Link href="/contribute">For Manufacturers</Link>.
+              <Link href="/manufacturers">For Manufacturers</Link>.
             </li>
           </ul>
 

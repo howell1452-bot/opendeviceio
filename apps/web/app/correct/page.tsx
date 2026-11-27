@@ -97,7 +97,7 @@ export default async function CorrectPage({
           Manufacturers can become verified publishers and publish their own
           records, which replace the drafts and show as{" "}
           <strong>manufacturer-verified</strong>.{" "}
-          <Link className="text-brand-700 underline" href="/contribute">
+          <Link className="text-brand-700 underline" href="/manufacturers#verification">
             How it works
           </Link>
           .

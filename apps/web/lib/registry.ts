@@ -285,3 +285,30 @@ export async function listRemovals(query: {
     return { rows: [], total: null, unavailable: true };
   }
 }
+
+/**
+ * Count registry rows (as the public sees them), optionally for one
+ * manufacturer and/or a set of validation statuses. Null when unavailable.
+ */
+export async function countRegistry(query: {
+  manufacturer?: string;
+  statuses?: string[];
+} = {}): Promise<number | null> {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+  try {
+    let q = supabase.from("registry").select("id", { count: "exact", head: true });
+    if (query.manufacturer) q = q.eq("manufacturer", query.manufacturer);
+    if (query.statuses && query.statuses.length > 0) {
+      // A missing status counts as a draft.
+      q = query.statuses.includes("draft")
+        ? q.or(`validation_status.in.(${query.statuses.join(",")}),validation_status.is.null`)
+        : q.in("validation_status", query.statuses);
+    }
+    const { count, error } = await q;
+    if (error) return null;
+    return typeof count === "number" ? count : null;
+  } catch {
+    return null;
+  }
+}
