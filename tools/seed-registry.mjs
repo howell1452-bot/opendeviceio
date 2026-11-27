@@ -119,6 +119,21 @@ if (statusFilter) rows = rows.filter((r) => statusFilter.has(r.validation_status
   }
 }
 
+// Skip the spec's fictional fixtures (the "Acme" and "Example" devices that
+// illustrate the format). They stay in examples/ for docs and conformance tests,
+// but they aren't real products, so they must never reach the public registry,
+// where integrations would mirror them as real catalog entries.
+{
+  const FIXTURE_ID_PREFIXES = ["acme/", "example/"];
+  const before = rows.length;
+  rows = rows.filter(
+    (r) => !FIXTURE_ID_PREFIXES.some((p) => String(r.id ?? "").toLowerCase().startsWith(p))
+  );
+  if (rows.length < before) {
+    console.error(`Skipped ${before - rows.length} fictional fixture row(s) (${FIXTURE_ID_PREFIXES.join(", ")}).`);
+  }
+}
+
 // Collapse duplicate ids before upsert: two source documents can extract to the
 // same device id (e.g. amp-x300.pdf + amp-x300_1.pdf), but `id` is the registry's
 // primary key and a single upsert command cannot touch the same id twice. Last

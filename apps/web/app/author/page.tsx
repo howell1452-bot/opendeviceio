@@ -5,6 +5,7 @@ import { listMyMemberships } from "@/lib/membership";
 import { getRegistryRow } from "@/lib/registry";
 import { OdioAuthor } from "./OdioAuthor";
 import { OdioEditor } from "./OdioEditor";
+import { PublishLicenseNote } from "@/components/PublishLicenseNote";
 
 export const dynamic = "force-dynamic";
 
@@ -58,6 +59,9 @@ export default async function AuthorPage({
                 brands={brands}
               />
             </div>
+            {brands.includes(row.manufacturer ?? "") ? (
+              <PublishLicenseNote className="mt-4 max-w-2xl" />
+            ) : null}
           </>
         ) : (
           <p className="mt-3 text-slate-600">
@@ -98,6 +102,9 @@ export default async function AuthorPage({
       <div className="mt-8">
         <OdioAuthor signedIn={Boolean(user)} brands={brands} />
       </div>
+      {brands.length > 0 ? (
+        <PublishLicenseNote className="mt-4 max-w-2xl" />
+      ) : null}
     </div>
   );
 }

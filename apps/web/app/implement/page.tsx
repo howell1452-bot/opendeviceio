@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { CodeBlock } from "@/components/CodeBlock";
+import { DATA_LICENSE, DATA_TERMS_PATH } from "@/lib/data-license";
 
 export const metadata: Metadata = {
   title: "For design software vendors",
@@ -15,7 +16,8 @@ const TOC = [
   ["reference", "Reference implementation"],
   ["snippets", "Code snippets"],
   ["api", "The public API"],
-  ["schemas", "Schemas & licensing"]
+  ["schemas", "Schemas & licensing"],
+  ["register", "Register your integration"]
 ] as const;
 
 const FETCH_SNIPPET = `// Fetch a single ODIO document from the free, read-only public API.
@@ -128,12 +130,24 @@ export default function ImplementPage() {
                 </a>
               ))}
             </nav>
-            <div className="mt-6 border-t border-slate-200 pt-4 text-sm">
+            <div className="mt-6 space-y-2 border-t border-slate-200 pt-4 text-sm">
               <Link
                 href="/api-docs"
-                className="font-medium text-brand-700 hover:text-brand-800"
+                className="block font-medium text-brand-700 hover:text-brand-800"
               >
                 API reference →
+              </Link>
+              <Link
+                href={DATA_TERMS_PATH}
+                className="block font-medium text-brand-700 hover:text-brand-800"
+              >
+                Data license →
+              </Link>
+              <Link
+                href="/implement/register"
+                className="block font-medium text-brand-700 hover:text-brand-800"
+              >
+                Register an integration →
               </Link>
             </div>
           </div>
@@ -154,6 +168,28 @@ export default function ImplementPage() {
             <Link href="/api-docs">free, read-only public API</Link> or read{" "}
             <code>.odio</code> files directly with the SDK.
           </p>
+
+          <div className="my-6 rounded-xl border border-brand-200 bg-brand-50 p-5">
+            <p className="m-0 font-semibold text-brand-900">
+              Storing or displaying registry data in your product?
+            </p>
+            <p className="mb-0 mt-2 text-brand-900">
+              Registry records are licensed{" "}
+              <Link href={DATA_TERMS_PATH} className="font-semibold underline">
+                {DATA_LICENSE.short}
+              </Link>
+              . You may store, normalize, and show them in a commercial product
+              with attribution. Bulk-sync with the{" "}
+              <Link href="/api-docs#sync" className="font-semibold underline">
+                export &amp; sync API
+              </Link>
+              , and{" "}
+              <Link href="/implement/register" className="font-semibold underline">
+                register your integration
+              </Link>{" "}
+              to get removal and change notices.
+            </p>
+          </div>
 
           <div className="my-6 rounded-xl border border-emerald-200 bg-emerald-50 p-5">
             <p className="m-0 font-semibold text-emerald-900">
@@ -328,7 +364,19 @@ export default function ImplementPage() {
               <code>GET /api/v1/devices/&#123;id&#125;</code> — fetch the full
               ODIO document by id (ids contain slashes).
             </li>
+            <li>
+              <code>GET /api/v1/removals</code> — ids withdrawn from the
+              registry, for keeping a mirror in sync.
+            </li>
           </ul>
+          <p>
+            To mirror the whole registry, page through{" "}
+            <code>GET /api/v1/devices?include=document&amp;sort=updated</code>
+            , then sync incrementally with <code>updated_since</code>. Filter
+            with <code>status=reviewed,manufacturer-verified</code> if you only
+            want human-checked data. See{" "}
+            <Link href="/api-docs#sync">Export &amp; sync</Link>.
+          </p>
 
           {/* Schemas */}
           <h2 id="schemas">Schemas &amp; licensing</h2>
@@ -342,9 +390,30 @@ export default function ImplementPage() {
             <code>$ref</code> resolution works from any validator.
           </p>
           <p>
-            The registry data is free and read-only. The schema and SDK are
-            Apache-2.0; the spec and docs are CC&nbsp;BY&nbsp;4.0. You are free
-            to ship an ODIO importer in a commercial product.
+            The schema and SDK are Apache-2.0, and the spec and docs are
+            CC&nbsp;BY&nbsp;4.0. You are free to ship an ODIO importer in a
+            commercial product.
+          </p>
+          <p>
+            <strong>Registry data</strong> (the records served by the registry
+            and API) is licensed{" "}
+            <Link href={DATA_TERMS_PATH}>{DATA_LICENSE.short}</Link>. You may
+            store, normalize, and display it, including to signed-in customers
+            in a paid product, provided you give attribution. Keep each
+            record&apos;s <code>validation_status</code> and label drafts. The
+            registry holds no product images. Read the{" "}
+            <Link href={DATA_TERMS_PATH}>data license &amp; integration terms</Link>{" "}
+            for attribution wording, sync expectations, and limits.
+          </p>
+
+          {/* Register */}
+          <h2 id="register">Register your integration</h2>
+          <p>
+            If your product stores or displays registry data,{" "}
+            <Link href="/implement/register">register it</Link>. It&apos;s
+            free and doesn&apos;t gate the API. It records your use case
+            against the data terms, and it means we can email you about
+            removals, corrections, and upcoming API or terms changes.
           </p>
         </article>
       </div>

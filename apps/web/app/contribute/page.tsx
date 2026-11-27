@@ -119,7 +119,13 @@ export default async function ContributePage() {
                 ))}
               </ul>
               <p className="mt-3 text-sm text-slate-600">
-                Two ways to publish for your brand:{" "}
+                Published records are shared under the{" "}
+                <Link className="text-brand-700 underline" href="/data-license">
+                  registry data license
+                </Link>{" "}
+                (CC BY 4.0), so design and catalog software can carry your
+                verified data with attribution. Two ways to publish for your
+                brand:{" "}
                 <Link className="text-brand-700 underline" href="/publish">
                   upload an .odio file
                 </Link>

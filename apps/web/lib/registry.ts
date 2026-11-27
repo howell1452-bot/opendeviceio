@@ -28,6 +28,17 @@ const LIST_COLUMNS =
 
 export interface RegistryQuery {
   search?: string;
+  /** Restrict to these validation statuses (OR). Empty/omitted = all. */
+  statuses?: string[];
+  /** ISO 8601 timestamp; only rows with updated_at >= this. */
+  updatedSince?: string;
+  /**
+   * "name" (default): manufacturer, model, id — for browsing.
+   * "updated": updated_at, id — for incremental sync.
+   */
+  sort?: "name" | "updated";
+  /** Embed the full `document` in each row (export / bulk sync). */
+  includeDocument?: boolean;
   kind?: string;
   category?: string;
   manufacturer?: string;
@@ -39,7 +50,10 @@ export interface RegistryQuery {
   offset?: number;
 }
 
-export type RegistryListRow = Omit<RegistryRow, "document">;
+export type RegistryListRow = Omit<RegistryRow, "document"> & {
+  /** Present only when the query set `includeDocument`. */
+  document?: OdioDocument;
+};
 
 export interface RegistryListResult {
   rows: RegistryListRow[];
@@ -67,8 +81,15 @@ export async function listRegistry(
   if (!supabase) return { rows: [], total: null, unavailable: true };
 
   try {
-    let q = supabase.from("registry").select(LIST_COLUMNS, { count: "exact" });
+    const columns = query.includeDocument
+      ? `${LIST_COLUMNS},document`
+      : LIST_COLUMNS;
+    let q = supabase.from("registry").select(columns, { count: "exact" });
 
+    if (query.statuses && query.statuses.length > 0) {
+      q = q.in("validation_status", query.statuses);
+    }
+    if (query.updatedSince) q = q.gte("updated_at", query.updatedSince);
     if (query.kind) q = q.eq("kind", query.kind);
     if (query.category) q = q.eq("category", query.category);
     if (query.manufacturer) q = q.eq("manufacturer", query.manufacturer);
@@ -82,9 +103,18 @@ export async function listRegistry(
       q = q.or(`manufacturer.ilike.${like},model.ilike.${like},id.ilike.${like}`);
     }
 
-    q = q.order("manufacturer", { ascending: true }).order("model", {
-      ascending: true
-    });
+    // Always end on the primary key so ordering is total and offset paging
+    // never skips or repeats rows that tie on the leading sort columns.
+    if (query.sort === "updated") {
+      q = q
+        .order("updated_at", { ascending: true })
+        .order("id", { ascending: true });
+    } else {
+      q = q
+        .order("manufacturer", { ascending: true })
+        .order("model", { ascending: true })
+        .order("id", { ascending: true });
+    }
 
     if (typeof query.limit === "number") {
       const offset = query.offset && query.offset > 0 ? query.offset : 0;
@@ -198,5 +228,60 @@ export async function getFacets(): Promise<RegistryFacets> {
     return pack();
   } catch {
     return EMPTY_FACETS;
+  }
+}
+
+/** A tombstone for a registry id that was deleted or renamed. */
+export interface RegistryRemoval {
+  id: string;
+  kind: string | null;
+  manufacturer: string | null;
+  removed_at: string;
+}
+
+export interface RegistryRemovalsResult {
+  rows: RegistryRemoval[];
+  total: number | null;
+  /** True when the DB (or the removals table) is unavailable. */
+  unavailable: boolean;
+}
+
+/**
+ * Removal feed: ids removed from the registry at or after `since`, oldest
+ * first. Ids that were later re-published are not included (the tombstone is
+ * cleared on re-insert). Backed by `registry_removals`
+ * (supabase/migrations/0002_registry_sync.sql).
+ */
+export async function listRemovals(query: {
+  since?: string;
+  limit: number;
+  offset: number;
+}): Promise<RegistryRemovalsResult> {
+  const supabase = getSupabase();
+  if (!supabase) return { rows: [], total: null, unavailable: true };
+  try {
+    let q = supabase
+      .from("registry_removals")
+      .select("id,kind,manufacturer,removed_at", { count: "exact" });
+    if (query.since) q = q.gte("removed_at", query.since);
+    q = q
+      .order("removed_at", { ascending: true })
+      .order("seq", { ascending: true })
+      .range(query.offset, query.offset + query.limit - 1);
+    const { data, error, count } = await q;
+    if (error) {
+      // eslint-disable-next-line no-console
+      console.error("[odio] registry removals error:", error.message);
+      return { rows: [], total: null, unavailable: true };
+    }
+    return {
+      rows: (data ?? []) as RegistryRemoval[],
+      total: typeof count === "number" ? count : null,
+      unavailable: false
+    };
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error("[odio] registry removals threw:", err);
+    return { rows: [], total: null, unavailable: true };
   }
 }

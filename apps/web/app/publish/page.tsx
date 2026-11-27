@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/session";
 import { listMyMemberships } from "@/lib/membership";
 import { supabaseConfigured } from "@/lib/supabase-server";
 import { PublishForm } from "./PublishForm";
+import { PublishLicenseNote } from "@/components/PublishLicenseNote";
 
 export const dynamic = "force-dynamic";
 
@@ -64,6 +65,7 @@ export default async function PublishPage() {
             . The document&apos;s manufacturer must match one of these.
           </p>
           <PublishForm brands={brands} />
+          <PublishLicenseNote className="mt-4" />
         </div>
       )}
     </div>

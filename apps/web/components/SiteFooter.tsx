@@ -24,6 +24,8 @@ export function SiteFooter() {
                 <li><Link className="hover:text-brand-700" href="/api-docs">API reference</Link></li>
                 <li><Link className="hover:text-brand-700" href="/registry">Registry</Link></li>
                 <li><Link className="hover:text-brand-700" href="/contribute">Contribute (manufacturers)</Link></li>
+                <li><Link className="hover:text-brand-700" href="/implement/register">Register an integration</Link></li>
+                <li><Link className="hover:text-brand-700" href="/data-license">Data license</Link></li>
               </ul>
             </div>
             <div>
@@ -37,7 +39,12 @@ export function SiteFooter() {
           </div>
         </div>
         <div className="mt-8 flex flex-col gap-1 border-t border-slate-200 pt-6 text-xs text-slate-500 sm:flex-row sm:justify-between">
-          <span>Code &amp; schema: Apache-2.0 · Spec &amp; docs: CC BY 4.0</span>
+          <span>
+            Code &amp; schema: Apache-2.0 · Spec &amp; docs: CC BY 4.0 ·{" "}
+            <Link className="hover:text-brand-700" href="/data-license">
+              Registry data: CC BY 4.0
+            </Link>
+          </span>
           <span>ODIO format version 0.1.0</span>
         </div>
       </div>
