@@ -206,8 +206,10 @@ export default function DataLicensePage() {
 
           <h2 id="status">Validation status</h2>
           <p>
-            Every record carries <code>provenance.validation.status</code>,
-            which the API also returns as <code>validation_status</code>:
+            The registry sets each record&apos;s verification status and
+            returns it as <code>validation_status</code>. It also writes it into
+            the record&apos;s <code>provenance.validation</code>. A submitted
+            file can&apos;t set its own status: whatever it claims is replaced.
           </p>
           <table>
             <thead>
@@ -222,8 +224,9 @@ export default function DataLicensePage() {
                   <code>draft</code>
                 </td>
                 <td>
-                  Machine-extracted from public manufacturer documents, or
-                  hand-entered, and <strong>not yet human-reviewed</strong>. It
+                  Unverified: machine-extracted from public manufacturer
+                  documents, or submitted by a community member or a design
+                  software vendor, and <strong>not yet reviewed</strong>. It
                   is useful as a starting point but may contain errors.
                 </td>
               </tr>
@@ -248,10 +251,18 @@ export default function DataLicensePage() {
             </tbody>
           </table>
           <p>
+            Separately, <code>source_type</code> says who submitted the current
+            version: <code>machine-draft</code>, <code>community</code>,{" "}
+            <code>design-vendor</code> (named in <code>source_org</code>) or{" "}
+            <code>manufacturer</code>.
+          </p>
+          <p>
             If you display records, keep the status with each one and show
             drafts in a way users can tell apart from reviewed and verified
             data. To take only checked data, filter with{" "}
-            <code>status=reviewed,manufacturer-verified</code>.
+            <code>status=reviewed,manufacturer-verified</code>. When you
+            register an integration that includes drafts, that covers
+            community and design-vendor drafts as well as machine drafts.
           </p>
 
           <h2 id="images">Images &amp; trademarks</h2>

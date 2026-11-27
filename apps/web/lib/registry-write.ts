@@ -5,14 +5,9 @@ import type { RegistryRow } from "./registry";
 // service client (clients have no write grant on public.registry, and a guard
 // trigger rejects client-role writes; see 0007_provenance_tiers.sql).
 
-export type SourceType = "machine-draft" | "community" | "design-vendor" | "manufacturer";
+import type { SourceType } from "./source";
 
-export const SOURCE_TYPES: readonly SourceType[] = [
-  "machine-draft",
-  "community",
-  "design-vendor",
-  "manufacturer"
-];
+export { SOURCE_TYPES, type SourceType } from "./source";
 
 export interface WriteMeta {
   sourceType: SourceType;

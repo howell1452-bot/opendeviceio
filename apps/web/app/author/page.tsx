@@ -94,9 +94,7 @@ export default async function AuthorPage({
                 signedIn={Boolean(user)}
                 brands={brands}
                 orgs={orgs}
-                baseRevisionId={
-                  (row as { current_revision_id?: string | null }).current_revision_id ?? null
-                }
+                baseRevisionId={row.revision_id ?? null}
                 acceptsRevision={acceptsRevision}
                 currentStatus={row.validation_status}
               />

@@ -2,6 +2,7 @@ import type { OdioDocument } from "@opendeviceio/sdk";
 import { normalizeManufacturer } from "@opendeviceio/sdk";
 import { getSupabase } from "./supabase";
 import { controlledCategoryOf } from "./category-filter";
+import type { SourceType } from "./source";
 
 // A row of the `public.registry` table. The `document` column is the full
 // .odio file (device | bundle | cable), stored as its parsed object.
@@ -21,11 +22,44 @@ export interface RegistryRow {
   document: OdioDocument;
   created_at?: string | null;
   updated_at?: string | null;
+  /** Who submitted the current version (provenance tiers). */
+  source_type?: SourceType;
+  /** Name of the submitting organization (design vendor or brand), or null. */
+  source_org?: string | null;
+  /** The record's current revision (record_revisions.id). */
+  revision_id?: string | null;
 }
 
 // The columns we select for list views (everything except the heavy document).
+// source_org is embedded through registry.source_org_id -> organizations; the
+// public can only see verified organizations' names.
 const LIST_COLUMNS =
-  "id,kind,manufacturer,model,category,product_line,sku,validation_status,odio_version,port_count,connectors,transports,created_at,updated_at";
+  "id,kind,manufacturer,model,category,product_line,sku,validation_status,odio_version,port_count,connectors,transports,created_at,updated_at,source_type,current_revision_id,source_org:organizations(name)";
+
+type RawSourceFields = {
+  source_type?: SourceType | null;
+  current_revision_id?: string | null;
+  source_org_id?: string | null;
+  source_org?: { name: string } | { name: string }[] | null;
+};
+
+/** Flatten the embedded org and the revision pointer into the public row shape. */
+function withSource<T extends RawSourceFields>(
+  raw: T
+): Omit<T, keyof RawSourceFields> & {
+  source_type: SourceType;
+  source_org: string | null;
+  revision_id: string | null;
+} {
+  const { source_type, current_revision_id, source_org_id: _orgId, source_org, ...rest } = raw;
+  const org = Array.isArray(source_org) ? source_org[0] : source_org;
+  return {
+    ...rest,
+    source_type: source_type ?? "machine-draft",
+    source_org: org?.name ?? null,
+    revision_id: current_revision_id ?? null
+  };
+}
 
 export interface RegistryQuery {
   search?: string;
@@ -45,6 +79,8 @@ export interface RegistryQuery {
   category?: string;
   /** Match any of these stored categories (the website's controlled filter). */
   categoryIn?: string[];
+  /** Restrict to these source types (OR). Empty/omitted = all. */
+  sources?: string[];
   manufacturer?: string;
   connector?: string;
   transport?: string;
@@ -93,6 +129,9 @@ export async function listRegistry(
     if (query.statuses && query.statuses.length > 0) {
       q = q.in("validation_status", query.statuses);
     }
+    if (query.sources && query.sources.length > 0) {
+      q = q.in("source_type", query.sources);
+    }
     if (query.updatedSince) q = q.gte("updated_at", query.updatedSince);
     if (query.kind) q = q.eq("kind", query.kind);
     if (query.category) q = q.eq("category", query.category);
@@ -138,7 +177,9 @@ export async function listRegistry(
       return { rows: [], total: null, unavailable: true };
     }
     return {
-      rows: (data ?? []) as unknown as RegistryListRow[],
+      rows: ((data ?? []) as unknown as RawSourceFields[]).map(
+        (r) => withSource(r) as unknown as RegistryListRow
+      ),
       total: typeof count === "number" ? count : null,
       unavailable: false
     };
@@ -156,7 +197,7 @@ export async function getRegistryRow(id: string): Promise<RegistryRow | null> {
   try {
     const { data, error } = await supabase
       .from("registry")
-      .select("*")
+      .select("*,source_org:organizations(name)")
       .eq("id", id)
       .maybeSingle();
     if (error) {
@@ -164,7 +205,7 @@ export async function getRegistryRow(id: string): Promise<RegistryRow | null> {
       console.error("[odio] registry get error:", error.message);
       return null;
     }
-    return (data as unknown as RegistryRow) ?? null;
+    return data ? (withSource(data as RawSourceFields) as unknown as RegistryRow) : null;
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error("[odio] registry get threw:", err);
@@ -321,4 +362,82 @@ export async function countRegistry(query: {
   } catch {
     return null;
   }
+}
+
+/** A public history entry (record_revisions, published or superseded; no submitter). */
+export interface PublicRevision {
+  revision_id: string;
+  status: "published" | "superseded";
+  source_type: SourceType;
+  source_org: string | null;
+  created_at: string;
+  document?: OdioDocument;
+}
+
+/**
+ * A record's public history, newest first. Read as anon: RLS (0008b) limits it
+ * to published/superseded revisions of publicly visible records.
+ */
+export async function listPublicRevisions(
+  id: string,
+  opts: { includeDocument?: boolean } = {}
+): Promise<PublicRevision[] | null> {
+  const supabase = getSupabase();
+  if (!supabase) return null;
+  try {
+    const cols = `id,status,source_type,created_at,source_org:organizations(name)${
+      opts.includeDocument ? ",document" : ""
+    }`;
+    const { data, error } = await supabase
+      .from("record_revisions")
+      .select(cols)
+      .eq("record_id", id)
+      .in("status", ["published", "superseded"])
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false });
+    if (error) {
+      // eslint-disable-next-line no-console
+      console.error("[odio] revisions error:", error.message);
+      return null;
+    }
+    return ((data ?? []) as unknown as Array<{
+      id: string;
+      status: "published" | "superseded";
+      source_type: SourceType;
+      created_at: string;
+      source_org: { name: string } | { name: string }[] | null;
+      document?: OdioDocument;
+    }>).map((r) => {
+      const org = Array.isArray(r.source_org) ? r.source_org[0] : r.source_org;
+      return {
+        revision_id: r.id,
+        status: r.status,
+        source_type: r.source_type,
+        source_org: org?.name ?? null,
+        created_at: r.created_at,
+        ...(opts.includeDocument ? { document: r.document } : {})
+      };
+    });
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error("[odio] revisions threw:", err);
+    return null;
+  }
+}
+
+/** Public revision counts for a set of record ids (one RPC; ids not found count 0). */
+export async function getRevisionCounts(ids: string[]): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  const supabase = getSupabase();
+  if (!supabase || ids.length === 0) return out;
+  try {
+    const { data, error } = await supabase.rpc("record_revision_counts", { p_ids: ids });
+    if (error) return out;
+    for (const r of (data ?? []) as Array<{ record_id: string; revision_count: number }>) {
+      out.set(r.record_id, r.revision_count);
+    }
+  } catch {
+    /* counts are best-effort */
+  }
+  return out;
 }

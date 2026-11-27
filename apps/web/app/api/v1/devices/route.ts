@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { listRegistry } from "@/lib/registry";
+import { getRevisionCounts, listRegistry } from "@/lib/registry";
+import { SOURCE_TYPES } from "@/lib/source";
 import {
   normalizeManufacturer,
   validateDocument,
@@ -75,6 +76,11 @@ export async function OPTIONS() {
  *   sort           "name" (default) | "updated" (updated_at, id — for sync)
  *   include        "document" embeds the full .odio document in each row
  *                  (page size capped at LIST_MAX_LIMIT_WITH_DOCUMENTS)
+ *   source         comma-separated source types
+ *                  (machine-draft, community, design-vendor, manufacturer)
+ *
+ * Each row also carries source_type, source_org (organization name or null),
+ * revision_id (the current revision) and revision_count (public revisions).
  */
 export async function GET(req: Request) {
   const url = new URL(req.url);
@@ -95,6 +101,23 @@ export async function GET(req: Request) {
       return err(
         400,
         `Unknown status: ${bad.join(", ")}. Use one or more of: ${VALIDATION_STATUSES.join(", ")}.`
+      );
+    }
+  }
+
+  // ---- source -------------------------------------------------------------
+  let sources: string[] | undefined;
+  const sourceParam = sp.get("source");
+  if (sourceParam != null && sourceParam.trim() !== "") {
+    sources = sourceParam
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const bad = sources.filter((s) => !(SOURCE_TYPES as readonly string[]).includes(s));
+    if (bad.length > 0) {
+      return err(
+        400,
+        `Unknown source: ${bad.join(", ")}. Use one or more of: ${SOURCE_TYPES.join(", ")}.`
       );
     }
   }
@@ -138,6 +161,7 @@ export async function GET(req: Request) {
     connector: sp.get("connector") ?? undefined,
     transport: sp.get("transport") ?? undefined,
     statuses,
+    sources,
     updatedSince,
     sort: sortParam,
     includeDocument,
@@ -145,8 +169,10 @@ export async function GET(req: Request) {
     offset
   });
 
+  const counts = await getRevisionCounts(rows.map((r) => r.id));
   const data = rows.map((row) => ({
     ...row,
+    revision_count: counts.get(row.id) ?? 0,
     registry_url: registryUrl(row.id),
     api_url: apiUrl(row.id)
   }));
