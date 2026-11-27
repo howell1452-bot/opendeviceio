@@ -13,26 +13,32 @@ const TYPES: { value: RequestType; label: string; help: string }[] = [
     help: "Something in the record is wrong or missing."
   },
   {
-    value: "removal",
-    label: "Remove it",
-    help: "Take the record down from the registry and the API."
-  },
-  {
     value: "verify",
     label: "Verify it / publish ours",
     help: "We're the manufacturer and want to verify or publish our own data."
   }
 ];
 
+/** Admins only: a legal takedown, logged like any other request. */
+const REMOVAL_TYPE = {
+  value: "removal" as RequestType,
+  label: "Take down (admin)",
+  help: "Legal takedown only, e.g. copyrighted material. Removed ids go to the removal feed."
+};
+
 export function RecordRequestForm({
   initialIds,
   initialType,
-  contactEmail
+  contactEmail,
+  allowRemoval = false
 }: {
   initialIds: string;
   initialType: RequestType;
   contactEmail: string;
+  /** Show the admin-only takedown option. */
+  allowRemoval?: boolean;
 }) {
+  const types = allowRemoval ? [...TYPES, REMOVAL_TYPE] : TYPES;
   const [type, setType] = useState<RequestType>(initialType);
   const [startedAt] = useState(() => Date.now());
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
@@ -80,7 +86,7 @@ export function RecordRequestForm({
           What would you like us to do?
         </legend>
         <div className="mt-2 grid gap-2 sm:grid-cols-3">
-          {TYPES.map((t) => (
+          {types.map((t) => (
             <label
               key={t.value}
               className={`flex cursor-pointer flex-col rounded-md border px-3 py-2 ${
@@ -172,7 +178,7 @@ export function RecordRequestForm({
             type === "correction"
               ? "What's wrong, and what it should say. A link to the current spec sheet helps."
               : type === "removal"
-                ? "Anything we should know, e.g. a product is discontinued or the data is confidential."
+                ? "The legal basis for the takedown, e.g. the copyrighted material and its owner."
                 : "Which products or brands you'd like to verify or publish."
           }
           className={INPUT}

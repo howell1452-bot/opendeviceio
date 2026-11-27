@@ -4,7 +4,6 @@ import {
   CONTACT_EMAIL,
   CONTACT_MAILTO
 } from "@/lib/project";
-import { REMOVAL_REQUEST_BUSINESS_DAYS } from "@/lib/data-license";
 
 /**
  * "How verification works" for manufacturers. Public (no sign-in needed);
@@ -51,8 +50,6 @@ export function VerificationSteps({ id = "verification" }: { id?: string }) {
           Publish files for your brand by upload, by filling in a form, or from
           a script with an API token. Edit existing drafts: what you publish
           replaces the draft and shows as <strong>manufacturer-verified</strong>.
-          You can also ask for records to be removed (done within{" "}
-          {REMOVAL_REQUEST_BUSINESS_DAYS} business days).
         </>
       )
     },
@@ -78,8 +75,7 @@ export function VerificationSteps({ id = "verification" }: { id?: string }) {
           <a className="text-brand-700 underline" href={CONTACT_MAILTO}>
             {CONTACT_EMAIL}
           </a>{" "}
-          and we&apos;ll remove your access. Your published records stay up
-          unless you ask us to take them down.
+          and we&apos;ll remove your access. Your published records stay up.
         </>
       )
     }

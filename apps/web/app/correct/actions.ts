@@ -3,8 +3,12 @@
 import { createHash } from "node:crypto";
 import { headers } from "next/headers";
 import { getSupabase } from "@/lib/supabase";
+import { getCurrentUser, isAdminEmail } from "@/lib/session";
+import { CONTACT_EMAIL } from "@/lib/project";
 
-// Public "correct or remove a record" submission. Runs on the server with the
+// Public "report an error / verify a record" submission. Removal requests
+// (legal takedowns) are accepted from admins only; the public form doesn't
+// offer them. Runs on the server with the
 // public (anon) key: RLS + column grants allow INSERT only, and the database
 // enforces rate limits (supabase/migrations/0005_record_requests.sql). This
 // action adds a honeypot, a minimum fill time, and input validation.
@@ -58,6 +62,15 @@ export async function submitRecordRequest(form: FormData): Promise<SubmitResult>
   const type = str(form, "request_type", 20) as RequestType;
   if (!["correction", "removal", "verify"].includes(type)) {
     return { ok: false, error: "Choose what you'd like us to do." };
+  }
+  if (type === "removal") {
+    const { user } = await getCurrentUser();
+    if (!isAdminEmail(user?.email)) {
+      return {
+        ok: false,
+        error: `We correct records rather than remove them. If a record contains material you have the right to have taken down (for example a copyrighted image), email ${CONTACT_EMAIL}.`
+      };
+    }
   }
   const name = str(form, "name", 200);
   const company = str(form, "company", 200);

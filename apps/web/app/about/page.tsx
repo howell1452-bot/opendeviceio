@@ -94,10 +94,9 @@ export default function AboutPage() {
         <p>
           Email <a href={CONTACT_MAILTO}>{CONTACT_EMAIL}</a> for anything about
           the project: manufacturer participation, corrections to a record,
-          integrations, or security reports. To fix or take down a specific
-          registry record, use the{" "}
-          <Link href="/correct">correction and removal form</Link>; no account
-          is needed.
+          integrations, or security reports. To report an error in a
+          specific registry record, use the{" "}
+          <Link href="/correct">correction form</Link>; no account is needed.
         </p>
       </article>
     </div>

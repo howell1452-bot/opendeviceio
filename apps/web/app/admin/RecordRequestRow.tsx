@@ -30,10 +30,10 @@ function businessDaysSince(iso: string): number {
 
 export function RecordRequestRow({
   request,
-  removalWindowDays
+  correctionWindowDays
 }: {
   request: RecordRequest;
-  removalWindowDays: number;
+  correctionWindowDays: number;
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -41,7 +41,7 @@ export function RecordRequestRow({
 
   const domain = request.email.split("@")[1] ?? "";
   const age = businessDaysSince(request.created_at);
-  const overdue = request.request_type === "removal" && age >= removalWindowDays;
+  const overdue = request.request_type === "correction" && age >= correctionWindowDays;
 
   function run(fn: () => Promise<{ ok: boolean; error?: string }>) {
     setError(null);
@@ -83,7 +83,7 @@ export function RecordRequestRow({
         ) : null}
         {overdue ? (
           <span className="text-xs font-semibold text-red-700">
-            past the {removalWindowDays}-day removal commitment
+            past the {correctionWindowDays}-day correction commitment
           </span>
         ) : null}
       </div>
