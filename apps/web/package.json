@@ -13,6 +13,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "pretest": "npm run build-workspace-deps",
     "test": "vitest run"
   },
   "dependencies": {
