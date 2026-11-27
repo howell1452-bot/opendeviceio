@@ -2,7 +2,8 @@
 // OpenDeviceIO registry seed/ingest tool.
 //
 // Reads every .odio.json under examples/ (excluding examples/invalid/), derives
-// the registry row metadata, and either:
+// the registry row metadata (manufacturer and category canonicalized with the
+// SDK's normalizeManufacturer / normalizeCategory), and either:
 //   * prints idempotent upsert SQL to stdout (default), or
 //   * applies it directly via the Supabase REST API when --apply is passed and
 //     SUPABASE_URL + a SUPABASE_SECRET_KEY (sb_secret_..., the modern replacement
@@ -22,7 +23,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { normalizeManufacturer } from "@opendeviceio/sdk";
+import { normalizeCategory, normalizeManufacturer } from "@opendeviceio/sdk";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, "..");
@@ -71,12 +72,19 @@ function rowFor(doc) {
   if (identity && manufacturer && identity.manufacturer !== manufacturer) {
     identity.manufacturer = manufacturer;
   }
+  // Same for the category: map near-duplicates ("av/accessory/mounting",
+  // "av/accessories/mounting" → "accessory/mount") onto the advisory taxonomy in
+  // vocab/ so the category facet doesn't fragment. Unknown paths pass through.
+  const category = normalizeCategory(identity?.category ?? null);
+  if (identity && category && identity.category !== category) {
+    identity.category = category;
+  }
   return {
     id,
     kind,
     manufacturer,
     model: identity?.model ?? null,
-    category: identity?.category ?? null,
+    category,
     product_line: identity?.productLine ?? null,
     sku: identity?.sku ?? null,
     validation_status: validation,

@@ -16,8 +16,12 @@ extract(text, extractor) -> dict     # candidate ODIO document
 validate(doc) -> [errors]            # against the canonical JSON Schema
 score(doc, signals) -> doc           # populates provenance.confidence
 assemble(doc) -> doc                 # generator=genie/0.1.0, method=llm-extraction,
-                                     # validation.status=draft
+                                     # validation.status=draft; categories normalized
+                                     # against ../vocab/ (odio_genie.category)
 ```
+
+The category taxonomy is read from the repo's `vocab/` directory, found the same way as
+the schema (walking up from the package); set `ODIO_VOCAB_DIR` to override.
 
 Heavy/optional dependencies are **lazily imported**: importing `odio_genie` and running
 the full test suite needs only `jsonschema` + `pydantic` + `pytest`. PDF backends and
