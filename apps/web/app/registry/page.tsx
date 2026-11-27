@@ -4,6 +4,7 @@ import { listRegistry, getFacets, type RegistryListRow } from "@/lib/registry";
 import { KindBadge, StatusBadge, Chip } from "@/components/Badge";
 import { RegistryFilters } from "@/components/RegistryFilters";
 import { STATUS_FILTERS } from "@/lib/status-filters";
+import { categoryFilterValues, categoryOptionLabel } from "@/lib/category-filter";
 
 // Always render at request time so `next build` never depends on the DB.
 export const dynamic = "force-dynamic";
@@ -38,6 +39,9 @@ export default async function RegistryPage({
   const [{ rows, unavailable }, facets] = await Promise.all([
     listRegistry({
       ...query,
+      // The Category dropdown lists controlled paths; match every raw spelling.
+      category: undefined,
+      categoryIn: query.category ? categoryFilterValues(query.category) : undefined,
       statuses: statusFilter ? [...statusFilter.statuses] : undefined
     }),
     getFacets()
@@ -67,7 +71,15 @@ export default async function RegistryPage({
       </div>
 
       <div className="mt-8">
-        <RegistryFilters options={facets} initial={query} />
+        <RegistryFilters
+          options={{
+            ...facets,
+            categoryLabels: Object.fromEntries(
+              facets.categories.map((c) => [c, categoryOptionLabel(c)])
+            )
+          }}
+          initial={query}
+        />
       </div>
 
       <div className="mt-6">
