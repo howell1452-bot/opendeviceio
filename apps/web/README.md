@@ -102,7 +102,7 @@ npm start             # serve the production build
   Without it, requesting brand access, listing brands, managing API tokens, and
   publishing from the site all fail with "permission denied".
 
-Production has 0001–0003 applied; 0004 is pending.
+All of these migrations are applied in production.
 
 Registry records are licensed **CC BY 4.0** for downstream use. The terms live on
 `/data-license`; their constants (license, terms version, sync and removal windows,
