@@ -5,9 +5,9 @@ import {
   validateDocument,
   type OdioDocument
 } from "@opendeviceio/sdk";
-import { getServerSupabase, getServiceSupabase } from "@/lib/supabase-server";
 import { membershipsForUser } from "@/lib/membership";
-import { hashToken } from "@/lib/tokens";
+import { resolveCaller, touchToken } from "@/lib/server-auth";
+import { writeRegistryRow } from "@/lib/registry-write";
 import {
   deriveRegistryRow,
   documentManufacturer,
@@ -161,14 +161,15 @@ function err(status: number, message: string, extra?: unknown) {
 /**
  * Authenticated write: publish a manufacturer-verified ODIO document.
  *
- * Auth (either):
- *   (a) cookie session  -> use the user's authenticated client; RLS enforces
- *       that the row's manufacturer is in the user's manufacturer_members.
- *   (b) Authorization: Bearer <token> -> sha256-hash, look up api_tokens, load
- *       that user's memberships, verify the doc's manufacturer in code, then
- *       upsert via the SERVICE client and bump last_used_at.
+ * Auth (either): a cookie session (the website: /publish, /author) or
+ * `Authorization: Bearer <token>` (scripts, CI). Both resolve to a user; the
+ * document's manufacturer must be one of that user's approved brands
+ * (manufacturer_members), checked here in code. The write itself goes through
+ * the service role: clients have no write grant on the registry
+ * (0007_provenance_tiers.sql).
  *
- * 400 invalid doc, 401 missing/invalid auth, 403 manufacturer out of scope.
+ * 400 invalid doc, 401 missing/invalid auth, 403 manufacturer out of scope,
+ * 503 server key not configured.
  */
 export async function POST(req: Request) {
   // Parse + validate the body first (same for both auth modes).
@@ -199,110 +200,28 @@ export async function POST(req: Request) {
     return err(400, "Document has no id.");
   }
 
-  const authHeader = req.headers.get("authorization");
-  const bearer =
-    authHeader && /^Bearer\s+/i.test(authHeader)
-      ? authHeader.replace(/^Bearer\s+/i, "").trim()
-      : null;
+  const resolved = await resolveCaller(req);
+  if (!resolved.ok) return err(resolved.status, resolved.error);
+  const { caller, service } = resolved;
 
-  // ---- Mode (b): Bearer token -> service-client upsert -----------------------
-  if (bearer) {
-    const service = getServiceSupabase();
-    if (!service) return err(401, "Token auth is not configured.");
-
-    const token_hash = hashToken(bearer);
-    const { data: tokenRow, error: tokenErr } = await service
-      .from("api_tokens")
-      .select("id,user_id")
-      .eq("token_hash", token_hash)
-      .maybeSingle();
-    if (tokenErr || !tokenRow) return err(401, "Invalid API token.");
-
-    const userId = (tokenRow as { user_id: string }).user_id;
-    const brands = (await membershipsForUser(service, userId)).map(
-      (b) => normalizeManufacturer(b) ?? b
-    );
-    if (!brands.includes(normalizeManufacturer(manufacturer) ?? manufacturer)) {
-      return err(
-        403,
-        `Manufacturer "${manufacturer}" is not in your approved brands.`
-      );
-    }
-
-    const stamped = stampManufacturerVerified(doc, manufacturer);
-    const row = deriveRegistryRow(stamped, validation.kind);
-
-    const { error: upErr } = await service.from("registry").upsert(
-      {
-        id: row.id,
-        kind: row.kind,
-        manufacturer: row.manufacturer,
-        model: row.model,
-        category: row.category,
-        product_line: row.product_line,
-        sku: row.sku,
-        validation_status: "manufacturer-verified",
-        odio_version: row.odio_version,
-        port_count: row.port_count,
-        connectors: row.connectors,
-        transports: row.transports,
-        document: row.document
-      },
-      { onConflict: "id" }
-    );
-    if (upErr) return err(400, `Publish failed: ${upErr.message}`);
-
-    // Bump last_used_at (best-effort).
-    await service
-      .from("api_tokens")
-      .update({ last_used_at: new Date().toISOString() })
-      .eq("id", (tokenRow as { id: string }).id);
-
-    return NextResponse.json(
-      { id: row.id, status: "manufacturer-verified" },
-      { headers: CORS_HEADERS }
-    );
+  // Brand scope, compared on canonical names.
+  const brands = (await membershipsForUser(service, caller.userId)).map(
+    (b) => normalizeManufacturer(b) ?? b
+  );
+  if (!brands.includes(normalizeManufacturer(manufacturer) ?? manufacturer)) {
+    return err(403, `Manufacturer "${manufacturer}" is not in your approved brands.`);
   }
-
-  // ---- Mode (a): cookie session -> user-client upsert (RLS scopes it) --------
-  const client = await getServerSupabase();
-  if (!client) return err(401, "Authentication required.");
-  const { data: auth } = await client.auth.getUser();
-  if (!auth.user) return err(401, "Authentication required.");
 
   const stamped = stampManufacturerVerified(doc, manufacturer);
   const row = deriveRegistryRow(stamped, validation.kind);
+  row.validation_status = "manufacturer-verified";
 
-  const { error: upErr } = await client.from("registry").upsert(
-    {
-      id: row.id,
-      kind: row.kind,
-      manufacturer: row.manufacturer,
-      model: row.model,
-      category: row.category,
-      product_line: row.product_line,
-      sku: row.sku,
-      validation_status: "manufacturer-verified",
-      odio_version: row.odio_version,
-      port_count: row.port_count,
-      connectors: row.connectors,
-      transports: row.transports,
-      document: row.document
-    },
-    { onConflict: "id" }
-  );
-  if (upErr) {
-    // RLS violation surfaces here when the manufacturer is out of the user's
-    // scope; report it as a 403.
-    const msg = upErr.message || "";
-    if (/row-level security|policy|not authorized|permission/i.test(msg)) {
-      return err(
-        403,
-        `Manufacturer "${manufacturer}" is not in your approved brands.`
-      );
-    }
-    return err(400, `Publish failed: ${msg}`);
-  }
+  const { error: upErr } = await writeRegistryRow(service, row, {
+    sourceType: "manufacturer"
+  });
+  if (upErr) return err(400, `Publish failed: ${upErr}`);
+
+  await touchToken(service, caller);
 
   return NextResponse.json(
     { id: row.id, status: "manufacturer-verified" },

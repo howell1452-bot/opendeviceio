@@ -22,6 +22,8 @@ type Result =
 /** A validated document waiting for the publisher to confirm. */
 interface Pending {
   row: ReturnType<typeof deriveRegistryRow>;
+  /** The document as uploaded; the server validates, scopes and stamps it. */
+  doc: OdioDocument;
   /** Validation status of the record this replaces, or null if new. */
   existingStatus: string | null;
   existing: boolean;
@@ -125,6 +127,7 @@ export function PublishForm({ brands }: { brands: string[] }) {
 
     setPending({
       row,
+      doc,
       existing: Boolean(existingRow),
       existingStatus:
         (existingRow as { validation_status?: string | null } | null)?.validation_status ??
@@ -134,35 +137,31 @@ export function PublishForm({ brands }: { brands: string[] }) {
 
   async function publish() {
     if (!pending) return;
-    const supabase = getBrowserSupabase();
-    if (!supabase) return;
     setBusy(true);
-    const { row } = pending;
+    const { row, doc } = pending;
 
-    // RLS enforces that the caller may only upsert rows whose manufacturer is
-    // in their memberships, so this fails server-side for any other brand.
-    const { error } = await supabase.from("registry").upsert(
-      {
-        id: row.id,
-        kind: row.kind,
-        manufacturer: row.manufacturer,
-        model: row.model,
-        category: row.category,
-        product_line: row.product_line,
-        sku: row.sku,
-        validation_status: "manufacturer-verified",
-        odio_version: row.odio_version,
-        port_count: row.port_count,
-        connectors: row.connectors,
-        transports: row.transports,
-        document: row.document
-      },
-      { onConflict: "id" }
-    );
+    // The server re-validates, checks the brand against your memberships, stamps
+    // provenance, and writes the record (the browser cannot write the registry).
+    let message: string | null = null;
+    try {
+      const res = await fetch("/api/v1/devices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify(doc)
+      });
+      if (!res.ok) {
+        const e = (await res.json().catch(() => ({}))) as { error?: string; details?: string[] };
+        message = e.error ?? `HTTP ${res.status}`;
+        if (e.details?.length) message += ` (${e.details.slice(0, 3).join("; ")})`;
+      }
+    } catch (e) {
+      message = e instanceof Error ? e.message : String(e);
+    }
     setBusy(false);
 
-    if (error) {
-      setResult({ kind: "error", message: `Publish failed: ${error.message}` });
+    if (message) {
+      setResult({ kind: "error", message: `Publish failed: ${message}` });
       return;
     }
     setResult({
