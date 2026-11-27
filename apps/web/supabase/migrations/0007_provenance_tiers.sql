@@ -135,11 +135,19 @@ revoke all on table public.organizations from anon, authenticated;
 grant select (id, kind, name, slug, website, status) on table public.organizations
   to anon, authenticated;
 
-create or replace view public.organizations_public
-  with (security_invoker = true) as
-  select id, kind, name, slug, website
-  from public.organizations
-  where status = 'verified';
+-- Created only if missing: 0010_brand_profiles.sql widens this view, and
+-- "create or replace" with fewer columns would fail on a re-run.
+do $$
+begin
+  if not exists (select 1 from pg_views where schemaname = 'public' and viewname = 'organizations_public') then
+    create view public.organizations_public
+      with (security_invoker = true) as
+      select id, kind, name, slug, website
+      from public.organizations
+      where status = 'verified';
+  end if;
+end;
+$$;
 
 revoke all on table public.organizations_public from anon, authenticated;
 grant select on table public.organizations_public to anon, authenticated;

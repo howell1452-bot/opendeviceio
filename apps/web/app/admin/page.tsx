@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getCurrentUser, isAdminEmail } from "@/lib/session";
 import { getServiceSupabase } from "@/lib/supabase-server";
-import type { AccessRequest } from "@/lib/membership";
 import {
   INTEGRATION_COLUMNS,
   type IntegrationRequest
@@ -12,7 +11,8 @@ import {
   RECORD_REQUEST_COLUMNS,
   type RecordRequest
 } from "@/lib/record-requests";
-import { RequestRow } from "./RequestRow";
+import { ClaimRow, type AdminClaim } from "./ClaimRow";
+import { loadAdminClaims } from "@/lib/claim-queue";
 import { IntegrationRow } from "./IntegrationRow";
 import { RecordRequestRow } from "./RecordRequestRow";
 import { BrandVisibilityRow } from "./BrandVisibilityRow";
@@ -35,7 +35,7 @@ export default async function AdminPage() {
   }
 
   const service = getServiceSupabase();
-  let pending: AccessRequest[] = [];
+  let claims: AdminClaim[] = [];
   let configError: string | null = null;
   let integrationsPending: IntegrationRequest[] = [];
   let integrationsApproved: IntegrationRequest[] = [];
@@ -57,11 +57,10 @@ export default async function AdminPage() {
       submissionsError = e instanceof Error ? e.message : String(e);
     }
     const [access, integrations, records, brandRows] = await Promise.all([
-      service
-        .from("access_requests")
-        .select("id,user_id,email,manufacturer,note,status,created_at")
-        .eq("status", "pending")
-        .order("created_at", { ascending: true }),
+      loadAdminClaims(service).then(
+        (data) => ({ data, error: null as { message: string } | null }),
+        (e: unknown) => ({ data: [] as AdminClaim[], error: { message: e instanceof Error ? e.message : String(e) } })
+      ),
       service
         .from("integration_requests")
         .select(INTEGRATION_COLUMNS)
@@ -79,7 +78,7 @@ export default async function AdminPage() {
     if (records.error) recordRequestsError = records.error.message;
     else recordRequests = (records.data ?? []) as RecordRequest[];
     if (access.error) configError = access.error.message;
-    else pending = (access.data ?? []) as AccessRequest[];
+    else claims = access.data;
 
     if (integrations.error) {
       integrationsError = integrations.error.message;
@@ -184,19 +183,20 @@ export default async function AdminPage() {
 
           <section className="mt-12">
             <h2 className="text-xl font-bold text-slate-900">
-              Manufacturer access requests
+              Brand claims
             </h2>
             <p className="mt-1 text-sm text-slate-600">
-              Publishers. Approving grants the requester membership in their
-              named brand; they can then publish manufacturer-verified files
-              for it.
+              Manufacturer reps claiming a brand. Approving adds them to the
+              brand&apos;s team (the first member becomes its brand-admin),
+              marks the brand claimed, and emails them. Free email addresses
+              are never approved automatically.
             </p>
-            {pending.length === 0 ? (
-              <p className="mt-4 text-sm text-slate-500">No pending requests.</p>
+            {claims.length === 0 ? (
+              <p className="mt-4 text-sm text-slate-500">No pending claims.</p>
             ) : (
               <ul className="mt-4 space-y-3">
-                {pending.map((r) => (
-                  <RequestRow key={r.id} request={r} />
+                {claims.map((c) => (
+                  <ClaimRow key={c.id} claim={c} />
                 ))}
               </ul>
             )}

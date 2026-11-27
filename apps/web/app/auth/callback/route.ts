@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getServerSupabase, siteOrigin } from "@/lib/supabase-server";
+import { getServerSupabase, getServiceSupabase, siteOrigin } from "@/lib/supabase-server";
+import { acceptInvitesFor } from "@/lib/invites";
 
 // Magic-link landing route. Supabase redirects here with a `code` (PKCE) which
 // we exchange for a session; the @supabase/ssr server client writes the session
@@ -36,6 +37,18 @@ export async function GET(req: Request) {
     return NextResponse.redirect(
       `${origin}/signin?error=${encodeURIComponent(error.message)}`
     );
+  }
+
+  // Brand invites for this email: join now when the domain is the brand's,
+  // otherwise queue a claim for review. Never blocks sign-in.
+  try {
+    const service = getServiceSupabase();
+    const { data } = await supabase.auth.getUser();
+    if (service && data.user) {
+      await acceptInvitesFor(service, { id: data.user.id, email: data.user.email ?? null });
+    }
+  } catch {
+    /* best effort */
   }
 
   const res = NextResponse.redirect(`${origin}${next}`);

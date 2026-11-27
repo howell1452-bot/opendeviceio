@@ -18,8 +18,8 @@ export default function SignInPage() {
       <p className="mt-3 text-slate-600">
         Enter your work email and we&apos;ll send you a one-time magic link. No
         password required. Anyone can sign in to submit records; manufacturer
-        reps also use it to request access and publish verified device files
-        for their brand.
+        reps also use it to claim their brand and publish verified device files
+        for it.
       </p>
       <div className="mt-8">
         <SignInForm />

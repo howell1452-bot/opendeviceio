@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { normalizeManufacturer, type OdioDevice, type Bundle } from "@opendeviceio/sdk";
 import { getRegistryRow, listPublicRevisions } from "@/lib/registry";
 import {
@@ -12,6 +12,7 @@ import {
   statusLabel
 } from "@/components/Badge";
 import { sourceLabel } from "@/lib/source";
+import { brandCounts, brandSlugForPrefix, getBrandByManufacturer } from "@/lib/brands";
 import { DeviceView } from "@/components/DeviceView";
 import { BundleView } from "@/components/BundleView";
 import { IoTableView } from "@/components/IoTableView";
@@ -52,9 +53,17 @@ export default async function RegistryDetailPage({
   params: Promise<{ id: string[] }>;
 }) {
   const { id: seg } = await params;
+  // A single segment is a brand, not a record: /registry/crestron (or an id
+  // prefix like /registry/qsys) -> 308 to the brand page.
+  if ((seg ?? []).length === 1) {
+    const brandSlug = await brandSlugForPrefix(joinId(seg));
+    if (brandSlug) permanentRedirect(`/brands/${brandSlug}`);
+    notFound();
+  }
   const id = joinId(seg);
   const row = await getRegistryRow(id);
   if (!row) notFound();
+  const brand = await getBrandByManufacturer(row.manufacturer);
 
   // Show an Edit link only to signed-in manufacturers approved for this brand.
   const { user, client } = await getCurrentUser();
@@ -67,6 +76,11 @@ export default async function RegistryDetailPage({
   );
 
   const history = (await listPublicRevisions(row.id)) ?? [];
+  // "Maintained by <Brand>" only once the claimed brand has verified records.
+  const maintainedBy =
+    brand?.claimed_at && row.manufacturer
+      ? ((await brandCounts(row.manufacturer)).verified ?? 0) > 0
+      : false;
 
   const doc = row.document as Record<string, unknown>;
   const provenance = doc.provenance as
@@ -100,7 +114,15 @@ export default async function RegistryDetailPage({
         <h1 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-900">
           {row.model ?? row.id}
         </h1>
-        <p className="mt-1 text-lg text-slate-600">{row.manufacturer}</p>
+        <p className="mt-1 text-lg text-slate-600">
+          {brand ? (
+            <Link href={`/brands/${brand.slug}`} className="hover:text-brand-700 hover:underline">
+              {row.manufacturer}
+            </Link>
+          ) : (
+            row.manufacturer
+          )}
+        </p>
         <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
           <span className="font-mono text-xs text-slate-500">{row.id}</span>
           {row.category ? <Chip>{row.category}</Chip> : null}
@@ -136,11 +158,26 @@ export default async function RegistryDetailPage({
         ) : null}
 
         <p className="mt-5 flex flex-wrap gap-x-6 gap-y-2 text-sm">
+          {brand && !canEdit && !brand.claimed_at ? (
+            <Link
+              href={`/brands/${brand.slug}/claim`}
+              className="font-medium text-brand-700 underline underline-offset-2 hover:text-brand-900"
+            >
+              Is this your product? Claim {brand.name} to verify and maintain it →
+            </Link>
+          ) : null}
+          {brand && !canEdit && brand.claimed_at && maintainedBy ? (
+            <Link href={`/brands/${brand.slug}`} className="font-medium text-emerald-800 hover:underline">
+              Maintained by {brand.name}
+            </Link>
+          ) : null}
           <Link
             href={`/correct?id=${encodeURIComponent(row.id)}`}
             className="font-medium text-brand-700 underline underline-offset-2 hover:text-brand-900"
           >
-            Is this your product? Verify, correct, or request removal →
+            {brand && !canEdit && !brand.claimed_at
+              ? "Report an error or request removal →"
+              : "Is this your product? Verify, correct, or request removal →"}
           </Link>
           {user && !canEdit ? (
             <Link

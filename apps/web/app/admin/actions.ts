@@ -4,6 +4,8 @@ import { normalizeManufacturer, validateDocument } from "@opendeviceio/sdk";
 import { getCurrentUser, isAdminEmail } from "@/lib/session";
 import { getServiceSupabase } from "@/lib/supabase-server";
 import { deriveRegistryRow } from "@/lib/odio-row";
+import { isFreeMailDomain, roleForNewMember } from "@/lib/claim-rules";
+import { claimApprovedEmail, claimRejectedEmail, sendEmail } from "@/lib/notify";
 import {
   ADMIN_REVIEWER,
   closeRevision,
@@ -33,49 +35,136 @@ async function requireAdminService() {
   return { error: null, service, admin: user.email, adminId: user.id };
 }
 
+/**
+ * Approve a brand claim (claim-your-brand brief, item 4). Everything comes
+ * from the stored claim, not the client: the claimant, the brand (canonical
+ * name, the same normalization the registry uses) and the email domain.
+ * The brand's first member becomes its brand-admin; later ones publishers.
+ * Optionally adds the claimant's email domain to the brand's verified
+ * domains (never a free-mail domain). Marks the brand claimed and listed.
+ */
 export async function approveRequest(
   requestId: string,
-  userId: string,
-  manufacturer: string
+  opts: { addDomain?: boolean } = {}
+): Promise<{ ok: boolean; error?: string; role?: string }> {
+  const { error, service, adminId } = await requireAdminService();
+  if (error || !service) return { ok: false, error: error ?? "Unavailable." };
+
+  const { data: reqRow } = await service
+    .from("access_requests")
+    .select("id,user_id,email,manufacturer,org_id,email_domain,status")
+    .eq("id", requestId)
+    .maybeSingle();
+  const req = reqRow as {
+    id: string;
+    user_id: string;
+    email: string | null;
+    manufacturer: string;
+    org_id: string | null;
+    email_domain: string | null;
+    status: string;
+  } | null;
+  if (!req) return { ok: false, error: "Claim not found." };
+  if (req.status !== "pending") return { ok: false, error: `This claim is already ${req.status}.` };
+
+  // The brand profile: the claim's org, else the one for its manufacturer.
+  let orgQuery = service
+    .from("organizations")
+    .select("id,name,slug,manufacturer,claimed_at,status,verified_domains")
+    .eq("kind", "manufacturer");
+  orgQuery = req.org_id
+    ? orgQuery.eq("id", req.org_id)
+    : orgQuery.eq("manufacturer", normalizeManufacturer(req.manufacturer.trim()) ?? req.manufacturer.trim());
+  const { data: orgRow } = await orgQuery.maybeSingle();
+  const org = orgRow as {
+    id: string;
+    name: string;
+    slug: string;
+    manufacturer: string | null;
+    claimed_at: string | null;
+    status: string;
+    verified_domains: string[];
+  } | null;
+
+  const brand =
+    org?.manufacturer ?? normalizeManufacturer(req.manufacturer.trim()) ?? req.manufacturer.trim();
+  if (!brand) return { ok: false, error: "Empty brand name." };
+
+  const { data: existing } = await service
+    .from("manufacturer_members")
+    .select("user_id,role")
+    .eq("manufacturer", brand);
+  const members = ((existing ?? []) as Array<{ user_id: string; role: "publisher" | "brand-admin" }>).map(
+    (m) => ({ userId: m.user_id, role: m.role })
+  );
+  const already = members.find((m) => m.userId === req.user_id);
+  const role = already?.role ?? roleForNewMember(members);
+
+  const { error: memErr } = await service.from("manufacturer_members").upsert(
+    // created_by is a uuid FK to auth.users: the approving admin's user id.
+    { user_id: req.user_id, manufacturer: brand, role, created_by: adminId },
+    { onConflict: "user_id,manufacturer" }
+  );
+  if (memErr) return { ok: false, error: memErr.message };
+
+  if (org) {
+    const domains = new Set(org.verified_domains ?? []);
+    if (opts.addDomain && req.email_domain && !isFreeMailDomain(req.email_domain)) {
+      domains.add(req.email_domain);
+    }
+    const { error: orgErr } = await service
+      .from("organizations")
+      .update({
+        claimed_at: org.claimed_at ?? new Date().toISOString(),
+        status: org.status === "pending" ? "verified" : org.status,
+        manufacturer: org.manufacturer ?? brand,
+        verified_domains: [...domains]
+      })
+      .eq("id", org.id);
+    if (orgErr) return { ok: false, error: orgErr.message };
+  }
+
+  const { error: reqErr } = await service
+    .from("access_requests")
+    .update({ status: "approved", decided_by: adminId, decided_at: new Date().toISOString() })
+    .eq("id", requestId);
+  if (reqErr) return { ok: false, error: reqErr.message };
+
+  if (req.email) {
+    await sendEmail(
+      claimApprovedEmail({ to: req.email, brand: org?.name ?? brand, slug: org?.slug ?? "" })
+    );
+  }
+  return { ok: true, role };
+}
+
+/** Reject a brand claim with an optional note, and tell the claimant. */
+export async function rejectRequest(
+  requestId: string,
+  note?: string
 ): Promise<{ ok: boolean; error?: string }> {
   const { error, service, adminId } = await requireAdminService();
   if (error || !service) return { ok: false, error: error ?? "Unavailable." };
 
-  // Store the canonical brand name (the same normalization the registry
-  // applies to documents), so "Crestron Electronics, Inc." grants "Crestron"
-  // and RLS / publish checks match the registry rows.
-  const brand = normalizeManufacturer(manufacturer.trim());
-  if (!brand) return { ok: false, error: "Empty brand name." };
-
-  const { error: memErr } = await service
-    .from("manufacturer_members")
-    .upsert(
-      // created_by is a uuid FK to auth.users: the approving admin's user id.
-      { user_id: userId, manufacturer: brand, created_by: adminId },
-      { onConflict: "user_id,manufacturer" }
-    );
-  if (memErr) return { ok: false, error: memErr.message };
-
-  const { error: reqErr } = await service
+  const decisionNote = note?.trim() ? note.trim().slice(0, 2000) : null;
+  const { data, error: reqErr } = await service
     .from("access_requests")
-    .update({ status: "approved" })
-    .eq("id", requestId);
+    .update({
+      status: "rejected",
+      decided_by: adminId,
+      decided_at: new Date().toISOString(),
+      decision_note: decisionNote
+    })
+    .eq("id", requestId)
+    .eq("status", "pending")
+    .select("email,manufacturer")
+    .maybeSingle();
   if (reqErr) return { ok: false, error: reqErr.message };
-
-  return { ok: true };
-}
-
-export async function rejectRequest(
-  requestId: string
-): Promise<{ ok: boolean; error?: string }> {
-  const { error, service } = await requireAdminService();
-  if (error || !service) return { ok: false, error: error ?? "Unavailable." };
-
-  const { error: reqErr } = await service
-    .from("access_requests")
-    .update({ status: "rejected" })
-    .eq("id", requestId);
-  if (reqErr) return { ok: false, error: reqErr.message };
+  const r = data as { email: string | null; manufacturer: string } | null;
+  if (!r) return { ok: false, error: "This claim is no longer pending." };
+  if (r.email) {
+    await sendEmail(claimRejectedEmail({ to: r.email, brand: r.manufacturer, note: decisionNote }));
+  }
   return { ok: true };
 }
 

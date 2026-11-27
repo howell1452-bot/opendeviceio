@@ -522,8 +522,8 @@ export function OdioAuthor({
                   Your account isn&apos;t approved to publish for{" "}
                   <strong>{trimmedMfr || "(no manufacturer)"}</strong>. Approved:{" "}
                   {brands.length ? brands.join(", ") : "none"}.{" "}
-                  <a className="underline" href="/contribute">
-                    Request access
+                  <a className="underline" href="/brands/claim">
+                    Claim your brand
                   </a>
                   .
                 </p>
@@ -546,8 +546,8 @@ export function OdioAuthor({
             <div className={`rounded-lg border border-slate-200 bg-white p-3 ${brands.length > 0 ? "mt-4" : ""}`}>
               <p className="mb-2 text-xs text-slate-600">
                 Submit it to the registry as an unverified record. Manufacturer?{" "}
-                <a className="underline" href="/manufacturers">
-                  Become a verified publisher
+                <a className="underline" href="/brands/claim">
+                  Claim your brand
                 </a>
                 .
               </p>

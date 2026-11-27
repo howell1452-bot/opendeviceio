@@ -13,13 +13,12 @@ import { REMOVAL_REQUEST_BUSINESS_DAYS } from "@/lib/data-license";
 export function VerificationSteps({ id = "verification" }: { id?: string }) {
   const steps: { title: string; body: React.ReactNode }[] = [
     {
-      title: "Request access with your work email",
+      title: "Claim your brand with your work email",
       body: (
         <>
-          Sign in with an email address at your brand&apos;s domain and name the
-          brand you represent on the{" "}
-          <Link className="text-brand-700 underline" href="/contribute">
-            request form
+          Sign in with an email address at your brand&apos;s domain and{" "}
+          <Link className="text-brand-700 underline" href="/brands/claim">
+            claim your brand
           </Link>
           . Sign-in is a one-time email link; there&apos;s no password.
         </>
@@ -88,7 +87,7 @@ export function VerificationSteps({ id = "verification" }: { id?: string }) {
 
   return (
     <section id={id} className="scroll-mt-24">
-      <h2 className="text-2xl font-bold text-slate-900">How verification works</h2>
+      <h2 className="text-2xl font-bold text-slate-900">Claim your brand</h2>
       <ol className="mt-5 space-y-4">
         {steps.map((s, i) => (
           <li key={s.title} className="flex gap-4">

@@ -87,3 +87,77 @@ jobs:
 
       - name: Run tests
         run: pytest
+
+  database:
+    name: Database (migrations + RLS tests)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: odio_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Apply every migration, re-apply the newer ones, run the RLS tests
+        env:
+          PGHOST: localhost
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: odio_test
+        run: bash apps/web/supabase/tests/run.sh
+
+  e2e:
+    name: End-to-end (Playwright, local Supabase)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ADMIN_EMAILS: admin@odio.test
+      E2E_ADMIN_EMAIL: admin@odio.test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install workspace dependencies
+        run: npm ci || npm install
+
+      - name: Set up the Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # Postgres, Auth (magic links into a local mail catcher) and PostgREST,
+      # with every migration in this repo, plus a small seed.
+      - name: Start local Supabase
+        run: bash apps/web/e2e/supabase-up.sh
+
+      - name: Build the site against it
+        run: npm run build -w @opendeviceio/web
+
+      - name: Install Playwright
+        working-directory: apps/web
+        run: |
+          npm install --no-save @playwright/test@1.49.1
+          npx playwright install --with-deps chromium
+
+      - name: Claim a brand end to end
+        working-directory: apps/web
+        run: npx playwright test -c e2e
+
+      - name: Stop local Supabase
+        if: always()
+        run: supabase --workdir "${{ runner.temp }}/odio-e2e" stop --no-backup || true

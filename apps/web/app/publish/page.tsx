@@ -46,11 +46,11 @@ export default async function PublishPage() {
         </Notice>
       ) : brands.length === 0 ? (
         <Notice>
-          You have no approved brands yet. Request access on the{" "}
-          <Link className="font-semibold underline" href="/contribute">
-            Contribute
+          You&apos;re not on a brand&apos;s team yet.{" "}
+          <Link className="font-semibold underline" href="/brands/claim">
+            Claim your brand
           </Link>{" "}
-          page first.
+          first.
         </Notice>
       ) : (
         <div className="mt-8">

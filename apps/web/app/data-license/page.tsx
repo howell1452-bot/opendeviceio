@@ -366,8 +366,8 @@ export default function DataLicensePage() {
               removal feed.
             </li>
             <li>
-              <strong>Manufacturers</strong> can also become verified publishers
-              and correct their own records directly; see{" "}
+              <strong>Manufacturers</strong> can also claim their brand and
+              correct their own records directly; see{" "}
               <Link href="/manufacturers">For Manufacturers</Link>.
             </li>
           </ul>
