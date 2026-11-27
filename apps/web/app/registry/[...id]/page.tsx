@@ -13,6 +13,7 @@ import {
 } from "@/components/Badge";
 import { sourceLabel } from "@/lib/source";
 import { brandCounts, brandSlugForPrefix, getBrandByManufacturer } from "@/lib/brands";
+import { resolveRedirect } from "@/lib/redirects";
 import { DeviceView } from "@/components/DeviceView";
 import { BundleView } from "@/components/BundleView";
 import { IoTableView } from "@/components/IoTableView";
@@ -25,6 +26,15 @@ export const dynamic = "force-dynamic";
 
 function joinId(segments: string[] | undefined): string {
   return (segments ?? []).map((s) => decodeURIComponent(s)).join("/");
+}
+
+function queryString(sp: Record<string, string | string[] | undefined>): string {
+  const q = new URLSearchParams();
+  for (const [k, v] of Object.entries(sp)) {
+    for (const value of Array.isArray(v) ? v : v === undefined ? [] : [v]) q.append(k, value);
+  }
+  const s = q.toString();
+  return s ? `?${s}` : "";
 }
 
 export async function generateMetadata({
@@ -48,9 +58,11 @@ export async function generateMetadata({
 }
 
 export default async function RegistryDetailPage({
-  params
+  params,
+  searchParams
 }: {
   params: Promise<{ id: string[] }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { id: seg } = await params;
   // A single segment is a brand, not a record: /registry/crestron (or an id
@@ -62,7 +74,12 @@ export default async function RegistryDetailPage({
   }
   const id = joinId(seg);
   const row = await getRegistryRow(id);
-  if (!row) notFound();
+  if (!row) {
+    // A renamed record: 308 to its current id, keeping the query string.
+    const moved = await resolveRedirect(id);
+    if (moved) permanentRedirect(`/registry/${moved}${queryString(await searchParams)}`);
+    notFound();
+  }
   const brand = await getBrandByManufacturer(row.manufacturer);
 
   // Show an Edit link only to signed-in manufacturers approved for this brand.

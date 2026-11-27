@@ -116,3 +116,5 @@ export {
   validateChassis,
   type ChassisIssue
 } from "./bundle.js";
+
+export { normalizeRecordId, RETIRED_ID_PREFIXES } from "./record-id.js";

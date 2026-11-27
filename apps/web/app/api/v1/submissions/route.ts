@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   normalizeManufacturer,
+  normalizeRecordId,
   validateDocument,
   type OdioDocument
 } from "@opendeviceio/sdk";
@@ -133,7 +134,9 @@ export async function POST(req: Request) {
   const rawManufacturer = documentManufacturer(doc);
   if (!rawManufacturer) return err(400, "Document does not name a manufacturer.");
   const manufacturer = normalizeManufacturer(rawManufacturer) ?? rawManufacturer;
-  const id = (doc as { id?: unknown }).id;
+  const rawId = (doc as { id?: unknown }).id;
+  const id = typeof rawId === "string" ? normalizeRecordId(rawId) : rawId;
+  if (typeof id === "string" && id !== rawId) (doc as { id?: unknown }).id = id;
   if (typeof id !== "string" || !RECORD_ID_PATTERN.test(id)) {
     return err(400, 'Document id must look like "manufacturer/model" (lowercase, e.g. "crestron/dm-md8x8").');
   }

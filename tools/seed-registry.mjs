@@ -24,7 +24,7 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { normalizeCategory, normalizeManufacturer } from "@opendeviceio/sdk";
+import { normalizeCategory, normalizeManufacturer, normalizeRecordId } from "@opendeviceio/sdk";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(__dirname, "..");
@@ -64,7 +64,10 @@ function rowFor(doc) {
   const kind = doc.kind || "device";
   const identity =
     kind === "bundle" ? doc.bundle : kind === "cable" ? doc.cable : doc.device;
-  const id = doc.id;
+  // A retired id prefix (vocab/id-prefixes.json) becomes its current one, so a
+  // renamed prefix can't come back on re-import.
+  const id = normalizeRecordId(doc.id);
+  if (id !== doc.id) doc.id = id;
   const validation = doc.provenance?.validation?.status ?? null;
   const portCount = kind === "device" && Array.isArray(doc.ports) ? doc.ports.length : null;
   const connectors = [...collectByKey(doc, ["connector"])].sort();

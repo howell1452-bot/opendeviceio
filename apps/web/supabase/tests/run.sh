@@ -20,7 +20,7 @@ done
 echo "== idempotency (second run)"
 for f in $(ls "$migrations"/*.sql | sort); do
   case "$(basename "$f")" in
-    0007_*|0008*|0010_*|0011_*)
+    0007_*|0008*|0010_*|0011_*|0012_*)
       echo "   $(basename "$f")"
       psql_q -f "$f" > /dev/null ;;
   esac

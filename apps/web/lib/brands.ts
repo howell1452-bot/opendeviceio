@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { normalizeManufacturer } from "@opendeviceio/sdk";
 import { getSupabase } from "./supabase";
 import { countRegistry } from "./registry";
+import { redirectedPrefix } from "./redirects";
 
 // Brand profiles: public.organizations rows with kind = 'manufacturer'
 // (0010_brand_profiles.sql). Public reads go through organizations_public as
@@ -82,7 +83,11 @@ export async function brandSlugForPrefix(prefix: string): Promise<string | null>
     .limit(1)
     .maybeSingle();
   const manufacturer = (data as { manufacturer: string | null } | null)?.manufacturer;
-  return (await getBrandByManufacturer(manufacturer))?.slug ?? null;
+  const viaRecords = (await getBrandByManufacturer(manufacturer))?.slug ?? null;
+  if (viaRecords) return viaRecords;
+  // A retired prefix whose records were renamed ("attero-tech-by-qsc").
+  const current = await redirectedPrefix(prefix);
+  return current && current !== prefix ? brandSlugForPrefix(current) : null;
 }
 
 export interface BrandCounts {

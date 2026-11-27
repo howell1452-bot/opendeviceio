@@ -447,14 +447,17 @@ def assemble(
 
     Extracted categories (the document's identity and any bundle components) are
     canonicalized against the advisory taxonomy in ``vocab/`` - see
-    :mod:`odio_genie.category`.
+    :mod:`odio_genie.category`. A retired id prefix (``vocab/id-prefixes.json``) is
+    rewritten to its current one - see :mod:`odio_genie.record_id`.
     """
     from .category import normalize_document_categories
+    from .record_id import normalize_document_id
 
     doc.setdefault("odioVersion", ODIO_VERSION)
     kind = validate_kind(doc)
     doc.setdefault("$schema", _KIND_TO_URL.get(kind, DEVICE_SCHEMA_URL))
     normalize_document_categories(doc)
+    normalize_document_id(doc)
 
     provenance = doc.setdefault("provenance", {})
     provenance["generator"] = GENERATOR

@@ -327,7 +327,9 @@ export default function DataLicensePage() {
             <li>
               <strong>Honor removals</strong>: delete or hide any id listed by{" "}
               <code>GET /api/v1/removals</code> within {REMOVAL_WINDOW_DAYS}{" "}
-              days.
+              days. Follow renamed ids from <code>GET /api/v1/redirects</code>{" "}
+              (a rename is not a removal; the record continues under its new
+              id).
             </li>
             <li>
               <strong>Don&apos;t imply endorsement</strong> by OpenDeviceIO or
