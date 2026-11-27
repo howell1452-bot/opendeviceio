@@ -92,7 +92,11 @@ export default async function ContributePage() {
         <Link className="text-brand-700 underline" href="/correct">
           correction and removal form
         </Link>
-        . No account is needed.
+        . No account is needed. Not a manufacturer? Anyone with an account can{" "}
+        <Link className="text-brand-700 underline" href="/submit">
+          submit a record
+        </Link>{" "}
+        as an unverified community submission.
       </p>
 
       {!configured ? (

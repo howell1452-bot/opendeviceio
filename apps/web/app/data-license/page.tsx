@@ -3,6 +3,7 @@ import Link from "next/link";
 import { CodeBlock } from "@/components/CodeBlock";
 import {
   ATTRIBUTION_TEXT,
+  CONTRIBUTOR_TERMS_VERSION,
   DATA_LICENSE,
   DATA_TERMS_VERSION,
   LIST_MAX_LIMIT,
@@ -27,6 +28,7 @@ const TOC = [
   ["sync", "Export, sync & limits"],
   ["integrations", "Integration terms"],
   ["removals", "Corrections & removals"],
+  ["contributing", "Contributing records"],
   ["warranty", "No warranty"],
   ["changes", "Changes"]
 ] as const;
@@ -358,6 +360,34 @@ export default function DataLicensePage() {
               <Link href="/manufacturers">For Manufacturers</Link>.
             </li>
           </ul>
+
+          <h2 id="contributing">Contributing records</h2>
+          <p>
+            Anyone with an account can submit a <code>.odio</code> file at{" "}
+            <Link href="/submit">/submit</Link> or through{" "}
+            <code>POST /api/v1/submissions</code>. By submitting, you confirm
+            that:
+          </p>
+          <ul>
+            <li>
+              you have the right to submit the data (for example, you wrote it,
+              or took it from public specifications rather than copying
+              someone else&apos;s protected content), and
+            </li>
+            <li>
+              you make it available under {DATA_LICENSE.short}, so the registry
+              can publish it and integrations can use it on the terms on this
+              page.
+            </li>
+          </ul>
+          <p>
+            Submissions are labelled by source (community member or design
+            software vendor) and stay <strong>unverified</strong> unless the
+            manufacturer verifies them. Whatever a file says about its own
+            validation status is ignored: the registry sets verification. Public
+            pages never show a submitter&apos;s name or email. Contributor terms
+            version: <code>{CONTRIBUTOR_TERMS_VERSION}</code>.
+          </p>
 
           <h2 id="warranty">No warranty</h2>
           <p>

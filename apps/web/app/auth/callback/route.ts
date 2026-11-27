@@ -10,7 +10,16 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const code = url.searchParams.get("code");
-  const next = url.searchParams.get("next") || "/account";
+  // ?next, else the odio_next cookie set by the sign-in form; local paths only.
+  const cookieNext = /(?:^|;\s*)odio_next=([^;]*)/.exec(req.headers.get("cookie") ?? "")?.[1];
+  let fromCookie = "";
+  try {
+    fromCookie = cookieNext ? decodeURIComponent(cookieNext) : "";
+  } catch {
+    /* malformed: ignore */
+  }
+  let next = url.searchParams.get("next") || fromCookie || "/account";
+  if (!next.startsWith("/") || next.startsWith("//")) next = "/account";
   const origin = siteOrigin(req.url);
 
   if (!code) {
@@ -29,5 +38,7 @@ export async function GET(req: Request) {
     );
   }
 
-  return NextResponse.redirect(`${origin}${next.startsWith("/") ? next : "/account"}`);
+  const res = NextResponse.redirect(`${origin}${next}`);
+  res.cookies.set("odio_next", "", { path: "/", maxAge: 0 });
+  return res;
 }

@@ -17,6 +17,8 @@ import { IntegrationRow } from "./IntegrationRow";
 import { RecordRequestRow } from "./RecordRequestRow";
 import { BrandVisibilityRow } from "./BrandVisibilityRow";
 import type { BrandOverviewRow } from "./actions";
+import { loadAdminQueue, type QueueItem } from "@/lib/submission-queue";
+import { SubmissionRow } from "@/components/SubmissionRow";
 
 export const dynamic = "force-dynamic";
 
@@ -42,11 +44,18 @@ export default async function AdminPage() {
   let brandsError: string | null = null;
   let recordRequests: RecordRequest[] = [];
   let recordRequestsError: string | null = null;
+  let submissions: QueueItem[] = [];
+  let submissionsError: string | null = null;
 
   if (!service) {
     configError =
       "SUPABASE_SECRET_KEY is not set, so admin review is unavailable on this deployment.";
   } else {
+    try {
+      submissions = await loadAdminQueue(service);
+    } catch (e) {
+      submissionsError = e instanceof Error ? e.message : String(e);
+    }
     const [access, integrations, records, brandRows] = await Promise.all([
       service
         .from("access_requests")
@@ -97,6 +106,30 @@ export default async function AdminPage() {
       ) : (
         <>
           <section className="mt-10">
+            <h2 className="text-xl font-bold text-slate-900">Submissions</h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Community and design-vendor uploads waiting for review, and
+              suggested changes to reviewed or protected records. Publishing
+              makes the revision the live record as an unverified draft with its
+              own source label. Changes to manufacturer-verified records are the
+              brand&apos;s to accept.
+            </p>
+            {submissionsError ? (
+              <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                {submissionsError}
+              </div>
+            ) : submissions.length === 0 ? (
+              <p className="mt-4 text-sm text-slate-500">Nothing waiting.</p>
+            ) : (
+              <ul className="mt-4 space-y-3">
+                {submissions.map((item) => (
+                  <SubmissionRow key={item.id} item={item} mode="admin" />
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section className="mt-12">
             <h2 className="text-xl font-bold text-slate-900">
               Record requests
             </h2>

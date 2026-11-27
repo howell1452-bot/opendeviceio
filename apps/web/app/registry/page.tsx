@@ -61,7 +61,12 @@ export default async function RegistryPage({
         <p className="mt-3 text-sm text-slate-600">
           Most entries are <strong>unverified drafts</strong>, machine-extracted
           from manufacturers&apos; public documents and not yet reviewed. Filter
-          by status to see reviewed and manufacturer-verified records.
+          by status to see reviewed and manufacturer-verified records. Missing
+          a device, or found a mistake?{" "}
+          <Link className="text-brand-700 underline" href="/submit">
+            Submit a record
+          </Link>
+          .
           Manufacturers can{" "}
           <Link className="text-brand-700 underline" href="/correct">
             correct, verify, or remove
