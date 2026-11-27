@@ -106,13 +106,14 @@ export function deriveRegistryRow(
 }
 
 /**
- * Stamp manufacturer-verified provenance onto a document, recording the
- * verifying user's email. Returns a shallow-cloned document; does not mutate
- * the input.
+ * Stamp manufacturer-verified provenance onto a document. `validation.by` is
+ * set to the BRAND (never the publishing rep's email: the document is public
+ * and is mirrored by downstream integrations), and `validation.date` to today
+ * (UTC). Returns a deep-cloned document; does not mutate the input.
  */
 export function stampManufacturerVerified(
   doc: OdioDocument,
-  by: string
+  manufacturer: string
 ): OdioDocument {
   const clone = JSON.parse(JSON.stringify(doc)) as AnyDoc;
   const provenance =
@@ -124,7 +125,8 @@ export function stampManufacturerVerified(
     validation: {
       ...validation,
       status: "manufacturer-verified",
-      by
+      by: normalizeManufacturer(manufacturer) ?? manufacturer,
+      date: new Date().toISOString().slice(0, 10)
     }
   } as AnyDoc["provenance"];
   return clone as OdioDocument;

@@ -55,3 +55,27 @@ export async function rejectRequest(
   if (reqErr) return { ok: false, error: reqErr.message };
   return { ok: true };
 }
+
+// ---- Integration registrations (software vendors consuming registry data) ----
+
+export async function reviewIntegrationRequest(
+  requestId: string,
+  decision: "approved" | "declined"
+): Promise<{ ok: boolean; error?: string }> {
+  const { error, service, admin } = await requireAdminService();
+  if (error || !service) return { ok: false, error: error ?? "Unavailable." };
+  if (decision !== "approved" && decision !== "declined") {
+    return { ok: false, error: "Invalid decision." };
+  }
+
+  const { error: upErr } = await service
+    .from("integration_requests")
+    .update({
+      status: decision,
+      reviewed_by: admin,
+      reviewed_at: new Date().toISOString()
+    })
+    .eq("id", requestId);
+  if (upErr) return { ok: false, error: upErr.message };
+  return { ok: true };
+}

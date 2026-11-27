@@ -9,17 +9,24 @@ import {
   documentManufacturer,
   stampManufacturerVerified
 } from "@/lib/odio-row";
+import {
+  LICENSE_LINK_HEADER,
+  LIST_DEFAULT_LIMIT,
+  LIST_MAX_LIMIT,
+  LIST_MAX_LIMIT_WITH_DOCUMENTS,
+  VALIDATION_STATUSES,
+  apiUrl,
+  licenseEnvelope,
+  registryUrl
+} from "@/lib/data-license";
 
 // REST API for the registry.
-//   GET  — public, read-only list / search (CORS-enabled).
+//   GET  — public, read-only list / search / export (CORS-enabled).
 //   POST — authenticated write (cookie session OR Bearer token). Publishes a
 //          manufacturer-verified document the caller is scoped to.
 // Resolved at request time so `next build` never touches the DB, and a missing
 // or unreachable DB degrades to an empty result set (never a 500) on GET.
 export const dynamic = "force-dynamic";
-
-const DEFAULT_LIMIT = 50;
-const MAX_LIMIT = 200;
 
 // Permissive CORS so the GET API is callable from any tool / browser origin.
 // POST is same-origin (cookie) or Bearer; it still tolerates preflight.
@@ -27,7 +34,9 @@ const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
-  "Cache-Control": "no-store"
+  "Access-Control-Expose-Headers": "Link",
+  "Cache-Control": "no-store",
+  Link: LICENSE_LINK_HEADER
 };
 
 function clampInt(
@@ -46,11 +55,69 @@ export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
 }
 
+/**
+ * List / search / export.
+ *
+ * Integration parameters (all optional, all additive to the original API):
+ *   status         comma-separated validation statuses
+ *                  (draft, reviewed, manufacturer-verified)
+ *   updated_since  ISO 8601 timestamp; rows with updated_at >= it
+ *   sort           "name" (default) | "updated" (updated_at, id — for sync)
+ *   include        "document" embeds the full .odio document in each row
+ *                  (page size capped at LIST_MAX_LIMIT_WITH_DOCUMENTS)
+ */
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const sp = url.searchParams;
 
-  const limit = clampInt(sp.get("limit"), DEFAULT_LIMIT, 1, MAX_LIMIT);
+  // ---- status -------------------------------------------------------------
+  let statuses: string[] | undefined;
+  const statusParam = sp.get("status");
+  if (statusParam != null && statusParam.trim() !== "") {
+    statuses = statusParam
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const bad = statuses.filter(
+      (s) => !(VALIDATION_STATUSES as readonly string[]).includes(s)
+    );
+    if (bad.length > 0) {
+      return err(
+        400,
+        `Unknown status: ${bad.join(", ")}. Use one or more of: ${VALIDATION_STATUSES.join(", ")}.`
+      );
+    }
+  }
+
+  // ---- updated_since ------------------------------------------------------
+  let updatedSince: string | undefined;
+  const sinceParam = sp.get("updated_since");
+  if (sinceParam != null && sinceParam.trim() !== "") {
+    const t = Date.parse(sinceParam);
+    if (Number.isNaN(t)) {
+      return err(
+        400,
+        "updated_since must be an ISO 8601 timestamp, e.g. 2026-11-01T00:00:00Z."
+      );
+    }
+    updatedSince = new Date(t).toISOString();
+  }
+
+  // ---- sort ---------------------------------------------------------------
+  const sortParam = sp.get("sort") ?? "name";
+  if (sortParam !== "name" && sortParam !== "updated") {
+    return err(400, 'sort must be "name" or "updated".');
+  }
+
+  // ---- include ------------------------------------------------------------
+  const includeParam = sp.get("include");
+  if (includeParam != null && includeParam !== "" && includeParam !== "document") {
+    return err(400, 'include must be "document".');
+  }
+  const includeDocument = includeParam === "document";
+
+  const maxLimit = includeDocument ? LIST_MAX_LIMIT_WITH_DOCUMENTS : LIST_MAX_LIMIT;
+  const limit = clampInt(sp.get("limit"), Math.min(LIST_DEFAULT_LIMIT, maxLimit), 1, maxLimit);
   const offset = clampInt(sp.get("offset"), 0, 0, Number.MAX_SAFE_INTEGER);
 
   const { rows, total } = await listRegistry({
@@ -60,12 +127,22 @@ export async function GET(req: Request) {
     kind: sp.get("kind") ?? undefined,
     connector: sp.get("connector") ?? undefined,
     transport: sp.get("transport") ?? undefined,
+    statuses,
+    updatedSince,
+    sort: sortParam,
+    includeDocument,
     limit,
     offset
   });
 
+  const data = rows.map((row) => ({
+    ...row,
+    registry_url: registryUrl(row.id),
+    api_url: apiUrl(row.id)
+  }));
+
   return NextResponse.json(
-    { data: rows, total: total ?? 0, limit, offset },
+    { data, total: total ?? 0, limit, offset, ...licenseEnvelope() },
     { headers: CORS_HEADERS }
   );
 }
@@ -146,16 +223,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // Best-effort: stamp provenance with the token owner's email if we have it.
-    let by = "api-token";
-    try {
-      const { data: au } = await service.auth.admin.getUserById(userId);
-      if (au?.user?.email) by = au.user.email;
-    } catch {
-      /* email is optional */
-    }
-
-    const stamped = stampManufacturerVerified(doc, by);
+    const stamped = stampManufacturerVerified(doc, manufacturer);
     const row = deriveRegistryRow(stamped, validation.kind);
 
     const { error: upErr } = await service.from("registry").upsert(
@@ -196,7 +264,7 @@ export async function POST(req: Request) {
   const { data: auth } = await client.auth.getUser();
   if (!auth.user) return err(401, "Authentication required.");
 
-  const stamped = stampManufacturerVerified(doc, auth.user.email ?? auth.user.id);
+  const stamped = stampManufacturerVerified(doc, manufacturer);
   const row = deriveRegistryRow(stamped, validation.kind);
 
   const { error: upErr } = await client.from("registry").upsert(

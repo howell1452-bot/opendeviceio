@@ -5,7 +5,8 @@ physical, and compliance characteristics — plus tooling to author and consume 
 
 ODIO files use the `.odio.json` extension. The reference importer is called **Genie**.
 
-- Code & schema: [Apache-2.0](LICENSE) · Spec & docs: [CC BY 4.0](LICENSE-docs)
+- Code & schema: [Apache-2.0](LICENSE) · Spec & docs: [CC BY 4.0](LICENSE-docs) ·
+  Registry data: [CC BY 4.0](https://opendeviceio.org/data-license)
 
 ## The problem
 
@@ -124,3 +125,6 @@ CI runs the conformance runner plus the SDK and Genie test suites
 - **Code and JSON Schema:** [Apache License 2.0](LICENSE) (with explicit patent grant).
 - **Specification and documentation:** [Creative Commons Attribution 4.0 International
   (CC BY 4.0)](LICENSE-docs).
+- **Registry data** (the records served at opendeviceio.org/registry and `/api/v1`):
+  CC BY 4.0, with the attribution, validation-status, and sync terms at
+  [opendeviceio.org/data-license](https://opendeviceio.org/data-license).

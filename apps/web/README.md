@@ -87,4 +87,15 @@ npm start             # serve the production build
 
   Running it without `--apply` prints the idempotent upsert SQL to stdout instead.
 
+- [`0002_registry_sync.sql`](supabase/migrations/0002_registry_sync.sql) re-asserts
+  the `updated_at` trigger (needed for `?updated_since=`) and adds the
+  `registry_removals` tombstone table behind `GET /api/v1/removals`.
+- [`0003_integration_requests.sql`](supabase/migrations/0003_integration_requests.sql)
+  adds `integration_requests`, which holds software-vendor registrations
+  (`/implement/register`) reviewed on `/admin`.
+
+Registry records are licensed **CC BY 4.0** for downstream use. The terms live on
+`/data-license`; their constants (license, terms version, sync and removal windows,
+page-size limits) are in [`lib/data-license.ts`](lib/data-license.ts).
+
 The website itself performs **no writes** — it only reads through the public anon key.

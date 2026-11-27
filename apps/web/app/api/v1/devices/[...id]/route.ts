@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { OdioDevice } from "@opendeviceio/sdk";
 import { buildDevicePrograms, buildIoTable, renderTableSvg } from "@opendeviceio/adapters";
 import { getRegistryRow } from "@/lib/registry";
+import { LICENSE_LINK_HEADER } from "@/lib/data-license";
 
 // Public, read-only REST API: fetch one ODIO document by id, or a render-ready
 // projection via ?format= :
@@ -18,7 +19,9 @@ const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type",
-  "Cache-Control": "no-store"
+  "Access-Control-Expose-Headers": "Link",
+  "Cache-Control": "no-store",
+  Link: LICENSE_LINK_HEADER
 };
 
 export async function OPTIONS() {

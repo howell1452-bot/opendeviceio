@@ -85,10 +85,7 @@ export function PublishForm({ brands }: { brands: string[] }) {
       return;
     }
 
-    const { data: userData } = await supabase.auth.getUser();
-    const email = userData.user?.email ?? "unknown";
-
-    const stamped = stampManufacturerVerified(doc, email);
+    const stamped = stampManufacturerVerified(doc, manufacturer);
     const row = deriveRegistryRow(stamped, validation.kind);
     if (!row.id) {
       setResult({ kind: "error", message: "The document has no id." });
