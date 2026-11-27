@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { countRegistry, getFacets } from "@/lib/registry";
+import { getBrandByManufacturer } from "@/lib/brands";
 import { VerificationSteps } from "@/components/VerificationSteps";
 import {
   CONTACT_EMAIL,
@@ -15,7 +16,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "For manufacturers",
   description:
-    "Publish your products' I/O once, as an open file every design tool can read. See your products in the registry, correct or remove a record without signing up, or become a verified publisher. Free, no exclusivity, no contract."
+    "Publish your products' I/O once, as an open file every design tool can read. See your products in the registry, correct or remove a record without signing up, or claim your brand. Free, no exclusivity, no contract."
 };
 
 function first(v: string | string[] | undefined): string {
@@ -59,6 +60,7 @@ export default async function ManufacturersPage({
   ]);
 
   const brandQs = brand ? `manufacturer=${encodeURIComponent(brand)}` : "";
+  const brandProfile = brand ? await getBrandByManufacturer(brand) : null;
 
   return (
     <div>
@@ -86,10 +88,10 @@ export default async function ManufacturersPage({
               See your products
             </a>
             <Link
-              href="/contribute"
+              href="/brands"
               className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 font-medium text-slate-800 shadow-sm transition hover:border-brand-400"
             >
-              Become a verified publisher
+              Claim your brand
             </Link>
             <Link
               href="/correct"
@@ -148,7 +150,33 @@ export default async function ManufacturersPage({
 
           {brand ? (
             <div className="mt-5">
-              <h3 className="text-lg font-semibold text-slate-900">{brand}</h3>
+              <h3 className="text-lg font-semibold text-slate-900">
+                {brandProfile ? (
+                  <Link className="hover:text-brand-700 hover:underline" href={`/brands/${brandProfile.slug}`}>
+                    {brand}
+                  </Link>
+                ) : (
+                  brand
+                )}
+              </h3>
+              {brandProfile ? (
+                <p className="mt-1 text-sm text-slate-600">
+                  {brandProfile.claimed_at ? (
+                    <>Claimed by {brand}. </>
+                  ) : (
+                    <>
+                      Unclaimed.{" "}
+                      <Link className="font-medium text-brand-700 underline" href={`/brands/${brandProfile.slug}/claim`}>
+                        Claim {brand}
+                      </Link>{" "}
+                      to verify and maintain these records.{" "}
+                    </>
+                  )}
+                  <Link className="text-brand-700 underline" href={`/brands/${brandProfile.slug}`}>
+                    Brand page →
+                  </Link>
+                </p>
+              ) : null}
               <div className="mt-3 grid gap-3 sm:grid-cols-3">
                 <CountCard
                   label="Unverified drafts"
@@ -215,18 +243,55 @@ export default async function ManufacturersPage({
               manufacturer-verified.
             </Way>
             <Way
-              title="Become a verified publisher"
+              title="Claim your brand"
               time="Ongoing"
-              cta={{ href: "/contribute", label: "Request access" }}
+              cta={{ href: "/brands/claim", label: "Claim your brand" }}
             >
-              Publish and maintain your own records directly, by upload, by form,
-              or from your build pipeline with an API token.
+              Maintain your own records directly, by upload, by form, or from
+              your build pipeline with an API token, and manage your team and
+              brand settings.
             </Way>
           </div>
         </section>
 
-        {/* 4. How verification works */}
+        {/* 4. Claim your brand: how it works, and what a claimed brand controls */}
         <VerificationSteps />
+
+        <section id="claimed-brand" className="scroll-mt-24">
+          <h2 className="text-2xl font-bold text-slate-900">What a claimed brand controls</h2>
+          <ul className="mt-4 grid gap-4 sm:grid-cols-2">
+            <li className="rounded-xl border border-slate-200 bg-white p-5">
+              <h3 className="font-semibold text-slate-900">Records</h3>
+              <p className="mt-1 text-sm text-slate-600">
+                Publish and update your products as manufacturer-verified, by
+                upload, form or API token. Your version replaces the draft. Export
+                all of your records at any time.
+              </p>
+            </li>
+            <li className="rounded-xl border border-slate-200 bg-white p-5">
+              <h3 className="font-semibold text-slate-900">Team</h3>
+              <p className="mt-1 text-sm text-slate-600">
+                Invite colleagues by email and choose who can publish and who can
+                manage the brand.
+              </p>
+            </li>
+            <li className="rounded-xl border border-slate-200 bg-white p-5">
+              <h3 className="font-semibold text-slate-900">Settings</h3>
+              <p className="mt-1 text-sm text-slate-600">
+                Hide unverified drafts until you&apos;ve reviewed them, and choose
+                whether community submissions are allowed, come to you as
+                suggestions, or are blocked.
+              </p>
+            </li>
+            <li className="rounded-xl border border-slate-200 bg-white p-5">
+              <h3 className="font-semibold text-slate-900">Profile</h3>
+              <p className="mt-1 text-sm text-slate-600">
+                Your public brand page: a short description, website, support
+                link and, if you want one, a product-data contact.
+              </p>
+            </li>
+          </ul>
+        </section>
 
         {/* 5. Correct or remove */}
         <section id="correct" className="scroll-mt-24">

@@ -21,6 +21,7 @@ export interface FakeOptions {
 
 export class FakeDb {
   tables: Record<string, Row[]> = {};
+  rpcCalls: Array<{ name: string; args: Record<string, unknown> }> = [];
   constructor(public opts: FakeOptions = {}) {}
   t(name: string): Row[] {
     this.tables[name] ??= [];
@@ -29,6 +30,10 @@ export class FakeDb {
   client() {
     return {
       from: (table: string) => new Query(this, table),
+      rpc: async (name: string, args: Record<string, unknown>) => {
+        this.rpcCalls.push({ name, args });
+        return { data: null, error: null };
+      },
       auth: {
         admin: {
           getUserById: async (id: string) => ({
@@ -55,6 +60,32 @@ const DEFAULTS: Record<string, () => Row> = {
     reviewed_at: null,
     review_note: null
   }),
+  organizations: () => ({
+    id: uuid(),
+    status: "pending",
+    verified_domains: [],
+    claimed_at: null,
+    description: null,
+    website: null,
+    support_url: null,
+    data_contact: null,
+    created_at: new Date().toISOString()
+  }),
+  access_requests: () => ({
+    id: uuid(),
+    status: "pending",
+    note: null,
+    created_at: new Date().toISOString()
+  }),
+  brand_invites: () => ({
+    id: uuid(),
+    role: "publisher",
+    accepted_at: null,
+    revoked_at: null,
+    created_at: new Date().toISOString()
+  }),
+  manufacturer_members: () => ({ role: "publisher", created_at: new Date().toISOString() }),
+  brand_settings: () => ({ hidden_until_opt_in: false, community_submissions: "allowed" }),
   registry: () => ({
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
@@ -122,6 +153,24 @@ class Query implements PromiseLike<{ data: unknown; error: unknown; count?: numb
   }
   not(c: string, op: string, v: unknown) {
     if (op === "is" && v === null) this.filters.push((r) => r[c] !== null && r[c] !== undefined);
+    return this;
+  }
+  ilike(c: string, pattern: string) {
+    const re = new RegExp(
+      "^" + pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/%/g, ".*").replace(/_/g, ".") + "$",
+      "i"
+    );
+    this.filters.push((r) => typeof r[c] === "string" && re.test(r[c] as string));
+    return this;
+  }
+  like(c: string, pattern: string) {
+    const re = new RegExp(
+      "^" + pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/%/g, ".*").replace(/_/g, ".") + "$"
+    );
+    this.filters.push((r) => typeof r[c] === "string" && re.test(r[c] as string));
+    return this;
+  }
+  range() {
     return this;
   }
   gte(c: string, v: string) {

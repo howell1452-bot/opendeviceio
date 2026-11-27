@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/session";
 import { listMyMemberships } from "@/lib/membership";
 import { getServiceSupabase, supabaseConfigured } from "@/lib/supabase-server";
 import { loadBrandQueue } from "@/lib/submission-queue";
+import { acceptInvitesFor } from "@/lib/invites";
 import { SubmissionRow } from "@/components/SubmissionRow";
 import { SignOutButton } from "@/components/SignOutButton";
 import { TokenManager, type TokenRow } from "./TokenManager";
@@ -43,6 +44,9 @@ export default async function AccountPage() {
   const { user, client } = await getCurrentUser();
   if (!user || !client) redirect("/signin?next=/account");
 
+  // Apply any brand invites first, so a just-joined brand shows below.
+  const inviteService = getServiceSupabase();
+  if (inviteService) await acceptInvitesFor(inviteService, user);
   const memberships = await listMyMemberships(client);
 
   const { data: tokenData } = await client
@@ -94,9 +98,9 @@ export default async function AccountPage() {
         <h2 className="text-lg font-semibold text-slate-900">Your brands</h2>
         {memberships.length === 0 ? (
           <p className="mt-2 text-sm text-slate-600">
-            No approved brands yet.{" "}
-            <Link className="text-brand-700 underline" href="/contribute">
-              Request access
+            No brands yet.{" "}
+            <Link className="text-brand-700 underline" href="/brands/claim">
+              Claim your brand
             </Link>
             .
           </p>

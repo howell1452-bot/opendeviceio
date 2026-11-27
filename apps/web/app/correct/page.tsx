@@ -81,7 +81,7 @@ export default async function CorrectPage({
       <section className="mt-8 grid gap-4 sm:grid-cols-3">
         <Option title="Correct it">
           Tell us what&apos;s wrong and what it should say. We fix the record
-          and note the change. Once you&apos;re a verified publisher you can
+          and note the change. Once you&apos;ve claimed your brand you can
           make corrections yourself.
         </Option>
         <Option title="Remove it">
@@ -94,7 +94,7 @@ export default async function CorrectPage({
           so tools that copied it delete it too.
         </Option>
         <Option title="Verify it">
-          Manufacturers can become verified publishers and publish their own
+          Manufacturers can claim their brand and publish their own
           records, which replace the drafts and show as{" "}
           <strong>manufacturer-verified</strong>.{" "}
           <Link className="text-brand-700 underline" href="/manufacturers#verification">

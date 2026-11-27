@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { listRegistry, getFacets, type RegistryListRow } from "@/lib/registry";
+import { listBrands } from "@/lib/brands";
 import { KindBadge, StatusBadge, SourceBadge, Chip } from "@/components/Badge";
 import { SOURCE_FILTERS } from "@/lib/source";
 import { RegistryFilters } from "@/components/RegistryFilters";
@@ -50,6 +51,9 @@ export default async function RegistryPage({
     }),
     getFacets()
   ]);
+  const brandSlugs = new Map(
+    (await listBrands()).map((b) => [b.manufacturer ?? b.name, b.slug] as const)
+  );
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
@@ -102,7 +106,7 @@ export default async function RegistryPage({
             <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {rows.map((row) => (
                 <li key={row.id}>
-                  <RegistryCard row={row} />
+                  <RegistryCard row={row} brandSlug={brandSlugs.get(row.manufacturer ?? "")} />
                 </li>
               ))}
             </ul>
@@ -113,20 +117,28 @@ export default async function RegistryPage({
   );
 }
 
-function RegistryCard({ row }: { row: RegistryListRow }) {
+function RegistryCard({ row, brandSlug }: { row: RegistryListRow; brandSlug?: string }) {
+  // A "stretched link" card: the model link covers the card, and the brand
+  // link sits above it (links can't nest).
   return (
-    <Link
-      href={`/registry/${row.id}`}
-      className="group flex h-full flex-col rounded-xl border border-slate-200 bg-white p-5 transition hover:border-brand-300 hover:shadow-md"
-    >
+    <div className="group relative flex h-full flex-col rounded-xl border border-slate-200 bg-white p-5 transition hover:border-brand-300 hover:shadow-md">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="truncate text-sm font-medium text-slate-500">
-            {row.manufacturer ?? "Unknown manufacturer"}
+            {brandSlug ? (
+              <Link href={`/brands/${brandSlug}`} className="relative z-10 hover:text-brand-700 hover:underline">
+                {row.manufacturer}
+              </Link>
+            ) : (
+              row.manufacturer ?? "Unknown manufacturer"
+            )}
           </div>
-          <div className="mt-0.5 truncate font-semibold text-slate-900">
+          <Link
+            href={`/registry/${row.id}`}
+            className="mt-0.5 block truncate font-semibold text-slate-900 after:absolute after:inset-0 after:content-['']"
+          >
             {row.model ?? row.id}
-          </div>
+          </Link>
         </div>
         <KindBadge kind={row.kind} />
       </div>
@@ -145,7 +157,7 @@ function RegistryCard({ row }: { row: RegistryListRow }) {
           </span>
         ) : null}
       </div>
-    </Link>
+    </div>
   );
 }
 

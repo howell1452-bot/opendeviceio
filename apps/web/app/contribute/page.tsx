@@ -6,15 +6,15 @@ import {
   listMyAccessRequests
 } from "@/lib/membership";
 import { supabaseConfigured } from "@/lib/supabase-server";
-import { AccessRequestForm } from "./AccessRequestForm";
+import { getBrandByManufacturer } from "@/lib/brands";
 import { VerificationSteps } from "@/components/VerificationSteps";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "For manufacturers",
+  title: "Claim your brand",
   description:
-    "Manufacturer reps: request access to publish manufacturer-verified .odio files for your brand on OpenDeviceIO."
+    "Manufacturer reps: claim your brand on OpenDeviceIO to publish manufacturer-verified .odio files, manage your team and choose how community submissions are handled."
 };
 
 export default async function ContributePage() {
@@ -23,6 +23,11 @@ export default async function ContributePage() {
 
   const memberships = user && client ? await listMyMemberships(client) : [];
   const requests = user && client ? await listMyAccessRequests(client) : [];
+  const brandSlugs = new Map(
+    await Promise.all(
+      memberships.map(async (m) => [m.manufacturer, (await getBrandByManufacturer(m.manufacturer))?.slug ?? null] as const)
+    )
+  );
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6">
@@ -30,7 +35,7 @@ export default async function ContributePage() {
         For manufacturers
       </p>
       <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-slate-900">
-        Contribute as a manufacturer
+        Claim your brand
       </h1>
       <p className="mt-3 text-slate-600">
         OpenDeviceIO lets the brands that make AV hardware publish authoritative{" "}
@@ -105,10 +110,10 @@ export default async function ContributePage() {
         </Notice>
       ) : !user ? (
         <Notice tone="brand">
-          <Link className="font-semibold underline" href="/signin">
+          <Link className="font-semibold underline" href="/signin?next=/brands/claim">
             Sign in
           </Link>{" "}
-          with your work email to request access for your brand.
+          with your work email to claim your brand.
         </Notice>
       ) : (
         <>
@@ -126,12 +131,22 @@ export default async function ContributePage() {
                     <span className="font-medium text-emerald-900">
                       {m.manufacturer}
                     </span>
-                    <Link
-                      href="/publish"
-                      className="text-sm font-medium text-emerald-800 underline"
-                    >
-                      Publish a file →
-                    </Link>
+                    <span className="flex flex-wrap gap-3">
+                      {brandSlugs.get(m.manufacturer) ? (
+                        <Link
+                          href={`/brands/${brandSlugs.get(m.manufacturer)}/manage`}
+                          className="text-sm font-medium text-emerald-800 underline"
+                        >
+                          Brand dashboard →
+                        </Link>
+                      ) : null}
+                      <Link
+                        href="/publish"
+                        className="text-sm font-medium text-emerald-800 underline"
+                      >
+                        Publish a file →
+                      </Link>
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -157,25 +172,28 @@ export default async function ContributePage() {
 
           <section className="mt-8">
             <h2 className="text-lg font-semibold text-slate-900">
-              Request access for a brand
+              Claim a brand
             </h2>
             <p className="mt-2 text-sm text-slate-600">
-              Signed in as <strong>{user.email}</strong>. Submit the exact
-              manufacturer name you want to publish for. An OpenDeviceIO admin
-              reviews each request.
+              Signed in as <strong>{user.email}</strong>. Pick your brand from the
+              registry (or add one that isn&apos;t listed yet). An OpenDeviceIO
+              admin reviews each claim.
             </p>
-            <div className="mt-4">
-              <AccessRequestForm email={user.email ?? ""} />
-            </div>
+            <Link
+              href="/brands/claim"
+              className="mt-4 inline-block rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700"
+            >
+              Claim your brand
+            </Link>
           </section>
 
           <section className="mt-10">
             <h2 className="text-lg font-semibold text-slate-900">
-              Your requests
+              Your claims
             </h2>
             {requests.length === 0 ? (
               <p className="mt-2 text-sm text-slate-500">
-                No access requests yet.
+                No claims yet.
               </p>
             ) : (
               <ul className="mt-3 divide-y divide-slate-200 rounded-lg border border-slate-200">
