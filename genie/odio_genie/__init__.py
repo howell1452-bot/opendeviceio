@@ -21,6 +21,12 @@ from .batch import (
     ingest_directory,
     slugify,
 )
+from .category import (
+    is_controlled_category,
+    load_category_vocab,
+    normalize_category,
+    normalize_document_categories,
+)
 from .extractor import (
     Extractor,
     MockExtractor,
@@ -73,4 +79,8 @@ __all__ = [
     "ingest_directory",
     "discover_documents",
     "slugify",
+    "normalize_category",
+    "normalize_document_categories",
+    "is_controlled_category",
+    "load_category_vocab",
 ]
