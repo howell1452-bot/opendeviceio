@@ -73,6 +73,17 @@ export {
   MANUFACTURER_ALIASES
 } from "./manufacturer.js";
 
+// --- Category normalization (advisory taxonomy in vocab/) ------------------
+export {
+  normalizeCategory,
+  isControlledCategory,
+  categoryLabel,
+  CATEGORY_VOCABULARY,
+  CATEGORY_MAP,
+  CATEGORY_VOCAB_VERSION,
+  type CategoryEntry
+} from "./category.js";
+
 // --- Bundle & cable validation / parsing ---------------------------------
 export {
   validateBundle,

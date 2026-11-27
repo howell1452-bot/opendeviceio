@@ -95,11 +95,26 @@ rackUnits(device);                        // physical.rackUnits
 For example, a switch port `{ count: 8, link: { poe: { role: "pse", classWatts: 30 } } }`
 contributes `8 * 30 = 240` W to `poeBudget(device)`.
 
+### Normalize categories
+
+`device.category` is a free-form path under schema v0.1. `normalizeCategory` maps it
+onto the advisory taxonomy in the repo's `vocab/` (bundled at build time):
+
+```ts
+import { normalizeCategory, isControlledCategory, categoryLabel } from "@opendeviceio/sdk";
+
+normalizeCategory("av/accessories/mounting");    // "accessory/mount"
+normalizeCategory("av/amplifier/multi-channel"); // "av/amplifier/power"
+normalizeCategory("av/widget/frobnicator");      // unchanged: unknown paths pass through
+isControlledCategory("accessory/mount");         // true
+categoryLabel("av/amplifier/power");             // "Power amplifier"
+```
+
 ## Scripts
 
 | Command            | Description                                                                 |
 | ------------------ | --------------------------------------------------------------------------- |
-| `npm run gen-types`| Regenerate `src/schema.ts` and `src/types.ts` from the canonical schema.    |
+| `npm run gen-types`| Regenerate `src/schema.ts`, `src/types.ts` (canonical schemas) and `src/category-vocab.ts` (`vocab/`). |
 | `npm run build`    | Run `gen-types`, then compile ESM + CJS with type declarations into `dist/`.|
 | `npm test`         | Run the Vitest suite (conformance corpus + accessor unit tests).            |
 | `npm run validate` | Validate `.odio` files (legacy `.odio.json` too; defaults to the repo example corpus) via CLI. |
