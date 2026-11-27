@@ -391,7 +391,7 @@
     "sourceDocuments": [
       { "title": "ss_UC-CX100-T-WM.pdf", "retrieved": "2026-05-29" }
     ],
-    "validation": { "status": "reviewed", "by": "howell1452@gmail.com", "date": "2026-05-29" }
+    "validation": { "status": "reviewed", "by": "OpenDeviceIO", "date": "2026-05-29" }
   },
   "x-note": "Illustrative kit example demonstrating a nested sub-assembly (UC Bracket Assembly) plus factory-terminated cables."
 }

@@ -111,3 +111,7 @@ create policy "registry_removals public read"
   using (true);
 
 grant select on table public.registry_removals to anon, authenticated;
+
+-- Least privilege: drop project-default TRUNCATE / REFERENCES / TRIGGER grants
+-- (TRUNCATE would bypass RLS). Applied in production as `tighten_new_table_grants`.
+revoke truncate, references, trigger on table public.registry_removals from anon, authenticated;

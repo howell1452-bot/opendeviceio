@@ -219,7 +219,7 @@
         "retrieved": "2026-05-29"
       }
     ],
-    "validation": { "status": "reviewed", "by": "howell1452@gmail.com", "date": "2026-05-29" }
+    "validation": { "status": "reviewed", "by": "OpenDeviceIO", "date": "2026-05-29" }
   },
   "x-note": "Extracted by Genie from the Lightware product brief, then human-reviewed: corrected the DC input connector (Phoenix power, 24V) and added the analog AUDIO OUT and dedicated Dante ports that text-only extraction missed."
 }

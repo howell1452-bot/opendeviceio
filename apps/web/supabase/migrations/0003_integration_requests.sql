@@ -57,3 +57,9 @@ create policy "read own integration requests"
   using (auth.uid() = user_id);
 
 grant select, insert on table public.integration_requests to authenticated;
+
+-- Least privilege: drop project-default TRUNCATE / REFERENCES / TRIGGER grants
+-- (TRUNCATE would bypass RLS); anon gets nothing here. Applied in production as
+-- `tighten_new_table_grants`.
+revoke truncate, references, trigger on table public.integration_requests from anon, authenticated;
+revoke all on table public.integration_requests from anon;

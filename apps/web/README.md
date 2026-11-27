@@ -87,12 +87,22 @@ npm start             # serve the production build
 
   Running it without `--apply` prints the idempotent upsert SQL to stdout instead.
 
+- [`0001b_manufacturer_participation.sql`](supabase/migrations/0001b_manufacturer_participation.sql)
+  and [`0001c_api_token_self_manage.sql`](supabase/migrations/0001c_api_token_self_manage.sql)
+  are backfilled from production (manufacturer access requests, memberships, API
+  tokens, and brand-scoped registry writes).
 - [`0002_registry_sync.sql`](supabase/migrations/0002_registry_sync.sql) re-asserts
   the `updated_at` trigger (needed for `?updated_since=`) and adds the
   `registry_removals` tombstone table behind `GET /api/v1/removals`.
 - [`0003_integration_requests.sql`](supabase/migrations/0003_integration_requests.sql)
   adds `integration_requests`, which holds software-vendor registrations
   (`/implement/register`) reviewed on `/admin`.
+- [`0004_fix_manufacturer_grants.sql`](supabase/migrations/0004_fix_manufacturer_grants.sql)
+  grants signed-in users the table privileges that 0001b's RLS policies assume.
+  Without it, requesting brand access, listing brands, managing API tokens, and
+  publishing from the site all fail with "permission denied".
+
+Production has 0001–0003 applied; 0004 is pending.
 
 Registry records are licensed **CC BY 4.0** for downstream use. The terms live on
 `/data-license`; their constants (license, terms version, sync and removal windows,
