@@ -3,7 +3,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { OdioDevice, Bundle } from "@opendeviceio/sdk";
 import { getRegistryRow } from "@/lib/registry";
-import { KindBadge, StatusBadge, Chip } from "@/components/Badge";
+import {
+  KindBadge,
+  StatusBadge,
+  Chip,
+  isUnverified,
+  statusLabel
+} from "@/components/Badge";
 import { DeviceView } from "@/components/DeviceView";
 import { BundleView } from "@/components/BundleView";
 import { IoTableView } from "@/components/IoTableView";
@@ -27,9 +33,13 @@ export async function generateMetadata({
   const row = await getRegistryRow(id);
   if (!row) return { title: "Not found" };
   const name = [row.manufacturer, row.model].filter(Boolean).join(" ") || id;
+  const unverified = isUnverified(row.validation_status);
   return {
     title: name,
-    description: `${name} — an OpenDeviceIO ${row.kind} document (${row.validation_status ?? "unverified"}).`
+    description: `${name} — an OpenDeviceIO ${row.kind} document (${statusLabel(row.validation_status).toLowerCase()}).`,
+    // Keep unverified machine drafts out of search results under
+    // manufacturers' product names. Reviewed and verified records are indexed.
+    ...(unverified ? { robots: { index: false, follow: true } } : {})
   };
 }
 
@@ -122,6 +132,29 @@ export default async function RegistryDetailPage({
         </p>
       </header>
 
+      {isUnverified(row.validation_status) ? (
+        <div
+          role="note"
+          className="mt-8 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900"
+        >
+          <p>
+            <strong>Unverified draft:</strong>{" "}
+            {provenance?.method === "llm-extraction"
+              ? "machine-extracted from the manufacturer's public documents"
+              : "compiled from public documents"}{" "}
+            and not yet reviewed. It may contain errors.
+          </p>
+          <p className="mt-2">
+            <Link
+              href={`/correct?id=${encodeURIComponent(row.id)}`}
+              className="font-semibold underline underline-offset-2"
+            >
+              Manufacturer? Verify or correct this record →
+            </Link>
+          </p>
+        </div>
+      ) : null}
+
       {/* Kind-specific body */}
       <div className="mt-8">
         {row.kind === "device" ? (
@@ -145,13 +178,26 @@ export default async function RegistryDetailPage({
               <Field label="Generator" value={provenance.generator} />
             ) : null}
             {provenance.method ? (
-              <Field label="Method" value={provenance.method} />
+              <Field
+                label="Method"
+                value={METHOD_LABELS[provenance.method] ?? provenance.method}
+              />
             ) : null}
-            {provenance.validation?.status ? (
-              <Field label="Validation" value={provenance.validation.status} />
-            ) : null}
+            <Field
+              label="Validation"
+              value={statusLabel(provenance.validation?.status ?? row.validation_status)}
+            />
             {provenance.validation?.date ? (
-              <Field label="Reviewed" value={provenance.validation.date} />
+              <Field
+                label={
+                  isUnverified(provenance.validation?.status ?? row.validation_status)
+                    ? "Drafted"
+                    : row.validation_status === "manufacturer-verified"
+                      ? "Verified"
+                      : "Reviewed"
+                }
+                value={provenance.validation.date}
+              />
             ) : null}
           </dl>
           {provenance.sourceDocuments?.length ? (
@@ -189,6 +235,12 @@ export default async function RegistryDetailPage({
     </div>
   );
 }
+
+const METHOD_LABELS: Record<string, string> = {
+  "llm-extraction": "Machine-extracted (AI) from public documents",
+  manual: "Entered by hand",
+  manufacturer: "Published by the manufacturer"
+};
 
 function DownloadLink({
   id,

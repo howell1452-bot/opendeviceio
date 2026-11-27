@@ -3,6 +3,7 @@ import Link from "next/link";
 import { listRegistry, getFacets, type RegistryListRow } from "@/lib/registry";
 import { KindBadge, StatusBadge, Chip } from "@/components/Badge";
 import { RegistryFilters } from "@/components/RegistryFilters";
+import { STATUS_FILTERS } from "@/lib/status-filters";
 
 // Always render at request time so `next build` never depends on the DB.
 export const dynamic = "force-dynamic";
@@ -29,11 +30,16 @@ export default async function RegistryPage({
     kind: first(sp.kind),
     manufacturer: first(sp.manufacturer),
     category: first(sp.category),
-    connector: first(sp.connector)
+    connector: first(sp.connector),
+    status: first(sp.status)
   };
+  const statusFilter = STATUS_FILTERS.find((s) => s.value === query.status);
 
   const [{ rows, unavailable }, facets] = await Promise.all([
-    listRegistry(query),
+    listRegistry({
+      ...query,
+      statuses: statusFilter ? [...statusFilter.statuses] : undefined
+    }),
     getFacets()
   ]);
 
@@ -48,6 +54,16 @@ export default async function RegistryPage({
           device, bundle, and cable files. Every entry is downloadable and shows its
           validation status. Search and filter below.
         </p>
+        <p className="mt-3 text-sm text-slate-600">
+          Most entries are <strong>unverified drafts</strong>, machine-extracted
+          from manufacturers&apos; public documents and not yet reviewed. Filter
+          by status to see reviewed and manufacturer-verified records.
+          Manufacturers can{" "}
+          <Link className="text-brand-700 underline" href="/correct">
+            correct, verify, or remove
+          </Link>{" "}
+          their records.
+        </p>
       </div>
 
       <div className="mt-8">
@@ -56,7 +72,7 @@ export default async function RegistryPage({
 
       <div className="mt-6">
         {rows.length === 0 ? (
-          <EmptyState unavailable={unavailable} filtered={Boolean(query.search || query.kind || query.manufacturer || query.category || query.connector)} />
+          <EmptyState unavailable={unavailable} filtered={Boolean(query.search || query.kind || query.manufacturer || query.category || query.connector || query.status)} />
         ) : (
           <>
             <p className="mb-4 text-sm text-slate-500">

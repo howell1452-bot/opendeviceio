@@ -7,7 +7,7 @@ const KIND_STYLES: Record<string, string> = {
 };
 
 const STATUS_STYLES: Record<string, string> = {
-  draft: "bg-slate-100 text-slate-700 ring-slate-200",
+  draft: "bg-amber-50 text-amber-800 ring-amber-200",
   reviewed: "bg-sky-100 text-sky-800 ring-sky-200",
   "manufacturer-verified": "bg-emerald-100 text-emerald-800 ring-emerald-200"
 };
@@ -30,11 +30,27 @@ export function KindBadge({ kind }: { kind: string }) {
   );
 }
 
+/** Human-readable validation status. A missing status counts as a draft. */
+export const STATUS_LABELS: Record<string, string> = {
+  draft: "Unverified draft",
+  reviewed: "Reviewed",
+  "manufacturer-verified": "Manufacturer-verified"
+};
+
+export function statusLabel(status: string | null | undefined): string {
+  return STATUS_LABELS[status ?? "draft"] ?? status ?? "Unverified draft";
+}
+
+/** True for records nobody has checked yet (draft or no status). */
+export function isUnverified(status: string | null | undefined): boolean {
+  return !status || status === "draft";
+}
+
 export function StatusBadge({ status }: { status: string | null | undefined }) {
-  if (!status) return null;
+  const s = status ?? "draft";
   return (
-    <Pill className={STATUS_STYLES[status] ?? "bg-slate-100 text-slate-700 ring-slate-200"}>
-      {status}
+    <Pill className={STATUS_STYLES[s] ?? "bg-slate-100 text-slate-700 ring-slate-200"}>
+      {statusLabel(s)}
     </Pill>
   );
 }
