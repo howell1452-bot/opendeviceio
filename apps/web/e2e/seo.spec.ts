@@ -26,8 +26,13 @@ test.describe("canonical URLs, sitemap and robots", () => {
     await page.goto("/brands/example-audio");
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", `${SITE}/brands/example-audio`);
     await expect(page.locator('meta[property="og:url"]')).toHaveAttribute("content", `${SITE}/brands/example-audio`);
+    // Filtered page 1 -> /registry; page N (filtered or not) -> /registry?page=N.
     await page.goto("/registry?brand=example-audio&q=x1");
     await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", `${SITE}/registry`);
+    await page.goto("/registry?page=2");
+    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", `${SITE}/registry?page=2`);
+    await page.goto("/registry?brand=example-audio&page=2");
+    await expect(page.locator('link[rel="canonical"]')).toHaveAttribute("href", `${SITE}/registry?page=2`);
   });
 
   test("pages behind sign-in are noindex", async ({ page }) => {

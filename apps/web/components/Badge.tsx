@@ -16,7 +16,7 @@ const STATUS_STYLES: Record<string, string> = {
 function Pill({ children, className }: { children: ReactNode; className: string }) {
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${className}`}
+      className={`badge ${className}`}
     >
       {children}
     </span>
@@ -85,7 +85,7 @@ export function SourceBadge({
 
 export function Chip({ children }: { children: ReactNode }) {
   return (
-    <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 font-mono text-xs text-slate-700 ring-1 ring-inset ring-slate-200">
+    <span className="chip">
       {children}
     </span>
   );

@@ -45,6 +45,8 @@ export function RegistryFilters({
 
   function pushWith(next: Record<string, string>) {
     const sp = new URLSearchParams(params.toString());
+    // A new filter or search starts again at page 1.
+    sp.delete("page");
     for (const [k, v] of Object.entries(next)) {
       if (v) sp.set(k, v);
       else sp.delete(k);

@@ -146,9 +146,18 @@ describe("brand pages", () => {
 });
 
 describe("listing and static pages", () => {
-  it("/registry canonicalizes to the plain listing whatever the filters", async () => {
-    const { metadata } = await import("../app/registry/page");
-    expect(canonicalOf(metadata)).toBe("https://opendeviceio.org/registry");
+  it("/registry: page 1 is the plain listing, page N keeps ?page=N, filters are dropped", async () => {
+    const { generateMetadata } = await import("../app/registry/page");
+    const meta = (sp: Record<string, string>) => generateMetadata({ searchParams: Promise.resolve(sp) });
+    expect(canonicalOf(await meta({}))).toBe("https://opendeviceio.org/registry");
+    expect(canonicalOf(await meta({ manufacturer: "QSC", q: "amp" }))).toBe("https://opendeviceio.org/registry");
+    expect(canonicalOf(await meta({ page: "3" }))).toBe("https://opendeviceio.org/registry?page=3");
+    expect(canonicalOf(await meta({ brand: "qsc", manufacturer: "QSC", page: "3" }))).toBe(
+      "https://opendeviceio.org/registry?page=3"
+    );
+    expect(canonicalOf(await meta({ page: "1" }))).toBe("https://opendeviceio.org/registry");
+    expect(canonicalOf(await meta({ page: "-2" }))).toBe("https://opendeviceio.org/registry");
+    expect(canonicalOf(await meta({ page: "abc" }))).toBe("https://opendeviceio.org/registry");
   });
 
   it.each([

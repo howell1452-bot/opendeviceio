@@ -9,6 +9,7 @@ import { STATUS_FILTERS } from "@/lib/status-filters";
 import { categoryFilterValues, categoryOptionLabel } from "@/lib/category-filter";
 import { KindBadge, SourceBadge, StatusBadge } from "@/components/Badge";
 import { brandPath } from "@/lib/site";
+import { pageNumber } from "@/lib/paging";
 
 export const dynamic = "force-dynamic";
 
@@ -16,10 +17,6 @@ const PAGE_SIZE = 24;
 
 function first(v: string | string[] | undefined): string {
   return Array.isArray(v) ? v[0] ?? "" : v ?? "";
-}
-
-function pageNumber(v: string | string[] | undefined): number {
-  return Math.max(1, Number.parseInt(first(v) || "1", 10) || 1);
 }
 
 export async function generateMetadata({
