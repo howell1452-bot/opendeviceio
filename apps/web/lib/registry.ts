@@ -106,6 +106,33 @@ export interface RegistryListResult {
   unavailable: boolean;
 }
 
+/** PostgREST's answer to an offset past the last row (HTTP 416). */
+function isRangeNotSatisfiable(error: { code?: string; message?: string }): boolean {
+  return error.code === "PGRST103" || /range not satisfiable/i.test(error.message ?? "");
+}
+
+// The search and filters of a RegistryQuery, applied to a registry select.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function applyRegistryFilters<Q extends Record<string, any>>(q: Q, query: RegistryQuery): Q {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let f = q as any;
+  if (query.statuses && query.statuses.length > 0) f = f.in("validation_status", query.statuses);
+  if (query.sources && query.sources.length > 0) f = f.in("source_type", query.sources);
+  if (query.updatedSince) f = f.gte("updated_at", query.updatedSince);
+  if (query.kind) f = f.eq("kind", query.kind);
+  if (query.category) f = f.eq("category", query.category);
+  if (query.categoryIn && query.categoryIn.length > 0) f = f.in("category", query.categoryIn);
+  if (query.manufacturer) f = f.eq("manufacturer", query.manufacturer);
+  if (query.connector) f = f.contains("connectors", [query.connector]);
+  if (query.transport) f = f.contains("transports", [query.transport]);
+  if (query.search && query.search.trim()) {
+    const like = `%${query.search.trim()}%`;
+    // Case-insensitive match across manufacturer / model / id.
+    f = f.or(`manufacturer.ilike.${like},model.ilike.${like},id.ilike.${like}`);
+  }
+  return f as Q;
+}
+
 /**
  * List registry rows, applying optional search + filters. Always runs at request
  * time (callers mark their route dynamic). Returns an empty list (never throws)
@@ -124,30 +151,7 @@ export async function listRegistry(
     const columns = query.includeDocument
       ? `${LIST_COLUMNS},document`
       : LIST_COLUMNS;
-    let q = supabase.from("registry").select(columns, { count: "exact" });
-
-    if (query.statuses && query.statuses.length > 0) {
-      q = q.in("validation_status", query.statuses);
-    }
-    if (query.sources && query.sources.length > 0) {
-      q = q.in("source_type", query.sources);
-    }
-    if (query.updatedSince) q = q.gte("updated_at", query.updatedSince);
-    if (query.kind) q = q.eq("kind", query.kind);
-    if (query.category) q = q.eq("category", query.category);
-    if (query.categoryIn && query.categoryIn.length > 0) {
-      q = q.in("category", query.categoryIn);
-    }
-    if (query.manufacturer) q = q.eq("manufacturer", query.manufacturer);
-    if (query.connector) q = q.contains("connectors", [query.connector]);
-    if (query.transport) q = q.contains("transports", [query.transport]);
-
-    if (query.search && query.search.trim()) {
-      const term = query.search.trim();
-      const like = `%${term}%`;
-      // Case-insensitive match across manufacturer / model / id.
-      q = q.or(`manufacturer.ilike.${like},model.ilike.${like},id.ilike.${like}`);
-    }
+    let q = applyRegistryFilters(supabase.from("registry").select(columns, { count: "exact" }), query);
 
     // Always end on the primary key so ordering is total and offset paging
     // never skips or repeats rows that tie on the leading sort columns.
@@ -171,6 +175,15 @@ export async function listRegistry(
     }
 
     const { data, error, count } = await q;
+    if (error && isRangeNotSatisfiable(error)) {
+      // An offset past the last row: no rows, but the total is still known
+      // (callers 404 a page past the end instead of showing "unavailable").
+      const { count: total, error: countErr } = await applyRegistryFilters(
+        supabase.from("registry").select("id", { count: "exact", head: true }),
+        query
+      );
+      if (!countErr && typeof total === "number") return { rows: [], total, unavailable: false };
+    }
     if (error) {
       // eslint-disable-next-line no-console
       console.error("[odio] registry list error:", error.message);
