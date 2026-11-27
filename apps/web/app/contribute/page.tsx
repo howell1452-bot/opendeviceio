@@ -93,9 +93,9 @@ export default async function ContributePage() {
       </div>
 
       <p className="mt-8 text-sm text-slate-600">
-        Just want one record fixed or taken down? Use the{" "}
+        Just want an error in a record fixed? Use the{" "}
         <Link className="text-brand-700 underline" href="/correct">
-          correction and removal form
+          correction form
         </Link>
         . No account is needed. Not a manufacturer? Anyone with an account can{" "}
         <Link className="text-brand-700 underline" href="/submit">

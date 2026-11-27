@@ -9,14 +9,14 @@ import {
   GOVERNANCE_URL,
   MAINTAINERS
 } from "@/lib/project";
-import { REMOVAL_REQUEST_BUSINESS_DAYS } from "@/lib/data-license";
+import { CORRECTION_BUSINESS_DAYS } from "@/lib/data-license";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "For manufacturers",
   description:
-    "Publish your products' I/O once, as an open file every design tool can read. See your products in the registry, correct or remove a record without signing up, or claim your brand. Free, no exclusivity, no contract."
+    "Publish your products' I/O once, as an open file every design tool can read. See your products in the registry, report an error without signing up, or claim your brand. Free, no exclusivity, no contract."
 };
 
 function first(v: string | string[] | undefined): string {
@@ -97,7 +97,7 @@ export default async function ManufacturersPage({
               href="/correct"
               className="rounded-lg px-5 py-2.5 font-medium text-brand-700 underline-offset-2 hover:underline"
             >
-              Correct or remove a record
+              Report an error in a record
             </Link>
           </div>
         </div>
@@ -200,10 +200,9 @@ export default async function ManufacturersPage({
               <p className="mt-3 text-sm text-slate-600">
                 Something wrong?{" "}
                 <Link className="text-brand-700 underline" href="/correct">
-                  Correct, remove, or verify a record
+                  Report an error or verify a record
                 </Link>
-                , or ask us to hide {brand}&apos;s unverified drafts until
-                you&apos;ve reviewed them.
+                .
               </p>
             </div>
           ) : null}
@@ -293,22 +292,19 @@ export default async function ManufacturersPage({
           </ul>
         </section>
 
-        {/* 5. Correct or remove */}
+        {/* 5. Report an error */}
         <section id="correct" className="scroll-mt-24">
           <h2 className="text-2xl font-bold text-slate-900">
-            Correct or remove a record, no sign-up
+            Report an error in a record, no sign-up
           </h2>
           <p className="mt-3 text-slate-600">
-            Every record page has an &ldquo;Is this your product?&rdquo; link. Use
-            it, or the{" "}
+            Every record page links to the{" "}
             <Link className="text-brand-700 underline" href="/correct">
-              request form
+              correction form
             </Link>
-            , to ask for a correction or removal. No account is needed. Removals
-            are done within {REMOVAL_REQUEST_BUSINESS_DAYS} business days and
-            published to our removal feed, so tools that copied the record
-            delete it too. You can also ask us to hide all of your unverified
-            drafts until you&apos;ve reviewed them.
+            . Use it to report an error. No account is needed. We fix reported errors
+            within {CORRECTION_BUSINESS_DAYS} business days, and claimed brands
+            can correct their own records at any time.
           </p>
         </section>
 
@@ -396,8 +392,8 @@ export default async function ManufacturersPage({
             <Faq q="Where did the draft data about our products come from?">
               Most drafts were machine-extracted from spec sheets published on
               manufacturers&apos; own websites. Every draft is labeled as
-              unverified, names its source document, and can be corrected,
-              removed, or hidden at your request.
+              unverified and names its source document. Report an error and we
+              fix it, or claim your brand and correct or verify it yourself.
             </Faq>
             <Faq q="What does it cost?">
               Nothing. There&apos;s no fee, no contract, and no exclusivity.

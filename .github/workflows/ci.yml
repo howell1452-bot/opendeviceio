@@ -138,7 +138,9 @@ jobs:
       - name: Set up the Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: latest
+          # Pinned: "latest" asks the GitHub API for the newest release, and the
+          # runner's anonymous API quota can run out (the CLI then never installs).
+          version: 3.4.0
 
       # Postgres, Auth (magic links into a local mail catcher) and PostgREST,
       # with every migration in this repo, plus a small seed.

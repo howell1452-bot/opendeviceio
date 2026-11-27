@@ -192,9 +192,9 @@ export default async function RegistryDetailPage({
             href={`/correct?id=${encodeURIComponent(row.id)}`}
             className="font-medium text-brand-700 underline underline-offset-2 hover:text-brand-900"
           >
-            {brand && !canEdit && !brand.claimed_at
-              ? "Report an error or request removal →"
-              : "Is this your product? Verify, correct, or request removal →"}
+            {canEdit || (brand && !brand.claimed_at)
+              ? "Report an error →"
+              : "Is this your product? Claim it, or report an error →"}
           </Link>
           {user && !canEdit ? (
             <Link

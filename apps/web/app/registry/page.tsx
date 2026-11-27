@@ -77,7 +77,7 @@ export default async function RegistryPage({
           .
           Manufacturers can{" "}
           <Link className="text-brand-700 underline" href="/correct">
-            correct, verify, or remove
+            correct or verify
           </Link>{" "}
           their records.
         </p>

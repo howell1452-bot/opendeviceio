@@ -32,11 +32,12 @@ export const SYNC_INTERVAL_DAYS = 30;
 export const REMOVAL_WINDOW_DAYS = 30;
 
 /**
- * Turnaround commitment for a removal requested through /correct (or by
- * email): the record is taken down and published to /api/v1/removals within
- * this many business days.
+ * Turnaround commitment for an error reported through /correct (or by email):
+ * the record is corrected within this many business days. Records are public
+ * information and aren't removed on request; removals happen only when legally
+ * required (for example copyrighted material) and still go to /api/v1/removals.
  */
-export const REMOVAL_REQUEST_BUSINESS_DAYS = 5;
+export const CORRECTION_BUSINESS_DAYS = 5;
 
 /** Page-size limits for the list API. */
 export const LIST_DEFAULT_LIMIT = 50;

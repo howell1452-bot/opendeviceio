@@ -8,7 +8,7 @@ import {
   DATA_TERMS_VERSION,
   LIST_MAX_LIMIT,
   LIST_MAX_LIMIT_WITH_DOCUMENTS,
-  REMOVAL_REQUEST_BUSINESS_DAYS,
+  CORRECTION_BUSINESS_DAYS,
   REMOVAL_WINDOW_DAYS,
   SYNC_INTERVAL_DAYS
 } from "@/lib/data-license";
@@ -346,26 +346,28 @@ export default function DataLicensePage() {
 
           <h2 id="removals">Corrections &amp; removals</h2>
           <p>
-            Anyone can ask for a record to be corrected, removed, or verified at{" "}
+            Anyone can report an error in a record, or ask to verify it, at{" "}
             <Link href="/correct">/correct</Link>. No account is needed. A link
             from every record page pre-fills the form for that record.
           </p>
           <ul>
             <li>
-              <strong>Removals</strong> are completed within{" "}
-              {REMOVAL_REQUEST_BUSINESS_DAYS} business days of the request, and the
-              removed ids are published to{" "}
-              <code>GET /api/v1/removals</code> so mirrors can delete them.
+              <strong>Corrections</strong>: we fix reported errors within{" "}
+              {CORRECTION_BUSINESS_DAYS} business days. Corrections are made to
+              the registry record and reach mirrors through{" "}
+              <code>updated_since</code>.
             </li>
             <li>
-              <strong>Corrections</strong> are made to the registry record and
-              reach mirrors through <code>updated_since</code>.
+              <strong>Removals</strong>: registry records are public information
+              and aren&apos;t removed on request. A record is taken down only
+              when that is legally required, for example for copyrighted
+              material; its id is then published to{" "}
+              <code>GET /api/v1/removals</code> so mirrors can delete it.
             </li>
             <li>
-              <strong>A manufacturer can ask us to hide its unverified drafts</strong>{" "}
+              <strong>A claimed brand can hide its unverified drafts</strong>{" "}
               until it has reviewed or published its own records. Hidden drafts
-              are left out of the registry and API, and can be listed in the
-              removal feed.
+              are left out of the registry and API.
             </li>
             <li>
               <strong>Manufacturers</strong> can also claim their brand and

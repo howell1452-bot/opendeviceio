@@ -6,7 +6,7 @@ import {
   INTEGRATION_COLUMNS,
   type IntegrationRequest
 } from "@/lib/integrations";
-import { REMOVAL_REQUEST_BUSINESS_DAYS, USE_CASES } from "@/lib/data-license";
+import { CORRECTION_BUSINESS_DAYS, USE_CASES } from "@/lib/data-license";
 import {
   RECORD_REQUEST_COLUMNS,
   type RecordRequest
@@ -133,9 +133,10 @@ export default async function AdminPage() {
               Record requests
             </h2>
             <p className="mt-1 text-sm text-slate-600">
-              Corrections, removals, and verification requests filed on{" "}
-              <code className="font-mono">/correct</code> (no sign-up). Removals
-              are promised within {REMOVAL_REQUEST_BUSINESS_DAYS} business days.
+              Error reports and verification requests filed on{" "}
+              <code className="font-mono">/correct</code> (no sign-up), plus any
+              takedowns filed by an admin. Corrections are promised within{" "}
+              {CORRECTION_BUSINESS_DAYS} business days.
             </p>
             {recordRequestsError ? (
               <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
@@ -149,7 +150,7 @@ export default async function AdminPage() {
                   <RecordRequestRow
                     key={r.id}
                     request={r}
-                    removalWindowDays={REMOVAL_REQUEST_BUSINESS_DAYS}
+                    correctionWindowDays={CORRECTION_BUSINESS_DAYS}
                   />
                 ))}
               </ul>
