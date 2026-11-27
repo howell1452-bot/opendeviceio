@@ -7,7 +7,13 @@ import {
 } from "@opendeviceio/sdk";
 import { membershipsForUser } from "@/lib/membership";
 import { resolveCaller, touchToken } from "@/lib/server-auth";
-import { writeRegistryRow } from "@/lib/registry-write";
+import {
+  closeRevision,
+  insertRevision,
+  loadRecordState,
+  publishRevision,
+  recordAcceptance
+} from "@/lib/revisions";
 import {
   deriveRegistryRow,
   documentManufacturer,
@@ -212,19 +218,58 @@ export async function POST(req: Request) {
     return err(403, `Manufacturer "${manufacturer}" is not in your approved brands.`);
   }
 
+  const brand = normalizeManufacturer(manufacturer) ?? manufacturer;
   const stamped = stampManufacturerVerified(doc, manufacturer);
   const row = deriveRegistryRow(stamped, validation.kind);
   row.validation_status = "manufacturer-verified";
 
-  const { error: upErr } = await writeRegistryRow(service, row, {
+  // Every publish is a revision. A manufacturer publish always replaces the
+  // record: the previous published revision is superseded, and open
+  // suggestions stay open for the brand (conflict-rules MANUFACTURER_PUBLISH).
+  const state = await loadRecordState(service, row.id);
+  const inserted = await insertRevision(service, {
+    record_id: row.id,
+    document: row.document,
+    manufacturer: row.manufacturer,
+    source_type: "manufacturer",
+    submitted_by: caller.userId,
+    status: "pending",
+    base_revision_id: state.currentRevisionId,
+    is_new_record: !state.exists
+  });
+  if (!inserted.ok) return err(inserted.status, `Publish failed: ${inserted.error}`);
+
+  const { error: upErr } = await publishRevision(service, {
+    revisionId: inserted.id,
+    row,
     sourceType: "manufacturer"
   });
   if (upErr) return err(400, `Publish failed: ${upErr}`);
 
+  // ?accepts=<revision id>: this publish takes up a suggestion (edited in
+  // /author first). Close it as accepted and credit its submitter.
+  const accepts = new URL(req.url).searchParams.get("accepts");
+  if (accepts) {
+    const { data: sug } = await service
+      .from("record_revisions")
+      .select("id,record_id,submitted_by,status")
+      .eq("id", accepts)
+      .maybeSingle();
+    const s = sug as {
+      record_id: string;
+      submitted_by: string | null;
+      status: string;
+    } | null;
+    if (s && s.record_id === row.id && (s.status === "pending" || s.status === "suggested")) {
+      const { error: closeErr } = await closeRevision(service, accepts, "accepted", brand, null);
+      if (!closeErr && s.submitted_by) await recordAcceptance(service, s.submitted_by);
+    }
+  }
+
   await touchToken(service, caller);
 
   return NextResponse.json(
-    { id: row.id, status: "manufacturer-verified" },
+    { id: row.id, status: "manufacturer-verified", revision_id: inserted.id },
     { headers: CORS_HEADERS }
   );
 }

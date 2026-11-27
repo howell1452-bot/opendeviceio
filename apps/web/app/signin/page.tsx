@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Sign in",
   description:
-    "Sign in to OpenDeviceIO with a magic link to request manufacturer access and publish verified .odio files for your brand."
+    "Sign in to OpenDeviceIO with a magic link to submit records, or to request manufacturer access and publish verified .odio files for your brand."
 };
 
 export default function SignInPage() {
@@ -17,8 +17,9 @@ export default function SignInPage() {
       </h1>
       <p className="mt-3 text-slate-600">
         Enter your work email and we&apos;ll send you a one-time magic link. No
-        password required. Manufacturer reps use this to request access and
-        publish verified device files for their brand.
+        password required. Anyone can sign in to submit records; manufacturer
+        reps also use it to request access and publish verified device files
+        for their brand.
       </p>
       <div className="mt-8">
         <SignInForm />

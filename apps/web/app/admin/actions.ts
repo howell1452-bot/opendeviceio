@@ -1,8 +1,16 @@
 "use server";
 
-import { normalizeManufacturer } from "@opendeviceio/sdk";
+import { normalizeManufacturer, validateDocument } from "@opendeviceio/sdk";
 import { getCurrentUser, isAdminEmail } from "@/lib/session";
 import { getServiceSupabase } from "@/lib/supabase-server";
+import { deriveRegistryRow } from "@/lib/odio-row";
+import {
+  ADMIN_REVIEWER,
+  closeRevision,
+  publishRevision,
+  recordAcceptance,
+  type RevisionRow
+} from "@/lib/revisions";
 
 // Admin actions for access-request review. Gated by ADMIN_EMAILS (the signed-in
 // user's email must be in the list) and performed via the SERVICE client, which
@@ -267,4 +275,127 @@ export async function setRecordReviewStatus(
     .or("validation_status.is.null,validation_status.neq.manufacturer-verified");
   if (upErr) return { ok: false, error: upErr.message };
   return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Submissions queue (provenance brief, item 6)
+// ---------------------------------------------------------------------------
+
+async function loadOpenRevision(
+  service: NonNullable<ReturnType<typeof getServiceSupabase>>,
+  revisionId: string
+): Promise<RevisionRow | null> {
+  const { data } = await service
+    .from("record_revisions")
+    .select("*")
+    .eq("id", revisionId)
+    .in("status", ["pending", "suggested"])
+    .maybeSingle();
+  return (data as RevisionRow | null) ?? null;
+}
+
+/**
+ * Publish a pending or suggested community / design-vendor revision. It
+ * becomes the record's live version as an unverified draft with its own
+ * source. Manufacturer-verified records are never replaced here: suggestions
+ * on them are the brand's to accept.
+ */
+export async function publishSubmission(
+  revisionId: string,
+  note?: string
+): Promise<{ ok: boolean; error?: string }> {
+  const { error, service } = await requireAdminService();
+  if (error || !service) return { ok: false, error: error ?? "Unavailable." };
+
+  const rev = await loadOpenRevision(service, revisionId);
+  if (!rev) return { ok: false, error: "This submission is no longer open." };
+  if (rev.source_type !== "community" && rev.source_type !== "design-vendor") {
+    return { ok: false, error: "Only community and design-vendor submissions are published here." };
+  }
+
+  const { data: current } = await service
+    .from("registry")
+    .select("validation_status")
+    .eq("id", rev.record_id)
+    .maybeSingle();
+  if ((current as { validation_status: string | null } | null)?.validation_status === "manufacturer-verified") {
+    return {
+      ok: false,
+      error: "The record is manufacturer-verified. Only the brand can accept changes to it; you can reject the suggestion."
+    };
+  }
+
+  const v = validateDocument(rev.document);
+  if (!v.valid) return { ok: false, error: "The submitted document no longer validates." };
+  const row = deriveRegistryRow(rev.document as never, v.kind);
+  row.validation_status = "draft";
+
+  const { error: pubErr } = await publishRevision(service, {
+    revisionId: rev.id,
+    row,
+    sourceType: rev.source_type,
+    sourceOrgId: rev.source_org_id,
+    reviewer: ADMIN_REVIEWER,
+    reviewNote: note?.trim() ? note.trim().slice(0, 2000) : null
+  });
+  if (pubErr) return { ok: false, error: pubErr };
+  if (rev.submitted_by) await recordAcceptance(service, rev.submitted_by);
+  return { ok: true };
+}
+
+/** Reject a pending or suggested revision, with an optional note. */
+export async function rejectSubmission(
+  revisionId: string,
+  note: string
+): Promise<{ ok: boolean; error?: string }> {
+  const { error, service } = await requireAdminService();
+  if (error || !service) return { ok: false, error: error ?? "Unavailable." };
+  const { error: closeErr } = await closeRevision(service, revisionId, "rejected", ADMIN_REVIEWER, note);
+  return closeErr ? { ok: false, error: closeErr } : { ok: true };
+}
+
+/**
+ * Suspend the submitter of a revision: they can no longer submit, and their
+ * open revisions are rejected. The user id never leaves the server.
+ */
+export async function suspendSubmitter(
+  revisionId: string,
+  note: string
+): Promise<{ ok: boolean; error?: string; rejected?: number }> {
+  const { error, service } = await requireAdminService();
+  if (error || !service) return { ok: false, error: error ?? "Unavailable." };
+
+  const { data } = await service
+    .from("record_revisions")
+    .select("submitted_by")
+    .eq("id", revisionId)
+    .maybeSingle();
+  const userId = (data as { submitted_by: string | null } | null)?.submitted_by;
+  if (!userId) return { ok: false, error: "This revision has no submitter account." };
+
+  const { error: upErr } = await service.from("contributor_status").upsert(
+    {
+      user_id: userId,
+      suspended: true,
+      trusted: false,
+      note: note.trim() ? note.trim().slice(0, 2000) : "Suspended from the submissions queue.",
+      updated_at: new Date().toISOString()
+    },
+    { onConflict: "user_id" }
+  );
+  if (upErr) return { ok: false, error: upErr.message };
+
+  const { data: closed, error: rejErr } = await service
+    .from("record_revisions")
+    .update({
+      status: "rejected",
+      reviewer: ADMIN_REVIEWER,
+      reviewed_at: new Date().toISOString(),
+      review_note: "Submitter suspended."
+    })
+    .eq("submitted_by", userId)
+    .in("status", ["pending", "suggested"])
+    .select("id");
+  if (rejErr) return { ok: false, error: rejErr.message };
+  return { ok: true, rejected: closed?.length ?? 0 };
 }

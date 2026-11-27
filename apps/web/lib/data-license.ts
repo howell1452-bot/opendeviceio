@@ -100,3 +100,13 @@ export const USE_CASES = [
   }
 ] as const;
 export type UseCase = (typeof USE_CASES)[number]["value"];
+
+/**
+ * Contributor terms for registry submissions (POST /api/v1/submissions, /submit).
+ * The submitter accepts this version explicitly; it is stored on each revision.
+ * Bump it when the #contributing section of /data-license changes in substance.
+ */
+export const CONTRIBUTOR_TERMS_VERSION = "2026-11-27";
+export const CONTRIBUTOR_TERMS_PATH = `${DATA_TERMS_PATH}#contributing`;
+export const CONTRIBUTOR_TERMS_SUMMARY =
+  "I have the right to submit this data, and I make it available under CC BY 4.0 as described in the registry data license.";

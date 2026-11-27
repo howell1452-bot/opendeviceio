@@ -61,6 +61,9 @@ jobs:
       - name: Test adapters
         run: npm run test -w @opendeviceio/adapters
 
+      - name: Test web (conflict rules, submission checks)
+        run: npm run test -w @opendeviceio/web
+
       - name: Build web
         run: npm run build -w @opendeviceio/web
 

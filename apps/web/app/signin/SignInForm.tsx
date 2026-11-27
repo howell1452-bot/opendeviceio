@@ -26,6 +26,13 @@ export function SignInForm() {
     if (!email.trim() || !supabase) return;
     setStatus("sending");
     setMessage("");
+    // Return to the page that sent the user here (?next=/submit), local paths
+    // only. Carried in a short-lived cookie so the magic-link redirect URL stays
+    // exactly the allow-listed /auth/callback.
+    const next = new URLSearchParams(window.location.search).get("next");
+    if (next && next.startsWith("/") && !next.startsWith("//")) {
+      document.cookie = `odio_next=${encodeURIComponent(next)}; path=/; max-age=3600; samesite=lax`;
+    }
     const { error } = await supabase.auth.signInWithOtp({
       email: email.trim(),
       options: {

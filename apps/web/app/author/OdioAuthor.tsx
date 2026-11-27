@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { SubmitToRegistry, type SubmitOrg } from "@/components/SubmitToRegistry";
 import { deviceSchema, normalizeManufacturer, validate } from "@opendeviceio/sdk";
 import { buildIoTable, renderTableSvg, renderTableHtml } from "@opendeviceio/adapters";
 
@@ -138,10 +139,13 @@ const labelCls = "block text-xs font-medium text-slate-500";
 
 export function OdioAuthor({
   signedIn = false,
-  brands = []
+  brands = [],
+  orgs = []
 }: {
   signedIn?: boolean;
   brands?: string[];
+  /** Verified design-vendor orgs the user can submit as. */
+  orgs?: SubmitOrg[];
 }) {
   const [device, setDevice] = useState({
     manufacturer: "",
@@ -504,7 +508,7 @@ export function OdioAuthor({
 
         {/* Publish (gated to signed-in manufacturers, scoped to approved brands). */}
         <div className="mt-3">
-          {signedIn ? (
+          {signedIn && brands.length > 0 ? (
             <>
               <button
                 onClick={publish}
@@ -537,14 +541,27 @@ export function OdioAuthor({
                 <p className="mt-2 text-xs text-red-700">Publish failed: {publishState.message}</p>
               ) : null}
             </>
-          ) : (
+          ) : null}
+          {signedIn && !brandOk ? (
+            <div className={`rounded-lg border border-slate-200 bg-white p-3 ${brands.length > 0 ? "mt-4" : ""}`}>
+              <p className="mb-2 text-xs text-slate-600">
+                Submit it to the registry as an unverified record. Manufacturer?{" "}
+                <a className="underline" href="/manufacturers">
+                  Become a verified publisher
+                </a>
+                .
+              </p>
+              <SubmitToRegistry document={errors.length === 0 ? doc : null} orgs={orgs} />
+            </div>
+          ) : null}
+          {!signedIn ? (
             <p className="text-xs text-slate-500">
-              <a className="underline" href="/contribute">
-                Sign in as a manufacturer
+              <a className="underline" href="/signin?next=/author">
+                Sign in
               </a>{" "}
-              to publish this to the registry, or just download it above.
+              to submit this to the registry (any account works), or just download it above.
             </p>
-          )}
+          ) : null}
         </div>
 
         {svg ? (

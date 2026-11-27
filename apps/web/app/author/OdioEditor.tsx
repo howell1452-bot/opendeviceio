@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { SubmitToRegistry, type SubmitOrg } from "@/components/SubmitToRegistry";
 import { normalizeManufacturer, validate } from "@opendeviceio/sdk";
 import { buildIoTable, renderTableSvg } from "@opendeviceio/adapters";
 
@@ -30,10 +31,19 @@ export function OdioEditor({
   initialJson,
   signedIn = false,
   brands = [],
-  currentStatus = null
+  currentStatus = null,
+  orgs = [],
+  baseRevisionId = null,
+  acceptsRevision = null
 }: {
   initialJson: string;
   signedIn?: boolean;
+  /** Verified design-vendor orgs the user can submit as. */
+  orgs?: SubmitOrg[];
+  /** The record's current revision, recorded as the base of a submitted change. */
+  baseRevisionId?: string | null;
+  /** A suggestion being taken up: publishing closes it as accepted. */
+  acceptsRevision?: string | null;
   /** Validation status of the registry record being edited (null = draft). */
   currentStatus?: string | null;
   brands?: string[];
@@ -77,7 +87,10 @@ export function OdioEditor({
   const publish = async () => {
     setPublishState({ status: "busy" });
     try {
-      const res = await fetch("/api/v1/devices", {
+      const url = acceptsRevision
+        ? `/api/v1/devices?accepts=${encodeURIComponent(acceptsRevision)}`
+        : "/api/v1/devices";
+      const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
@@ -135,7 +148,7 @@ export function OdioEditor({
         )}
 
         <div className="mt-3">
-          {signedIn ? (
+          {signedIn && brands.length > 0 ? (
             <>
               <button
                 onClick={publish}
@@ -171,14 +184,30 @@ export function OdioEditor({
                 <p className="mt-2 text-xs text-red-700">Publish failed: {publishState.message}</p>
               ) : null}
             </>
-          ) : (
+          ) : null}
+          {signedIn && !brandOk ? (
+            <div className={`rounded-lg border border-slate-200 bg-white p-3 ${brands.length > 0 ? "mt-4" : ""}`}>
+              <p className="mb-2 text-xs text-slate-600">
+                Submit your change. It replaces an unverified draft when the
+                rules allow it; otherwise it&apos;s saved as a suggestion for the
+                brand or the maintainers.
+              </p>
+              <SubmitToRegistry
+                document={!parseError && errors.length === 0 ? doc : null}
+                orgs={orgs}
+                baseRevisionId={baseRevisionId}
+                label="Submit this change"
+              />
+            </div>
+          ) : null}
+          {!signedIn ? (
             <p className="text-xs text-slate-500">
-              <a className="underline" href="/contribute">
-                Sign in as a manufacturer
+              <a className="underline" href="/signin">
+                Sign in
               </a>{" "}
-              to publish updates, or download the edited file.
+              to suggest this change (any account works), or download the edited file.
             </p>
-          )}
+          ) : null}
         </div>
 
         {svg ? (
