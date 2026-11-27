@@ -1,5 +1,5 @@
 import type { OdioDocument } from "@opendeviceio/sdk";
-import { normalizeManufacturer } from "@opendeviceio/sdk";
+import { normalizeManufacturer, normalizeRecordId } from "@opendeviceio/sdk";
 import type { RegistryRow } from "./registry";
 
 // Mirrors the registry-row metadata derivation in tools/seed-registry.mjs so
@@ -73,6 +73,9 @@ export function deriveRegistryRow(
 ): RegistryRow {
   const d = doc as AnyDoc;
   const identity = identityOf(doc);
+  // A retired id prefix (vocab/id-prefixes.json) becomes its current one, in
+  // the row and in the stored document, so a renamed prefix can't come back.
+  if (typeof d.id === "string") d.id = normalizeRecordId(d.id);
   const id = typeof d.id === "string" ? d.id : "";
   const validation = d.provenance?.validation?.status ?? null;
   const portCount =

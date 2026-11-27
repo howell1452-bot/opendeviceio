@@ -12,6 +12,7 @@ import {
   licenseEnvelope,
   registryUrl
 } from "@/lib/data-license";
+import { resolveRedirect } from "@/lib/redirects";
 
 // Public, read-only REST API: fetch one ODIO document by id, or a render-ready
 // projection via ?format= :
@@ -44,7 +45,7 @@ const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type",
-  "Access-Control-Expose-Headers": ["Link", ...META_HEADERS].join(", "),
+  "Access-Control-Expose-Headers": ["Link", "Location", ...META_HEADERS].join(", "),
   "Cache-Control": "no-store",
   Link: LICENSE_LINK_HEADER
 };
@@ -55,6 +56,17 @@ export async function OPTIONS() {
 
 function notFound() {
   return NextResponse.json({ error: "not found" }, { status: 404, headers: CORS_HEADERS });
+}
+
+/** A renamed record: 308 to the same resource under its current id, or 404. */
+async function movedOrNotFound(req: Request, id: string, suffix = ""): Promise<NextResponse> {
+  const moved = await resolveRedirect(id);
+  if (!moved) return notFound();
+  const url = new URL(req.url);
+  return new NextResponse(null, {
+    status: 308,
+    headers: { ...CORS_HEADERS, Location: `/api/v1/devices/${moved}${suffix}${url.search}` }
+  });
 }
 
 /**
@@ -83,7 +95,7 @@ export async function GET(
   if (segments.length === 3 && segments[2] === "revisions") {
     const id = segments.slice(0, 2).join("/");
     const row = await getRegistryRow(id);
-    if (!row) return notFound();
+    if (!row) return movedOrNotFound(req, id, "/revisions");
     const includeDocument = sp.get("include") === "document";
     const revisions = (await listPublicRevisions(id, { includeDocument })) ?? [];
     return NextResponse.json(
@@ -101,7 +113,7 @@ export async function GET(
   if (!id) return notFound();
 
   const row = await getRegistryRow(id);
-  if (!row) return notFound();
+  if (!row) return movedOrNotFound(req, id);
 
   const doc = row.document as OdioDevice;
   const format = sp.get("format");

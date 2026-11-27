@@ -27,6 +27,7 @@ from .category import (
     normalize_category,
     normalize_document_categories,
 )
+from .record_id import normalize_record_id
 from .extractor import (
     Extractor,
     MockExtractor,
@@ -80,6 +81,7 @@ __all__ = [
     "discover_documents",
     "slugify",
     "normalize_category",
+    "normalize_record_id",
     "normalize_document_categories",
     "is_controlled_category",
     "load_category_vocab",

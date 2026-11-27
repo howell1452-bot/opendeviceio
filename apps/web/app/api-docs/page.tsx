@@ -28,6 +28,7 @@ const TOC = [
   ["submissions", "POST /api/v1/submissions"],
   ["sync", "Export & sync"],
   ["removals", "GET /api/v1/removals"],
+  ["redirects", "GET /api/v1/redirects"],
   ["cors", "CORS"],
   ["license", "License"],
   ["usage", "Usage & limits"]
@@ -124,7 +125,37 @@ async function syncRemovals(since: string) {
   }
 }
 
+// 3. Re-key anything renamed since the last sync (the record under its new id
+//    also arrives through updated_since).
+async function syncRedirects(since: string) {
+  for (let offset = 0; ; offset += ${LIST_MAX_LIMIT}) {
+    const url = new URL(\`\${BASE}/redirects\`);
+    url.searchParams.set("since", since);
+    url.searchParams.set("limit", "${LIST_MAX_LIMIT}");
+    url.searchParams.set("offset", String(offset));
+    const page = await (await fetch(url)).json();
+    for (const r of page.data) await rename(r.old_id, r.new_id);
+    if (offset + ${LIST_MAX_LIMIT} >= page.total) break;
+  }
+}
+
 // Record the time BEFORE you start, and use it as "since" next run.`;
+
+const REDIRECTS_RESPONSE = `{
+  "data": [
+    {
+      "old_id": "attero-tech-by-qsc/axiom-ml1",
+      "new_id": "attero-tech/axiom-ml1",
+      "created_at": "2026-11-27T16:00:00.000Z"
+    }
+  ],
+  "total": 1,
+  "limit": 50,
+  "offset": 0,
+  "license": { "...": "..." },
+  "terms_url": "https://opendeviceio.org${DATA_TERMS_PATH}",
+  "attribution": "${ATTRIBUTION_TEXT}"
+}`;
 
 const REMOVALS_RESPONSE = `{
   "data": [
@@ -536,10 +567,12 @@ export default function ApiDocsPage() {
             To keep a copy of the registry in your own catalog, page through{" "}
             <code>GET /api/v1/devices?include=document&amp;sort=updated</code>{" "}
             once for a full export. After that, sync incrementally with{" "}
-            <code>updated_since</code> and apply removals from{" "}
-            <code>GET /api/v1/removals</code>. Upsert by <code>id</code>; ids
-            are stable. A full export of a few thousand records is a few dozen
-            requests.
+            <code>updated_since</code>, apply removals from{" "}
+            <code>GET /api/v1/removals</code>, and follow renamed ids from{" "}
+            <code>GET /api/v1/redirects</code>. Upsert by <code>id</code>. Ids
+            rarely change; when one does, the old id answers with a{" "}
+            <code>308</code> to the new one. A full export of a few thousand
+            records is a few dozen requests.
           </p>
           <CodeBlock language="typescript">{SYNC_SNIPPET}</CodeBlock>
           <p>
@@ -560,10 +593,11 @@ export default function ApiDocsPage() {
             <code className="text-base">/api/v1/removals</code>
           </h2>
           <p>
-            The removal feed lists ids that were deleted from the registry or
-            renamed out of it, oldest first. If an id is published again later,
-            it drops out of this feed and reappears in{" "}
-            <code>updated_since</code> results.
+            The removal feed lists ids that were deleted from the registry,
+            oldest first. If an id is published again later, it drops out of
+            this feed and reappears in <code>updated_since</code> results.
+            Renamed ids are not removals; they are in the{" "}
+            <a href="#redirects">redirects feed</a>.
           </p>
           <div className="not-prose my-4 overflow-x-auto">
             <table className="w-full border-collapse text-left">
@@ -591,6 +625,24 @@ export default function ApiDocsPage() {
           </div>
           <p className="mb-1 font-semibold text-slate-800">Example response</p>
           <CodeBlock language="json">{REMOVALS_RESPONSE}</CodeBlock>
+
+          {/* Redirects */}
+          <h2 id="redirects">
+            <Method>get</Method>{" "}
+            <code className="text-base">/api/v1/redirects</code>
+          </h2>
+          <p>
+            Records are occasionally given a new id, for example when a brand&apos;s
+            id prefix is corrected. The redirects feed lists each rename as{" "}
+            <code>{`{ old_id, new_id, created_at }`}</code>, oldest first, with
+            the same <code>since</code>, <code>limit</code> and{" "}
+            <code>offset</code> parameters as the removal feed. Re-key your copy
+            of <code>old_id</code> to <code>new_id</code>. The old id keeps
+            working: <code>GET /api/v1/devices/&lt;old id&gt;</code>, the record
+            page and the download link answer with a <code>308</code> to the
+            new id.
+          </p>
+          <CodeBlock language="json">{REDIRECTS_RESPONSE}</CodeBlock>
 
           {/* CORS */}
           <h2 id="cors">CORS</h2>

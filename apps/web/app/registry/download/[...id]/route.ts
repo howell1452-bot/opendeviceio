@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { OdioDevice } from "@opendeviceio/sdk";
 import { getAdapter } from "@opendeviceio/adapters";
 import { getRegistryRow } from "@/lib/registry";
+import { resolveRedirect } from "@/lib/redirects";
 
 // Multi-format download for a registry entry. Served at request time so it never
 // depends on the DB at build. The catch-all id segment carries the slash, e.g.
@@ -62,6 +63,12 @@ export async function GET(
 
   const row = await getRegistryRow(id);
   if (!row) {
+    // A renamed record: 308 to its current id, keeping ?format= etc.
+    const moved = await resolveRedirect(id);
+    if (moved) {
+      const url = new URL(req.url);
+      return NextResponse.redirect(new URL(`/registry/download/${moved}${url.search}`, url), 308);
+    }
     return NextResponse.json({ error: "not found", id }, { status: 404 });
   }
 

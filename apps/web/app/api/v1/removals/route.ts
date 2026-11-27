@@ -10,8 +10,9 @@ import {
 
 // Public, read-only removal feed for integrations that mirror the registry.
 //   GET /api/v1/removals?since=<ISO 8601>&limit=&offset=
-// Returns ids that were deleted from (or renamed out of) the registry at or
-// after `since`, oldest first. A mirror should delete these ids locally.
+// Returns ids that were deleted from the registry at or after `since`, oldest
+// first. A mirror should delete these ids locally. Renamed ids are not removals:
+// they are in GET /api/v1/redirects.
 export const dynamic = "force-dynamic";
 
 const CORS_HEADERS: Record<string, string> = {
