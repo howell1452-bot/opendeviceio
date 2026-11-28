@@ -1,6 +1,8 @@
 // Document checks and re-stamping for registry submissions (provenance brief,
 // item 4). Pure helpers, unit-tested in test/submission-doc.test.ts.
 
+import { brandSlug, expectedIdPrefix } from "@opendeviceio/sdk";
+
 /** Largest accepted request body for POST /api/v1/submissions. */
 export const MAX_SUBMISSION_BYTES = 512 * 1024;
 
@@ -8,15 +10,13 @@ export const MAX_SUBMISSION_BYTES = 512 * 1024;
 export const RECORD_ID_PATTERN =
   /^[a-z0-9][a-z0-9-]*\/[a-z0-9][a-z0-9._-]*(?:@[a-z0-9][a-z0-9._-]*)?$/;
 
-/** URL-style slug of a (normalized) manufacturer name: "Extron Electronics" -> "extron-electronics". */
+/**
+ * Brand slug of a (normalized) manufacturer name, identical to the database's
+ * private.brand_slug(): "Extron Electronics" -> "extron-electronics". A record
+ * id's prefix must be this slug (0013 rejects anything else).
+ */
 export function manufacturerSlug(name: string): string {
-  return name
-    .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .replace(/&/g, " and ")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+  return brandSlug(name);
 }
 
 /** The manufacturer part of a record id ("crestron/dm-md8x8" -> "crestron"). */
@@ -25,14 +25,12 @@ export function idPrefix(id: string): string {
 }
 
 /**
- * Does the id's prefix match the document's (normalized) manufacturer? Compared
- * hyphen-insensitively, so "lightware/…" matches "Lightware" and
- * "audio-technica/…" matches "Audio-Technica".
+ * Is the id's prefix exactly the brand slug of the document's manufacturer
+ * (after normalizeManufacturer)? "qsys/…" for QSC is not.
  */
 export function idMatchesManufacturer(id: string, manufacturer: string): boolean {
-  const prefix = idPrefix(id).replace(/-/g, "");
-  const slug = manufacturerSlug(manufacturer).replace(/-/g, "");
-  return prefix.length > 0 && prefix === slug;
+  const expected = expectedIdPrefix(manufacturer);
+  return expected !== null && idPrefix(id) === expected;
 }
 
 type Json = Record<string, unknown>;

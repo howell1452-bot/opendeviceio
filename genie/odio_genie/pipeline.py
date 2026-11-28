@@ -447,8 +447,8 @@ def assemble(
 
     Extracted categories (the document's identity and any bundle components) are
     canonicalized against the advisory taxonomy in ``vocab/`` - see
-    :mod:`odio_genie.category`. A retired id prefix (``vocab/id-prefixes.json``) is
-    rewritten to its current one - see :mod:`odio_genie.record_id`.
+    :mod:`odio_genie.category`. The id's prefix is rewritten to the brand slug of the
+    document's manufacturer (logged) - see :mod:`odio_genie.record_id`.
     """
     from .category import normalize_document_categories
     from .record_id import normalize_document_id

@@ -135,7 +135,7 @@ end $$;
 
 -- 0010: brands that appear later get a profile -------------------------------
 insert into public.registry (id, kind, manufacturer, model, validation_status, document)
-values ('new-brand-co/x1', 'device', 'New Brand & Co', 'X1', 'draft', '{}');
+values ('new-brand-and-co/x1', 'device', 'New Brand & Co', 'X1', 'draft', '{}');
 select pg_temp.check(
   (select slug from public.organizations where manufacturer = 'New Brand & Co') = 'new-brand-and-co',
   'a new registry brand gets a profile row from the trigger');

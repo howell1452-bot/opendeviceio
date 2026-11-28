@@ -1,7 +1,14 @@
 {
-  "$comment": "Record id prefixes that were retired in favour of another prefix. Every tool that writes registry ids (the SDK's normalizeRecordId, Genie, tools/seed-registry.mjs, the website's publish and submission routes) rewrites a retired prefix to its current one, so a renamed prefix can't come back. The registry keeps redirects from the old ids (0012_record_id_redirects.sql). Only add an entry together with a rename migration and redirects.",
+  "$comment": "Record id prefixes that were retired in favour of another prefix. A record id's prefix is its brand slug (vocab/manufacturers.json, organizations.slug). Machine tools (the SDK's normalizeRecordId, Genie, tools/seed-registry.mjs) rewrite a retired prefix to its current one; the website's publish and submission routes reject an id whose prefix isn't the brand slug; the database rejects it too (id_prefix_mismatch, 0013). The registry keeps redirects from the old ids (0012_record_id_redirects.sql, 0013_record_id_cleanup.sql). Only add an entry together with a rename migration and redirects.",
   "version": "1",
   "retired": {
-    "attero-tech-by-qsc": "attero-tech"
+    "attero-tech-by-qsc": "attero-tech",
+    "qsys": "qsc",
+    "qsc-audio": "qsc",
+    "qsc-audio-products": "qsc",
+    "uslinc": "usl",
+    "us-linc": "usl",
+    "usl-inc": "usl",
+    "dis-digital-conference-systems": "dis"
   }
 }

@@ -397,3 +397,65 @@ describe("verified records", () => {
     expect(revision(String(r.body.revision_id))).toMatchObject({ status: "accepted", reviewer: "Extron" });
   });
 });
+
+// Registry paging and ID cleanup brief, item 4: the id prefix is the brand slug.
+describe("id prefix = brand slug", () => {
+  const withPrefix = (prefix: string, manufacturer = "Extron") => {
+    const d = doc();
+    d.id = `${prefix}/${EXAMPLE.id.split("/")[1]}`;
+    (d.device as Record<string, unknown>).manufacturer = manufacturer;
+    return d;
+  };
+
+  it("a submission under a retired prefix is rejected with the right id, and nothing is stored", async () => {
+    state.caller = ALICE;
+    const d = withPrefix("qsys", "QSC");
+    const r = await send(envelope(d));
+    expect(r.status).toBe(400);
+    expect(r.body.error).toBe(
+      `id prefix 'qsys' doesn't match brand slug 'qsc'. Use the id "qsc/${EXAMPLE.id.split("/")[1]}".`
+    );
+    expect(state.db.t("record_revisions")).toHaveLength(0);
+    expect(state.db.t("registry")).toHaveLength(0);
+  });
+
+  it("an alias of the brand name still needs the brand slug", async () => {
+    state.caller = ALICE;
+    expect((await send(envelope(withPrefix("q-sys", "Q-SYS")))).status).toBe(400);
+    const ok = await send(envelope(withPrefix("qsc", "Q-SYS")));
+    expect(ok.status).toBeLessThan(300);
+  });
+
+  it("the brand's stored slug is the authority", async () => {
+    state.caller = ALICE;
+    state.db.t("organizations").push({
+      id: "0rg00000-0000-4000-8000-0000000000e1",
+      kind: "manufacturer",
+      name: "Extron",
+      slug: "extron-a1b2c3",
+      manufacturer: "Extron",
+      status: "verified"
+    });
+    const r = await send(envelope(withPrefix("extron")));
+    expect(r.status).toBe(400);
+    expect(String(r.body.error)).toContain("brand slug 'extron-a1b2c3'");
+  });
+
+  it("a manufacturer publish under another prefix is rejected before anything is written", async () => {
+    seedDraft();
+    state.caller = EXTRON_REP;
+    const before = state.db.t("record_revisions").length;
+    const res = await publish(
+      new Request("https://opendeviceio.org/api/v1/devices", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(withPrefix("extron-electronics"))
+      })
+    );
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: string }).error).toContain(
+      "id prefix 'extron-electronics' doesn't match brand slug 'extron'"
+    );
+    expect(state.db.t("record_revisions")).toHaveLength(before);
+  });
+});

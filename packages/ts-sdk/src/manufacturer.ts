@@ -13,10 +13,13 @@
 //      This alone collapses case- and suffix-only variants.
 //   2. `MANUFACTURER_ALIASES` — a curated map for brand-word variants the mechanical
 //      pass can't safely infer ("QSC Audio Products" → "QSC", "Attero Tech by QSC" →
-//      "Attero Tech"). Authoritative; keyed by the mechanical key.
+//      "Attero Tech"). Authoritative; keyed by the mechanical key; kept in
+//      vocab/manufacturers.json.
 //
 // `normalizeManufacturer` returns the canonical display name, or the original
 // (trimmed) string unchanged when nothing matches — never a mangled guess.
+
+import { MANUFACTURER_ALIAS_VOCAB } from "./manufacturer-vocab.js";
 
 const LEGAL_SUFFIX =
   /\b(inc|incorporated|llc|l\.?l\.?c|ltd|limited|co|company|corp|corporation|gmbh|ag|sa|s\.?a|srl|bv|kg|plc|pty|llp|lp)\b\.?$/;
@@ -36,35 +39,10 @@ export function manufacturerKey(raw: string): string {
 }
 
 // Curated canonical names, keyed by `manufacturerKey` of each known variant.
-// Add an entry only when the mechanical key can't safely unify the variants.
-export const MANUFACTURER_ALIASES: Record<string, string> = {
-  // Crestron — "Crestron Electronics[, Inc.]"
-  crestron: "Crestron",
-  "crestron electronics": "Crestron",
-  // QSC — "QSC Audio[ Products][, LLC]"
-  qsc: "QSC",
-  "qsc audio": "QSC",
-  "qsc audio products": "QSC",
-  // Attero Tech (a QSC sub-brand kept as its own line)
-  "attero tech": "Attero Tech",
-  "attero tech by qsc": "Attero Tech",
-  // USL / US Linc / US Kinema (cinema-sound brand, now USL)
-  usl: "USL",
-  "us linc": "USL",
-  "us kinema / usl": "USL",
-  // Steinel — case-only variant handled by the key, listed for clarity
-  steinel: "Steinel",
-  // Shure ("Shure Incorporated" / "Shure Inc.")
-  shure: "Shure",
-  // DIS — Danish Interpretation Systems, a Shure conferencing brand
-  dis: "DIS",
-  "dis digital conference systems": "DIS",
-  "dis (shure)": "DIS",
-  "dis (danish interpretation systems a/s)": "DIS",
-  // Example/placeholder fixtures
-  acme: "Acme",
-  "acme audio": "Acme"
-};
+// The list lives in vocab/manufacturers.json (bundled by scripts/gen-types.mjs;
+// Genie reads the same file). Add an entry only when the mechanical key can't
+// safely unify the variants.
+export const MANUFACTURER_ALIASES: Record<string, string> = { ...MANUFACTURER_ALIAS_VOCAB };
 
 /**
  * Canonical display name for a manufacturer string. Returns the trimmed original

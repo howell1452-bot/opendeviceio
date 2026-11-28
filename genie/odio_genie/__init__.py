@@ -27,7 +27,8 @@ from .category import (
     normalize_category,
     normalize_document_categories,
 )
-from .record_id import normalize_record_id
+from .manufacturer import brand_slug, expected_id_prefix, normalize_manufacturer
+from .record_id import normalize_record_id, with_brand_prefix
 from .extractor import (
     Extractor,
     MockExtractor,
@@ -82,6 +83,10 @@ __all__ = [
     "slugify",
     "normalize_category",
     "normalize_record_id",
+    "with_brand_prefix",
+    "brand_slug",
+    "expected_id_prefix",
+    "normalize_manufacturer",
     "normalize_document_categories",
     "is_controlled_category",
     "load_category_vocab",

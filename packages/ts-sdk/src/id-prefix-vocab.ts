@@ -4,5 +4,12 @@
 /* eslint-disable */
 /** Retired record-id prefix -> current prefix (see vocab/id-prefixes.json). */
 export const RETIRED_ID_PREFIXES: Readonly<Record<string, string>> = {
-  "attero-tech-by-qsc": "attero-tech"
+  "attero-tech-by-qsc": "attero-tech",
+  "qsys": "qsc",
+  "qsc-audio": "qsc",
+  "qsc-audio-products": "qsc",
+  "uslinc": "usl",
+  "us-linc": "usl",
+  "usl-inc": "usl",
+  "dis-digital-conference-systems": "dis"
 };

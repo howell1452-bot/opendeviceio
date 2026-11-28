@@ -117,4 +117,14 @@ export {
   type ChassisIssue
 } from "./bundle.js";
 
-export { normalizeRecordId, RETIRED_ID_PREFIXES } from "./record-id.js";
+export {
+  normalizeRecordId,
+  RETIRED_ID_PREFIXES,
+  brandSlug,
+  expectedIdPrefix,
+  idPrefix,
+  replaceIdPrefix,
+  checkIdPrefix,
+  withBrandPrefix,
+  type IdPrefixMismatch
+} from "./record-id.js";

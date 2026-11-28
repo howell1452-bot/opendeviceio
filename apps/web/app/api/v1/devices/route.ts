@@ -30,6 +30,7 @@ import {
   licenseEnvelope,
   registryUrl
 } from "@/lib/data-license";
+import { idPrefixErrorMessage, idPrefixProblem } from "@/lib/id-prefix";
 
 // REST API for the registry.
 //   GET  — public, read-only list / search / export (CORS-enabled).
@@ -245,6 +246,10 @@ export async function POST(req: Request) {
   }
 
   const brand = normalizeManufacturer(manufacturer) ?? manufacturer;
+  // The id's prefix must be the brand slug ("qsc/…" for QSC, never "qsys/…").
+  // The database rejects anything else too (id_prefix_mismatch).
+  const prefixProblem = await idPrefixProblem(service, docId, brand);
+  if (prefixProblem) return err(400, idPrefixErrorMessage(prefixProblem));
   const stamped = stampManufacturerVerified(doc, manufacturer);
   const row = deriveRegistryRow(stamped, validation.kind);
   row.validation_status = "manufacturer-verified";
