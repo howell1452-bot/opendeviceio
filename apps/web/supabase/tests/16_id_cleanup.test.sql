@@ -132,6 +132,9 @@ select pg_temp.check(
   and (select count(*) from public.record_revisions where record_id = 'usl/cm-10b') = (select revs from before_rerun)
   and (select count(*) from public.registry) = (select records from before_rerun),
   'running the migration again changes nothing');
+-- The re-runs above re-created 0013's brand_slug; the ASCII follow-up is the
+-- final version everywhere, so that is the one the slug checks below test.
+\ir ../migrations/0013a_brand_slug_ascii.sql
 
 -- ---- the guard ----------------------------------------------------------------
 do $$ begin
@@ -183,7 +186,9 @@ select pg_temp.check(
   and private.brand_slug('İstanbul Ses') = 'istanbul-ses'
   and private.brand_slug(E'Café Audio') = 'cafe-audio'
   and private.brand_slug('Stem Audio') = 'stem-audio'
-  and private.brand_slug('Ørsted') = 'rsted',
+  and private.brand_slug('Ørsted') = 'rsted'
+  and private.brand_slug(chr(8491) || 'ngstrom') = 'angstrom'
+  and private.brand_slug(chr(8490) || 'elvin') = 'kelvin',
   'brand_slug strips accents like the SDK (NFD) and slugs the rest');
 
 -- ---- merge errors -----------------------------------------------------------------
